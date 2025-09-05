@@ -1,0 +1,102 @@
+
+body {
+  background: transparent;
+}
+
+#bg-video {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  min-width: 100%;
+  min-height: 100%;
+  z-index: -1;
+  transform: scale(1); /* bigger = zoom in, smaller = zoom out */
+  transform-origin: center center; /* zoom from the middle */
+}
+
+:root {
+    --bg: #0e0f12;
+    --dark: #15171b;
+    --highlight: #3ddc84;
+    --text: #e9edf3;
+}
+html, body {
+    width:100%; height:100%; margin:0; padding:0;
+    overflow:hidden; color:var(--text); font-family:sans-serif;
+}
+#game-border {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 8px solid black;
+    pointer-events: none; /* Make sure clicks go through to the canvas */
+    box-sizing: border-box; /* Include border in width/height */
+    z-index: 1; /* Make sure the border is on top */
+}
+#game-border.white-turn { border-color: white; }
+#game-border.black-turn { border-color: black; }
+#app { position:absolute; inset:0; }
+#hud {
+    position:absolute; top:16px; left:16px;
+    background:rgba(0,0,0,0.5); padding:8px 12px;
+    border-radius:6px; font-weight:bold;
+}
+#play-music-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.5);
+    color: var(--text);
+    border: 1px solid var(--text);
+    cursor: pointer;
+}
+
+#move-history {
+    position: absolute;
+    top: 80px;
+    right: 16px;
+    width: 200px;
+    max-height: 60vh;
+    overflow: auto;
+    background: rgba(0,0,0,0.5);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 4;
+}
+
+/* Move history helper visuals */
+#moves-list li { margin:6px 0; cursor:default; display:flex; align-items:center; }
+#moves-list .mini-path { width:72px; height:32px; margin-right:8px; flex:0 0 72px; }
+#moves-list .move-text { flex:1; font-size:13px; }
+
+/* Orientation overlay (labels N, NE, SE, S, SW, NW) */
+#hex-orient-overlay {
+    position: absolute;
+    pointer-events: none;
+    width: 160px; height: 160px;
+    right: calc(200px + 32px); /* place left of move history */
+    top: 80px;
+    z-index: 6;
+    display: none;
+}
+#hex-orient-overlay svg text { fill: var(--text); font-size:12px; font-weight:600; }
+#hex-orient-overlay svg circle { fill: rgba(255,255,255,0.04); stroke: rgba(255,255,255,0.08); }
+
+#move-history h3 { margin: 0 0 6px 0; font-size: 14px }
+#moves-list { padding-left: 18px; margin: 0; }
+#play-music-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.5);
+    color: var(--text);
+    border: 1px solid var(--text);
+    cursor: pointer;
+}

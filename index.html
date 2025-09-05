@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hive • PIXI Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <video autoplay muted loop playsinline id="bg-video" src="assets/videos/honeycells.mp4"></video>
+  <div id="hud">White to move</div>
+  <div id="move-history">
+    <h3>Move History</h3>
+    <ol id="moves-list"></ol>
+  </div>
+  <div id="app"></div>
+  <div id="game-border"></div>
+  <button id="play-music-button">Play Music</button>
+  <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
+  <div id="hex-orient-overlay" aria-hidden="true">
+    <!-- SVG will be injected dynamically -->
+  </div>
+<script>
+  const bgVideo = document.getElementById('bg-video');
+  bgVideo.playbackRate = 0.4; // 0.5 = half speed, 2 = double speed
+
+  // Optional: live tweak with + / - keys
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '+') bgVideo.playbackRate += 0.1;
+    if (e.key === '-') bgVideo.playbackRate = Math.max(0.1, bgVideo.playbackRate - 0.1);
+    console.log(`Video speed: ${bgVideo.playbackRate.toFixed(2)}x`);
+  });
+</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.10/browser/pixi.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/game.js"></script>
+  <script src="js/pieces.js"></script>
+  <script src="js/resize.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
