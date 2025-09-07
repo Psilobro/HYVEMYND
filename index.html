@@ -4,18 +4,24 @@
   <meta charset="UTF-8"/>
   <title>Hive • PIXI Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="preload" href="assets/Fonts/Beetype-Outline.otf" as="font" type="font/otf" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <video autoplay muted loop playsinline id="bg-video" src="assets/videos/honeycells.mp4"></video>
+  <div id="game-title">HYVEMYND</div>
   <div id="hud">White to move</div>
   <div id="move-history">
     <h3>Move History</h3>
     <ol id="moves-list"></ol>
   </div>
-  <div id="app"></div>
-  <div id="game-border"></div>
+  <div id="game-container">
+    <div id="app"></div>
+  </div>
+  <div id="white-tray" class="player-tray"></div>
+  <div id="black-tray" class="player-tray"></div>
   <button id="play-music-button">Play Music</button>
+  <button id="auto-zoom-toggle">Auto-Zoom: ON</button>
   <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
   <div id="hex-orient-overlay" aria-hidden="true">
     <!-- SVG will be injected dynamically -->

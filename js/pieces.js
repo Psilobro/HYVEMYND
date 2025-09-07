@@ -43,6 +43,46 @@ const PIECE_MAP = {
 };
 
 const tray = [];
+const traySlots = []; // Array to hold the background slot graphics
+
+function createTraySlot(color, key, i, pieceLayer, x, y) {
+    const slotContainer = new PIXI.Container();
+    
+    // Define insect-specific colors
+    const insectColors = {
+        'Q': 0xFFD700, // Gold for Queen
+        'A': 0x4169E1, // Royal Blue for Ants
+        'G': 0x32CD32, // Lime Green for Grasshoppers
+        'B': 0x8A2BE2, // Blue Violet for Beetles
+        'S': 0x8B4513  // Saddle Brown for Spiders
+    };
+    
+    // Create a recessed/inset hex shape for the slot
+    const slotGraphics = new PIXI.Graphics();
+    
+    // Use insect-specific color with transparency
+    const slotColor = insectColors[key] || 0x1a1a1a; // Default to dark gray if key not found
+    slotGraphics.beginFill(slotColor, 0.4); // Semi-transparent insect color
+    drawRoundedTile(slotGraphics, CELL_RADIUS - 2);
+    slotGraphics.endFill();
+    
+    // Inner border to make it look recessed, tinted with insect color
+    const innerBorder = new PIXI.Graphics()
+        .lineStyle(2, slotColor, 0.8, 0.5); // Use insect color for border
+    drawRoundedTile(innerBorder, CELL_RADIUS - 4);
+    slotContainer.addChild(slotGraphics);
+    slotContainer.addChild(innerBorder);
+    
+    // Position the slot
+    slotContainer.position.set(x, y);
+    slotContainer.meta = { color, key, i, type: 'slot' };
+    
+    pieceLayer.addChild(slotContainer);
+    traySlots.push(slotContainer);
+    
+    return slotContainer;
+}
+
 function makePiece(color, key, i, pieceLayer, app){
     const pieceContainer = new PIXI.Container();
 
@@ -108,40 +148,137 @@ function createPieces(pieceLayer, app) {
             makePiece('black', d.key, i, pieceLayer, app);
         }
     });
-    console.log('Tray after creation:', tray);
 }
 
-window.layoutTray = function(app){
-    const W = app.renderer.width, H = app.renderer.height;
-    // Get the container's current position to calculate correct local coordinates
-    const containerX = window.pieceLayer ? window.pieceLayer.position.x : 0;
-    const containerY = window.pieceLayer ? window.pieceLayer.position.y : 0;
+// New function to layout trays in separate containers
+window.layoutTrays = function() {
+    if (!window.whiteTrayApp || !window.blackTrayApp) {
+        console.warn('Tray apps not initialized yet');
+        return;
+    }
 
-    const totalWhite = tray.filter(p => !p.meta.placed && p.meta.color === 'white').length;
-    const totalBlack = tray.filter(p => !p.meta.placed && p.meta.color === 'black').length;
-    const whiteSpacing = W / (totalWhite + 1);
-    const blackSpacing = W / (totalBlack + 1);
+    const pieceSize = CELL_RADIUS * 2;
+    const trayPieceScale = 1.3; // Make tray pieces 30% larger than board pieces
+    const scaledPieceSize = pieceSize * trayPieceScale;
+    const pieceSpacing = scaledPieceSize * 0.8; // Slightly increased spacing for better balance
+    const typeGap = scaledPieceSize * 0.5; // Gap between different insect types  
+    const colGap = scaledPieceSize * 0.4; // Gap between columns
+    const queenOffset = scaledPieceSize * 1.4; // Queen offset above columns
 
-    let w = 0, b = 0;
-    tray.forEach(p => {
-        if (p.meta.placed) return;
+    // Clear existing pieces from tray apps (but preserve slots)
+    // Remove all children to start fresh for now
+    window.whiteTrayApp.stage.removeChildren();
+    window.blackTrayApp.stage.removeChildren();
 
-        if (p.meta.color === 'white') {
-            w++;
-            // The desired GLOBAL position is (whiteSpacing * w, H - 20 - CELL_RADIUS)
-            // To get the LOCAL position, we subtract the container's offset
-            p.position.set(
-                (whiteSpacing * w) - containerX,
-                (H - 20 - CELL_RADIUS) - containerY
-            );
-        } else {
-            b++;
-            // The desired GLOBAL position is (blackSpacing * b, 20 + CELL_RADIUS)
-            // To get the LOCAL position, we subtract the container's offset
-            p.position.set(
-                (blackSpacing * b) - containerX,
-                (20 + CELL_RADIUS) - containerY
-            );
+    // Tray dimensions - updated for larger tray size
+    const trayHeight = window.whiteTrayApp.renderer.height;
+    const trayWidth = 220; // Updated to match CSS and main.js
+    
+    // Start position (vertically centered)
+    const startY = (trayHeight - (pieceSpacing * 4 + typeGap)) / 2;
+
+    // Column positions for each tray - balanced spacing for larger pieces
+    const leftColumnX = 50; // Increased margin to prevent clipping of scaled pieces
+    const rightColumnX = 150; // Adjusted to maintain good spacing
+    const queenCenterX = trayWidth / 2; // Center queen on the entire tray width
+    
+    const whitePositions = {
+        // Column 1: Ants and Spiders (left side)
+        'A1': { x: leftColumnX, y: startY },
+        'A2': { x: leftColumnX, y: startY + pieceSpacing },
+        'A3': { x: leftColumnX, y: startY + pieceSpacing * 2 },
+        'S1': { x: leftColumnX, y: startY + pieceSpacing * 3 + typeGap },
+        'S2': { x: leftColumnX, y: startY + pieceSpacing * 4 + typeGap },
+        
+        // Queen perfectly centered above both columns
+        'Q1': { x: queenCenterX, y: startY - queenOffset },
+        
+        // Column 2: Grasshoppers and Beetles (right side)
+        'G1': { x: rightColumnX, y: startY },
+        'G2': { x: rightColumnX, y: startY + pieceSpacing },
+        'G3': { x: rightColumnX, y: startY + pieceSpacing * 2 },
+        'B1': { x: rightColumnX, y: startY + pieceSpacing * 3 + typeGap },
+        'B2': { x: rightColumnX, y: startY + pieceSpacing * 4 + typeGap }
+    };
+
+    const blackPositions = { ...whitePositions }; // Same layout for black
+
+    // Create slots and position pieces for white tray
+    Object.keys(whitePositions).forEach(pieceKey => {
+        const [key, i] = [pieceKey[0], pieceKey[1]];
+        const position = whitePositions[pieceKey];
+        
+        // Create slot
+        createTraySlotInApp(window.whiteTrayApp, 'white', key, i, position.x, position.y);
+        
+        // Find and position piece
+        const piece = tray.find(p => p.meta.color === 'white' && p.meta.key === key && p.meta.i == i);
+        if (piece && !piece.meta.placed) {
+            // Remove from main app and add to tray app
+            if (piece.parent) {
+                piece.parent.removeChild(piece);
+            }
+            
+            // Clear any mask that might have been applied from the main app
+            piece.mask = null;
+            
+            // Scale the piece to be larger in the tray
+            piece.scale.set(trayPieceScale);
+            
+            window.whiteTrayApp.stage.addChild(piece);
+            piece.position.set(position.x, position.y);
         }
     });
+
+    // Create slots and position pieces for black tray
+    Object.keys(blackPositions).forEach(pieceKey => {
+        const [key, i] = [pieceKey[0], pieceKey[1]];
+        const position = blackPositions[pieceKey];
+        
+        // Create slot
+        createTraySlotInApp(window.blackTrayApp, 'black', key, i, position.x, position.y);
+        
+        // Find and position piece
+        const piece = tray.find(p => p.meta.color === 'black' && p.meta.key === key && p.meta.i == i);
+        if (piece && !piece.meta.placed) {
+            // Remove from main app and add to tray app
+            if (piece.parent) {
+                piece.parent.removeChild(piece);
+            }
+            
+            // Clear any mask that might have been applied from the main app
+            piece.mask = null;
+            
+            // Scale the piece to be larger in the tray
+            piece.scale.set(trayPieceScale);
+            
+            window.blackTrayApp.stage.addChild(piece);
+            piece.position.set(position.x, position.y);
+        }
+    });
+}
+
+// Helper function to create slots in tray apps
+function createTraySlotInApp(app, color, key, i, x, y) {
+    const slotContainer = new PIXI.Container();
+    
+    // Define insect-specific colors
+    const slotColors = {
+        'Q': 0xFFD700, // Gold for queen
+        'A': 0x4169E1, // Blue for ants  
+        'G': 0x32CD32, // Green for grasshoppers
+        'B': 0x9932CC, // Purple for beetles
+        'S': 0x8B4513  // Brown for spiders
+    };
+    
+    const bg = new PIXI.Graphics();
+    bg.beginFill(slotColors[key], 0.3);
+    // Scale the slot to match the larger tray pieces
+    drawRoundedTile(bg, CELL_RADIUS * 1.3);
+    bg.endFill();
+    
+    slotContainer.addChild(bg);
+    slotContainer.position.set(x, y);
+    
+    app.stage.addChild(slotContainer);
 }

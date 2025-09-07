@@ -1,26 +1,17 @@
 function resizeApp() {
-    const hud = document.getElementById('hud');
-    if (!hud) return; // Can't do anything without the HUD
-
-    if (!window.cells) {
-        hud.textContent = 'ERROR: cells map not found';
-        return;
+    // Update board viewport size and position
+    if (window.updateBoardViewport) {
+        window.updateBoardViewport();
     }
-
-    const centerCell = cells.get('0,0');
-
-    if (centerCell && centerCell.gfx) {
-        hud.textContent = 'SUCCESS: Center cell GFX found.';
-        // I'll try to tint it again, just in case.
-        centerCell.gfx.tint = 0x00FF00;
-    } else if (centerCell) {
-        hud.textContent = 'ERROR: Center cell found, but GFX is missing.';
-    } else {
-        hud.textContent = 'ERROR: Center cell not found in map.';
+    
+    // Update tray apps size
+    if (window.whiteTrayApp) {
+        window.whiteTrayApp.renderer.resize(220, window.innerHeight);
     }
-
-    // Also resize the renderer
-    if (window.app) {
-        app.renderer.resize(window.innerWidth, window.innerHeight);
+    if (window.blackTrayApp) {
+        window.blackTrayApp.renderer.resize(220, window.innerHeight);
     }
+    
+    // Don't re-layout trays on resize to avoid clearing placed pieces
+    // Tray layout is fixed and doesn't need to change with window size
 }

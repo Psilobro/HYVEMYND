@@ -2,6 +2,23 @@
 window.CELL_RADIUS = 38;
 
 window.GRID_RADIUS = 4;
+window.MIN_GRID_RADIUS = 4; // Original size
+window.AUTO_ZOOM_ENABLED = true; // Toggle for auto-zoom feature
+
+// Zoom variables
+let currentZoom = 1.0;
+let minZoom = 0.3;
+let maxZoom = 3.0;
+let panX = 0;
+let panY = 0;
+let isDragging = false;
+let lastPointerX = 0;
+let lastPointerY = 0;
+
+// Export zoom variables to window for global access
+window.currentZoom = currentZoom;
+window.minZoom = minZoom;
+window.maxZoom = maxZoom;
 const DIRS = [
     {dq:1,dr:0},{dq:1,dr:-1},{dq:0,dr:-1},
     {dq:-1,dr:0},{dq:-1,dr:1},{dq:0,dr:1}
@@ -9,6 +26,430 @@ const DIRS = [
 
 function isNearBorder(q, r) {
     return Math.abs(q) > GRID_RADIUS || Math.abs(r) > GRID_RADIUS;
+}
+
+// --- DYNAMIC BOARD EXPANSION ---
+function isAtPerimeter(q, r) {
+    // Check if a piece is at the current outer ring
+    return Math.abs(q) === GRID_RADIUS || Math.abs(r) === GRID_RADIUS || Math.abs(q + r) === GRID_RADIUS;
+}
+
+// Function to update board positioning to fit in available space
+window.updateBoardViewport = function() {
+    const gameContainer = document.getElementById('game-container');
+    if (!gameContainer || !window.app) return;
+    
+    // Get the container size
+    const containerRect = gameContainer.getBoundingClientRect();
+    
+    // Resize the PIXI app to fill the container
+    window.app.renderer.resize(containerRect.width, containerRect.height);
+    
+    // Calculate the outer bounds including the glow (this defines our viewport)
+    const cellRadius = window.CELL_RADIUS;
+    const glowExtent = cellRadius + 24; // Glow extends 24px beyond cell edge (3 layers * 8px)
+    
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    // Find perimeter cells to calculate glow bounds
+    for(let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
+        for(let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) {
+            if(Math.abs(q + r) > GRID_RADIUS) continue;
+            
+            // Only check perimeter cells
+            if(Math.abs(q) === GRID_RADIUS || Math.abs(r) === GRID_RADIUS || Math.abs(q + r) === GRID_RADIUS) {
+                const pos = axialToPixel(q, r);
+                // Include glow extent in bounds
+                minX = Math.min(minX, pos.x - glowExtent);
+                maxX = Math.max(maxX, pos.x + glowExtent);
+                minY = Math.min(minY, pos.y - glowExtent);
+                maxY = Math.max(maxY, pos.y + glowExtent);
+            }
+        }
+    }
+    
+    const glowWidth = maxX - minX;
+    const glowHeight = maxY - minY;
+    
+    // Calculate scale so glow perimeter exactly fills the container (this is 100% zoom)
+    const scaleX = containerRect.width / glowWidth;
+    const scaleY = containerRect.height / glowHeight;
+    const baseScale = Math.min(scaleX, scaleY);
+    
+    // Ensure baseScale is never too small (minimum 0.1) and log for debugging
+    const safeBaseScale = Math.max(0.1, baseScale);
+    console.log(`Board scale calculation: container=${containerRect.width}x${containerRect.height}, glow=${glowWidth}x${glowHeight}, baseScale=${baseScale}, safeBaseScale=${safeBaseScale}`);
+    
+    // Store the glow bounds and base scale globally
+    window.glowBounds = { minX, maxX, minY, maxY, width: glowWidth, height: glowHeight };
+    window.baseScale = safeBaseScale;
+    
+    // Position the board layers so the glow perimeter touches container edges
+    if (window.boardLayer && window.pieceLayer) {
+        const centerX = containerRect.width / 2;
+        const centerY = containerRect.height / 2;
+        
+        // Calculate offset to center the board within the glow bounds
+        const boardCenterX = (minX + maxX) / 2;
+        const boardCenterY = (minY + maxY) / 2;
+        
+        // Ensure board is always visible with minimum scale
+        const minVisibleScale = 0.3;
+        const finalScale = Math.max(minVisibleScale, safeBaseScale);
+        
+        // Reset zoom and position to 100%
+        window.currentZoom = 1.0;
+        panX = 0;
+        panY = 0;
+        
+        // Position glow layer at fixed base scale and position
+        if (window.glowLayer) {
+            window.glowLayer.scale.set(finalScale);
+            window.glowLayer.position.set(centerX - boardCenterX * finalScale, centerY - boardCenterY * finalScale);
+        }
+        
+        // Apply positioning for board and piece layers with forced minimum scale
+        window.boardLayer.scale.set(finalScale);
+        window.pieceLayer.scale.set(finalScale);
+        window.boardLayer.position.set(centerX - boardCenterX * finalScale, centerY - boardCenterY * finalScale);
+        window.pieceLayer.position.set(centerX - boardCenterX * finalScale, centerY - boardCenterY * finalScale);
+        
+        // Update stored base scale to match what we actually applied
+        window.baseScale = finalScale;
+    }
+    
+    // Set zoom constraints - can only zoom in from glow boundary
+    window.minZoom = 1.0; // 100% = glow touches container edges
+    window.maxZoom = 3.0;
+}
+
+// --- ZOOM SYSTEM ---
+function updateZoomConstraints() {
+    // Minimum zoom is 1.0 (100% - board fits perfectly in container)
+    window.minZoom = 1.0;
+    window.maxZoom = 3.0; // Can zoom in up to 300%
+    
+    // Ensure current zoom is valid
+    window.currentZoom = Math.max(window.minZoom, Math.min(window.maxZoom, window.currentZoom));
+    
+    console.log(`Zoom constraints: min=100%, max=300%, current=${(window.currentZoom * 100).toFixed(0)}%`);
+}
+
+function expandBoard() {
+    const oldRadius = GRID_RADIUS;
+    GRID_RADIUS++;
+    console.log(`Expanding board from radius ${oldRadius} to ${GRID_RADIUS}`);
+    
+    // Add new cells in the expanded ring
+    for(let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
+        for(let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) {
+            if(Math.abs(q + r) > GRID_RADIUS) continue;
+            
+            const key = `${q},${r}`;
+            if(window.cells.has(key)) continue; // Skip existing cells
+            
+            // Create new cell
+            const c = new PIXI.Graphics()
+                .lineStyle(2, THEME.boardLine)
+                .beginFill(THEME.boardFill);
+            drawHex(c, CELL_RADIUS);
+            c.endFill();
+            const p = axialToPixel(q, r);
+            c.position.set(p.x, p.y);
+            c.interactive = true;
+            c.buttonMode = true;
+            
+            // Add click handler
+            c.on('pointerdown', () => {
+                if(state.gameOver || animating || !selected) return;
+                const cellKey = `${q},${r}`;
+                if(!legalZones.has(cellKey)) return;
+                if(selected.mode === 'place') commitPlacement(q, r);
+                else commitMove(q, r);
+            });
+            
+            window.boardLayer.addChild(c);
+            window.cells.set(key, { gfx: c, q, r, stack: [] });
+        }
+    }
+    
+    // Update board perimeter glow for new size
+    if (window.createBoardPerimeterGlow && window.glowLayer) {
+        createBoardPerimeterGlow(window.glowLayer);
+        
+        // Apply current transform to the new mask immediately
+        if (window.boardMask && window.baseScale && window.glowBounds) {
+            const centerX = app.renderer.width / 2;
+            const centerY = app.renderer.height / 2;
+            const boardCenterX = (window.glowBounds.minX + window.glowBounds.maxX) / 2;
+            const boardCenterY = (window.glowBounds.minY + window.glowBounds.maxY) / 2;
+            const baseX = centerX - boardCenterX * window.baseScale;
+            const baseY = centerY - boardCenterY * window.baseScale;
+            
+            window.boardMask.scale.set(window.baseScale);
+            window.boardMask.position.set(baseX, baseY);
+        }
+    }
+    
+    // Update viewport to match new board size
+    updateBoardViewport();
+    
+    // Auto-zoom to fit all pieces if enabled
+    // Temporarily disable to debug piece disappearance
+    // if(AUTO_ZOOM_ENABLED) {
+    //     autoZoomToFitPieces();
+    // }
+}
+
+function checkForBoardExpansion() {
+    // Check if any placed piece is at the perimeter
+    const placedPieces = tray.filter(p => p.meta.placed);
+    for(const piece of placedPieces) {
+        if(isAtPerimeter(piece.meta.q, piece.meta.r)) {
+            expandBoard();
+            break;
+        }
+    }
+}
+
+// --- ZOOM SYSTEM ---
+// Zoom variables are declared at the top of the file
+
+function setupZoomControls(app) {
+    // Mouse wheel zoom
+    app.view.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = app.view.getBoundingClientRect();
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        // Convert screen coordinates to app coordinates
+        const appX = e.clientX - rect.left;
+        const appY = e.clientY - rect.top;
+        zoomAt(appX, appY, zoomFactor);
+    });
+    
+    // Touch pinch zoom
+    let lastTouchDistance = 0;
+    app.view.addEventListener('touchstart', (e) => {
+        if(e.touches.length === 2) {
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            lastTouchDistance = Math.sqrt(
+                Math.pow(touch2.clientX - touch1.clientX, 2) +
+                Math.pow(touch2.clientY - touch1.clientY, 2)
+            );
+        } else if(e.touches.length === 1) {
+            // Start dragging
+            isDragging = true;
+            lastPointerX = e.touches[0].clientX;
+            lastPointerY = e.touches[0].clientY;
+        }
+    });
+    
+    app.view.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if(e.touches.length === 2) {
+            // Pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.sqrt(
+                Math.pow(touch2.clientX - touch1.clientX, 2) +
+                Math.pow(touch2.clientY - touch1.clientY, 2)
+            );
+            
+            if(lastTouchDistance > 0) {
+                const zoomFactor = currentDistance / lastTouchDistance;
+                const rect = boardViewport.getBoundingClientRect();
+                const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
+                const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
+                zoomAt(centerX, centerY, zoomFactor);
+            }
+            lastTouchDistance = currentDistance;
+        } else if(e.touches.length === 1 && isDragging) {
+            // Pan
+            const deltaX = e.touches[0].clientX - lastPointerX;
+            const deltaY = e.touches[0].clientY - lastPointerY;
+            pan(deltaX, deltaY);
+            lastPointerX = e.touches[0].clientX;
+            lastPointerY = e.touches[0].clientY;
+        }
+    });
+    
+    app.view.addEventListener('touchend', (e) => {
+        if(e.touches.length < 2) {
+            lastTouchDistance = 0;
+        }
+        if(e.touches.length === 0) {
+            isDragging = false;
+        }
+    });
+    
+    // Mouse drag for desktop
+    app.view.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+    });
+    
+    app.view.addEventListener('mousemove', (e) => {
+        if(isDragging) {
+            const deltaX = e.clientX - lastPointerX;
+            const deltaY = e.clientY - lastPointerY;
+            pan(deltaX, deltaY);
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+        }
+    });
+    
+    app.view.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+}
+
+function zoomAt(appX, appY, zoomFactor) {
+    const newZoom = Math.max(window.minZoom, Math.min(window.maxZoom, window.currentZoom * zoomFactor));
+    
+    if(newZoom !== window.currentZoom && window.baseScale) {
+        // Calculate zoom point in world coordinates
+        const currentTotalScale = window.baseScale * window.currentZoom;
+        const centerX = app.renderer.width / 2;
+        const centerY = app.renderer.height / 2;
+        
+        // Get current board position
+        const currentBoardX = window.boardLayer.position.x;
+        const currentBoardY = window.boardLayer.position.y;
+        
+        // Convert mouse position to world coordinates
+        const worldX = (appX - currentBoardX) / currentTotalScale;
+        const worldY = (appY - currentBoardY) / currentTotalScale;
+        
+        // Update zoom
+        window.currentZoom = newZoom;
+        
+        // Calculate new board position to keep zoom point fixed
+        const newTotalScale = window.baseScale * window.currentZoom;
+        const newBoardX = appX - worldX * newTotalScale;
+        const newBoardY = appY - worldY * newTotalScale;
+        
+        // Calculate pan from the base position
+        const baseX = centerX - ((window.glowBounds.minX + window.glowBounds.maxX) / 2) * window.baseScale;
+        const baseY = centerY - ((window.glowBounds.minY + window.glowBounds.maxY) / 2) * window.baseScale;
+        
+        const zoomOffsetX = (centerX - baseX) * (window.currentZoom - 1);
+        const zoomOffsetY = (centerY - baseY) * (window.currentZoom - 1);
+        
+        panX = newBoardX - baseX + zoomOffsetX;
+        panY = newBoardY - baseY + zoomOffsetY;
+        
+        applyTransform();
+    }
+}
+
+function pan(deltaX, deltaY) {
+    panX += deltaX;
+    panY += deltaY;
+    applyTransform();
+}
+
+function applyTransform() {
+    if(window.boardLayer && window.pieceLayer && window.baseScale && window.glowBounds) {
+        const centerX = app.renderer.width / 2;
+        const centerY = app.renderer.height / 2;
+        const boardCenterX = (window.glowBounds.minX + window.glowBounds.maxX) / 2;
+        const boardCenterY = (window.glowBounds.minY + window.glowBounds.maxY) / 2;
+        
+        const baseX = centerX - boardCenterX * window.baseScale;
+        const baseY = centerY - boardCenterY * window.baseScale;
+        
+        // The glow layer stays fixed at base scale and position
+        if(window.glowLayer) {
+            window.glowLayer.scale.set(window.baseScale);
+            window.glowLayer.position.set(baseX, baseY);
+        }
+        
+        // Update mask to match glow layer position and scale
+        if(window.boardMask) {
+            window.boardMask.scale.set(window.baseScale);
+            window.boardMask.position.set(baseX, baseY);
+        }
+        
+        // Board and piece layers scale with zoom
+        const totalScale = window.baseScale * window.currentZoom;
+        window.boardLayer.scale.set(totalScale);
+        window.pieceLayer.scale.set(totalScale);
+        
+        // Apply zoom scaling to position and add pan offset
+        const zoomOffsetX = (centerX - baseX) * (window.currentZoom - 1);
+        const zoomOffsetY = (centerY - baseY) * (window.currentZoom - 1);
+        
+        window.boardLayer.position.set(baseX - zoomOffsetX + panX, baseY - zoomOffsetY + panY);
+        window.pieceLayer.position.set(baseX - zoomOffsetX + panX, baseY - zoomOffsetY + panY);
+        
+        // Limit pan to keep some part of the board visible
+        limitPanToKeepBoardVisible();
+    }
+}
+
+// Function to limit panning so board doesn't disappear completely
+function limitPanToKeepBoardVisible() {
+    if (!window.glowBounds || !window.baseScale) return;
+    
+    const totalScale = window.baseScale * window.currentZoom;
+    const scaledWidth = window.glowBounds.width * totalScale;
+    const scaledHeight = window.glowBounds.height * totalScale;
+    
+    const containerWidth = app.renderer.width;
+    const containerHeight = app.renderer.height;
+    
+    // At 100% zoom, glow should touch edges (pan = 0)
+    // At higher zoom, allow panning but keep some board visible
+    const maxPanX = Math.max(0, (scaledWidth - containerWidth) / 2);
+    const maxPanY = Math.max(0, (scaledHeight - containerHeight) / 2);
+    
+    panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+}
+
+function autoZoomToFitPieces() {
+    if(!AUTO_ZOOM_ENABLED) return;
+    
+    const placedPieces = tray.filter(p => p.meta.placed);
+    if(placedPieces.length === 0) return;
+    
+    // Find bounds of all placed pieces
+    let minQ = Infinity, maxQ = -Infinity;
+    let minR = Infinity, maxR = -Infinity;
+    
+    placedPieces.forEach(piece => {
+        minQ = Math.min(minQ, piece.meta.q);
+        maxQ = Math.max(maxQ, piece.meta.q);
+        minR = Math.min(minR, piece.meta.r);
+        maxR = Math.max(maxR, piece.meta.r);
+    });
+    
+    // Convert to pixel bounds
+    const topLeft = axialToPixel(minQ, minR);
+    const bottomRight = axialToPixel(maxQ, maxR);
+    
+    // Add padding
+    const padding = CELL_RADIUS * 3;
+    const boundsWidth = bottomRight.x - topLeft.x + padding * 2;
+    const boundsHeight = bottomRight.y - topLeft.y + padding * 2;
+    
+    // Calculate zoom to fit
+    const scaleX = (app.renderer.width - 400) / boundsWidth; // Account for inventories
+    const scaleY = app.renderer.height / boundsHeight;
+    const targetZoom = Math.min(scaleX, scaleY, maxZoom);
+    
+    // Center on the bounds
+    const centerX = (topLeft.x + bottomRight.x) / 2;
+    const centerY = (topLeft.y + bottomRight.y) / 2;
+    
+    currentZoom = Math.max(minZoom, targetZoom);
+    panX = -centerX * currentZoom;
+    panY = -centerY * currentZoom;
+    
+    applyTransform();
 }
 
 const COLORS = { white:0xFFFFFF, black:0x000000 };
@@ -35,6 +476,7 @@ let state = {
     queenPlaced:{white:false,black:false},
     gameOver: false
 };
+window.state = state; // Make state globally accessible
 let selected = null;
 let legalZones = new Set();
 let animating = false;
@@ -44,6 +486,282 @@ try {
 } catch (e) {
     console.warn('Could not load sound file.');
     clickSfx = { play: () => {} };
+}
+
+// --- PIECE-SPECIFIC ANIMATIONS ---
+function animatePieceMovement(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
+    const pieceType = piece.meta.key;
+    
+    // Get the target position
+    const cell = window.cells.get(`${toQ},${toR}`);
+    const targetPos = axialToPixel(toQ, toR);
+    const targetY = targetPos.y - (cell.stack.length - 1) * 6;
+    
+    // Play sound effect based on piece type
+    if (window.playSound) {
+        const soundMap = {
+            'Q': 'queen-move',
+            'S': 'spider-move', 
+            'A': 'ant-move',
+            'B': 'beetle-move',
+            'G': 'grasshopper-move'
+        };
+        window.playSound(soundMap[pieceType] || 'placement');
+    }
+    
+    switch (pieceType) {
+        case 'Q':
+            animateQueenWaggle(piece, targetPos.x, targetY, onComplete);
+            break;
+        case 'S':
+            animateSpiderStepByStep(piece, fromQ, fromR, toQ, toR, occBefore, onComplete);
+            break;
+        case 'A':
+            animateAntDarting(piece, fromQ, fromR, toQ, toR, occBefore, onComplete);
+            break;
+        case 'B':
+            animateBeetleClimbing(piece, fromQ, fromR, toQ, toR, onComplete);
+            break;
+        case 'G':
+            animateGrasshopperJump(piece, fromQ, fromR, toQ, toR, onComplete);
+            break;
+        default:
+            // Fallback to direct movement
+            gsap.to(piece, {
+                x: targetPos.x,
+                y: targetY,
+                duration: 0.5,
+                onComplete: onComplete
+            });
+            break;
+    }
+}
+
+function animateQueenWaggle(piece, targetX, targetY, onComplete) {
+    const timeline = gsap.timeline({ onComplete: onComplete });
+    
+    timeline
+        .to(piece, {
+            rotation: 0.2,
+            duration: 0.1,
+            ease: "power2.out"
+        })
+        .to(piece, {
+            rotation: -0.2,
+            duration: 0.1,
+            ease: "power2.inOut"
+        })
+        .to(piece, {
+            x: targetX,
+            y: targetY,
+            rotation: 0,
+            duration: 0.3,
+            ease: "power2.inOut"
+        });
+}
+
+function animateSpiderStepByStep(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
+    console.log(`Spider animation: ${fromQ},${fromR} -> ${toQ},${toR}`);
+    
+    // Get all possible spider paths from the starting position using original board state
+    const allPaths = getSpiderPaths(fromQ, fromR, occBefore);
+    console.log('Spider paths found:', allPaths);
+    
+    // Find the path that ends at the target destination
+    let targetPath = null;
+    if (allPaths && allPaths.length > 0) {
+        console.log('Looking for target:', toQ, toR);
+        for (const path of allPaths) {
+            const lastStep = path[path.length - 1];
+            console.log('Path ends at:', lastStep[0], lastStep[1]);
+            if (lastStep[0] === toQ && lastStep[1] === toR) {
+                targetPath = path;
+                break;
+            }
+        }
+    }
+    
+    console.log('Target path found:', targetPath);
+    
+    if (!targetPath) {
+        // Fallback to direct movement if no path found
+        console.log('No spider path found, using fallback animation');
+        gsap.to(piece, {
+            x: axialToPixel(toQ, toR).x,
+            y: axialToPixel(toQ, toR).y - (window.cells.get(`${toQ},${toR}`).stack.length - 1) * 6,
+            duration: 0.5,
+            onComplete: onComplete
+        });
+        return;
+    }
+    
+    console.log('Using spider step-by-step animation');
+    const timeline = gsap.timeline({ onComplete: onComplete });
+    
+    // Animate through each step with pauses
+    for (let i = 1; i < targetPath.length; i++) {
+        const [q, r] = targetPath[i];
+        const pos = axialToPixel(q, r);
+        const isLastStep = i === targetPath.length - 1;
+        const cell = window.cells.get(`${q},${r}`);
+        const yOffset = isLastStep ? -(cell.stack.length - 1) * 6 : 0;
+        
+        timeline
+            .to(piece, {
+                x: pos.x,
+                y: pos.y + yOffset,
+                duration: 0.2,  // Faster step from 0.3 to 0.2
+                ease: "power2.inOut"
+            })
+            .to({}, { duration: isLastStep ? 0 : 0.15 }); // Shorter pause from 0.25 to 0.15
+    }
+}
+
+function animateAntDarting(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
+    console.log(`Ant animation: ${fromQ},${fromR} -> ${toQ},${toR}`);
+    
+    // Calculate the distance to determine timing
+    const distance = Math.abs(toQ - fromQ) + Math.abs(toR - fromR);
+    const baseTime = 0.05;
+    const totalTime = Math.max(0.4, baseTime * distance);
+    
+    console.log(`Ant distance: ${distance}, total time: ${totalTime}`);
+    
+    // Find path along perimeter using BFS with original board state
+    const queue = [[fromQ, fromR, []]];
+    const visited = new Set([`${fromQ},${fromR}`]);
+    let path = null;
+    
+    // Use the original board state instead of building a new one
+    const occupied = new Set(occBefore);
+    // Remove the moving piece from the original state
+    occupied.delete(`${fromQ},${fromR}`);
+    
+    while (queue.length && !path) {
+        const [q, r, currentPath] = queue.shift();
+        
+        if (q === toQ && r === toR) {
+            path = currentPath.concat([[q, r]]);
+            break;
+        }
+        
+        DIRS.forEach(d => {
+            const nq = q + d.dq, nr = r + d.dr;
+            const key = `${nq},${nr}`;
+            
+            if (!window.cells.has(key) || occupied.has(key) || visited.has(key)) return;
+            if (!canSlide(q, r, nq, nr, occupied)) return;
+            
+            // Must touch the hive (be adjacent to an occupied cell)
+            const touchesHive = DIRS.some(d2 => occupied.has(`${nq + d2.dq},${nr + d2.dr}`));
+            if (!touchesHive) return;
+            
+            visited.add(key);
+            queue.push([nq, nr, currentPath.concat([[q, r]])]);
+        });
+    }
+    
+    console.log('Ant path found:', path);
+    
+    if (!path || path.length <= 1) {
+        // Fallback to direct movement
+        console.log('No ant path found, using fallback animation');
+        gsap.to(piece, {
+            x: axialToPixel(toQ, toR).x,
+            y: axialToPixel(toQ, toR).y - (window.cells.get(`${toQ},${toR}`).stack.length - 1) * 6,
+            duration: totalTime,
+            onComplete: onComplete
+        });
+        return;
+    }
+    
+    console.log('Using ant darting animation');
+    const timeline = gsap.timeline({ onComplete: onComplete });
+    const timePerStep = totalTime / path.length;
+    
+    // Create twitchy movement along the path
+    for (let i = 1; i < path.length; i++) {
+        const [q, r] = path[i];
+        const pos = axialToPixel(q, r);
+        const isLastStep = i === path.length - 1;
+        const cell = window.cells.get(`${q},${r}`);
+        const yOffset = isLastStep ? -(cell.stack.length - 1) * 6 : 0;
+        
+        // Add slight random offset for twitchy effect (except final position)
+        const offsetX = isLastStep ? 0 : (Math.random() - 0.5) * 3;
+        const offsetY = isLastStep ? 0 : (Math.random() - 0.5) * 3;
+        
+        timeline.to(piece, {
+            x: pos.x + offsetX,
+            y: pos.y + yOffset + offsetY,
+            duration: timePerStep,
+            ease: "power1.inOut"
+        });
+        
+        // Quick correction to exact position if not last step
+        if (!isLastStep) {
+            timeline.to(piece, {
+                x: pos.x,
+                y: pos.y + yOffset,
+                duration: timePerStep * 0.3,
+                ease: "power2.out"
+            });
+        }
+    }
+}
+
+function animateBeetleClimbing(piece, fromQ, fromR, toQ, toR, onComplete) {
+    const startPos = axialToPixel(fromQ, fromR);
+    const endPos = axialToPixel(toQ, toR);
+    const cell = window.cells.get(`${toQ},${toR}`);
+    const finalY = endPos.y - (cell.stack.length - 1) * 6;
+    
+    const timeline = gsap.timeline({ onComplete: onComplete });
+    
+    // Rise up
+    timeline.to(piece, {
+        y: startPos.y - 20,
+        duration: 0.2,
+        ease: "power2.out"
+    });
+    
+    // Move horizontally while elevated
+    timeline.to(piece, {
+        x: endPos.x,
+        duration: 0.3,
+        ease: "power1.inOut"
+    }, "-=0.1");
+    
+    // Settle down onto target (possibly stacking)
+    timeline.to(piece, {
+        y: finalY,
+        duration: 0.2,
+        ease: "bounce.out"
+    });
+}
+
+function animateGrasshopperJump(piece, fromQ, fromR, toQ, toR, onComplete) {
+    const startPos = axialToPixel(fromQ, fromR);
+    const endPos = axialToPixel(toQ, toR);
+    const cell = window.cells.get(`${toQ},${toR}`);
+    const finalY = endPos.y - (cell.stack.length - 1) * 6;
+    
+    // Simple parabolic hop
+    const timeline = gsap.timeline({ onComplete: onComplete });
+    const arcHeight = 40; // Fixed arc height for natural hop
+    
+    timeline
+        .to(piece, {
+            x: endPos.x,
+            y: startPos.y - arcHeight,  // Go up first
+            duration: 0.4,
+            ease: "power2.out"
+        })
+        .to(piece, {
+            y: finalY,  // Then down to target
+            duration: 0.4,
+            ease: "power2.in"
+        });
 }
 
 // --- HUD ---
@@ -125,7 +843,7 @@ function passTurn() {
 
 function clearHighlights(){
     legalZones.forEach(k=>{
-        const c=cells.get(k);
+        const c=window.cells.get(k);
         if(c) c.gfx.tint = 0xFFFFFF;
     });
     legalZones.clear();
@@ -136,7 +854,7 @@ function selectPlacement(piece){
     clearHighlights();
     selected = {piece, mode:'place'};
     legalPlacementZones(piece.meta.color).forEach(k=>{
-        const c = cells.get(k);
+        const c = window.cells.get(k);
         if(c){ c.gfx.tint = THEME.highlight; legalZones.add(k); }
     });
     clickSfx.play().catch(()=>{});
@@ -164,7 +882,7 @@ function legalPlacementZones(color){
         placed.forEach(p=>{
             if(p.meta.color!==color) DIRS.forEach(d=>{
                 const k=`${p.meta.q+d.dq},${p.meta.r+d.dr}`;
-                if(cells.has(k)&&!occ.has(k)) zones.add(k);
+                if(window.cells.has(k)&&!occ.has(k)) zones.add(k);
             });
         });
         return zones;
@@ -174,10 +892,10 @@ function legalPlacementZones(color){
     my.forEach(p=>{
         DIRS.forEach(d=>{
             const x=p.meta.q+d.dq, y=p.meta.r+d.dr, k=`${x},${y}`;
-            if(!cells.has(k)||occ.has(k)) return;
+            if(!window.cells.has(k)||occ.has(k)) return;
             const bad=DIRS.some(d2=>{
                 const nkey=`${x+d2.dq},${y+d2.dr}`;
-                const nc=cells.get(nkey);
+                const nc=window.cells.get(nkey);
                 if(!nc||nc.stack.length===0) return false;
                 return nc.stack[nc.stack.length-1].meta.color!==color;
             });
@@ -188,14 +906,23 @@ function legalPlacementZones(color){
 }
 
 function commitPlacement(q,r){
-    const p = selected.piece; // Move piece reference to function scope
+    const p = selected.piece;
+    
     if (!isNearBorder(q,r)) {
         animating=true;
         p.meta.placed = true;
         p.meta.q = q; p.meta.r = r;
         if(p.meta.key==='Q') state.queenPlaced[p.meta.color] = true;
 
-        const cell = cells.get(`${q},${r}`);
+        // Move piece from tray app to main board app if it's currently in a tray
+        if (p.parent && (p.parent === window.whiteTrayApp.stage || p.parent === window.blackTrayApp.stage)) {
+            p.parent.removeChild(p);
+            // Reset scale to normal size when moving to board
+            p.scale.set(1.0);
+            window.pieceLayer.addChild(p);
+        }
+
+        const cell = window.cells.get(`${q},${r}`);
         cell.stack.push(p);
         const base=axialToPixel(q,r);
         cell.stack.forEach((c,i)=>{
@@ -256,9 +983,11 @@ function commitPlacement(q,r){
     }catch(e){console.warn('move history update failed', e);} 
 
     clearHighlights();
-    layoutTray(app);
     selected = null;
     clickSfx.play().catch(()=>{});
+    
+    // Check if board needs expansion after placement
+    checkForBoardExpansion();
 }
 
 function checkSurrounded(color) {
@@ -277,7 +1006,7 @@ function checkSurrounded(color) {
     console.log(`Queen found at ${q},${r}`);
     return DIRS.every(d => {
         const key = `${q + d.dq},${r + d.dr}`;
-        const cell = cells.get(key);
+        const cell = window.cells.get(key);
         const isOccupied = cell && cell.stack.length > 0;
         console.log(`  Checking neighbor ${key}: ${isOccupied ? 'Occupied' : 'Empty'}`);
         return isOccupied;
@@ -327,7 +1056,7 @@ function selectMove(piece) {
 
     tray.forEach(p => { if (p !== piece) p.interactive = false; });
     moves.forEach(k => {
-        const c = cells.get(k);
+        const c = window.cells.get(k);
         if (c) {
             c.gfx.tint = THEME.highlight;
             legalZones.add(k);
@@ -362,14 +1091,14 @@ function wouldHiveRemainConnectedAfterMove(fx,fr,tx,tr){
     const toKey = `${tx},${tr}`;
     const occ = new Set();
     // build occupancy from actual cell stacks
-    cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occ.add(key); });
-    const fromCell = cells.get(fromKey);
+    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occ.add(key); });
+    const fromCell = window.cells.get(fromKey);
     // simulate removal: if the origin cell becomes empty, delete it
     if (!fromCell || !fromCell.stack || fromCell.stack.length <= 1) {
         occ.delete(fromKey);
     }
     // simulate placement: if destination was empty, add it
-    const toCell = cells.get(toKey);
+    const toCell = window.cells.get(toKey);
     if (!toCell || !toCell.stack || toCell.stack.length === 0) {
         occ.add(toKey);
     }
@@ -387,12 +1116,12 @@ function canSlide(fx,fr,tx,tr,occ){
 
 function hiveIntactAfterRemoval(q, r) {
     const k = `${q},${r}`;
-    const cell = cells.get(k);
+    const cell = window.cells.get(k);
     // if origin cell is empty, nothing to remove
     if (!cell || !cell.stack || cell.stack.length === 0) return true;
     // build occupancy from actual cell stacks so stacking is respected
     const occ = new Set();
-    cells.forEach((c, key) => {
+    window.cells.forEach((c, key) => {
         if (c && c.stack && c.stack.length > 0) occ.add(key);
     });
     // simulate removal: if the origin cell only had one piece, it becomes empty
@@ -406,11 +1135,11 @@ function legalMoveZones(piece){
             r0=piece.meta.r;
     // build occupancy from actual cell stacks so stacking is respected
     const occAll = new Set();
-    cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
+    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
     const occRem = new Set(occAll);
     // simulate removal: only delete the origin key if it will become empty
     const originKey = `${q0},${r0}`;
-    const originCell = cells.get(originKey);
+    const originCell = window.cells.get(originKey);
     if (!originCell || !originCell.stack || originCell.stack.length <= 1) {
         occRem.delete(originKey);
     }
@@ -422,13 +1151,13 @@ function legalMoveZones(piece){
     if(type==='B'){
         DIRS.forEach(d=>{
             const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`;
-            if(cells.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
+            if(window.cells.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
         });
     }
     else if(type==='Q'){
         DIRS.forEach(d=>{
             const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`;
-            if(cells.has(k)
+            if(window.cells.has(k)
                && !occAll.has(k)
                && canSlide(q0,r0,x,y,occRem)
                && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)
@@ -443,7 +1172,7 @@ function legalMoveZones(piece){
                 x+=d.dq; y+=d.dr;
             }
             const k=`${x},${y}`;
-            if(jumped>0 && cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
+            if(jumped>0 && window.cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
         });
     }
     else if(type==='A'){
@@ -452,7 +1181,7 @@ function legalMoveZones(piece){
             const [cx,cy]=queue.shift();
             DIRS.forEach(d=>{
                 const nx=cx+d.dq, ny=cy+d.dr, k=`${nx},${ny}`;
-                if(!cells.has(k)
+                if(!window.cells.has(k)
                    || occRem.has(k)
                    || vis.has(k)
                    || !canSlide(cx,cy,nx,ny,occRem)
@@ -485,10 +1214,10 @@ function getSpiderMoves(q0, r0) {
     if (!hiveIntactAfterRemoval(q0, r0)) return [];
 
     const startKey = `${q0},${r0}`;
-    const cell = cells.get(startKey);
+    const cell = window.cells.get(startKey);
     // build occRem from current cells and simulate removal of the spider piece
     const occAll = new Set();
-    cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
+    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
     const occRem = new Set(occAll);
     if (!cell || !cell.stack || cell.stack.length <= 1) {
         occRem.delete(startKey);
@@ -517,7 +1246,7 @@ function getSpiderMoves(q0, r0) {
         DIRS.forEach(d => {
             const nq = oq + d.dq, nr = or + d.dr;
             const nk = `${nq},${nr}`;
-            if(!cells.has(nk)) return;
+            if(!window.cells.has(nk)) return;
             if(occRem.has(nk)) return;
             // ensure it touches hive (by virtue of adjacency above)
             if(!perimeter.has(nk)){
@@ -620,7 +1349,7 @@ function getSpiderMoves(q0, r0) {
             for(let i=0;i<6;i++){
                 const nx = q + DIRS[i].dq, ny = r + DIRS[i].dr;
                 const k = `${nx},${ny}`;
-                if(!cells.has(k) || occRem.has(k)) continue;
+                if(!window.cells.has(k) || occRem.has(k)) continue;
                 if(DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))){ startIdx = i; break; }
             }
             if(startIdx === -1) return null;
@@ -629,7 +1358,7 @@ function getSpiderMoves(q0, r0) {
                 idx = (idx + dirStep + 6) % 6;
                 const nx = q + DIRS[idx].dq, ny = r + DIRS[idx].dr;
                 const k = `${nx},${ny}`;
-                if(!cells.has(k) || occRem.has(k)) return null;
+                if(!window.cells.has(k) || occRem.has(k)) return null;
                 if(!canSlide(q,r,nx,ny,occRem)) return null;
                 if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null;
                 const common = DIRS.some(d2=>{
@@ -664,7 +1393,7 @@ function getSpiderPaths(q0, r0, occAllParam){
     } else {
         // build occupancy from actual cell stacks like other functions
         occAll = new Set();
-        cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
+        window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
     }
     // remove the spider itself (it must move)
     occAll.delete(startKey);
@@ -685,7 +1414,7 @@ function getSpiderPaths(q0, r0, occAllParam){
         const [oq,or] = k.split(',').map(Number);
         DIRS.forEach(d=>{
             const nq=oq+d.dq, nr=or+d.dr, nk=`${nq},${nr}`;
-            if(!cells.has(nk)) return; if(occRem.has(nk)) return;
+            if(!window.cells.has(nk)) return; if(occRem.has(nk)) return;
             if(!perimeter.has(nk)) perimeter.set(nk, {q:nq,r:nr,x:axialToPixel(nq,nr).x,y:axialToPixel(nq,nr).y});
         });
     });
@@ -745,7 +1474,7 @@ function commitMove(q,r){
     // capture occupancy prior to move (includes the moving piece at its old position)
     const occBefore = new Set(tray.filter(p2=>p2.meta.placed).map(p2=>`${p2.meta.q},${p2.meta.r}`));
     const oldKey=`${p.meta.q},${p.meta.r}`,
-            oldCell=cells.get(oldKey);
+            oldCell=window.cells.get(oldKey);
     const ix=oldCell.stack.indexOf(p);
     if(ix>=0) oldCell.stack.splice(ix,1);
 
@@ -755,57 +1484,58 @@ function commitMove(q,r){
         c.y = rel.y - i*6;
     });
 
-    const cell=cells.get(`${q},${r}`);
+    const cell=window.cells.get(`${q},${r}`);
     cell.stack.push(p);
-    const rel=axialToPixel(q,r);
+    
+    // Store original position for animation
+    const fromQ = p.meta.q;
+    const fromR = p.meta.r;
 
-    gsap.to(p, {
-        x: rel.x,
-        y: rel.y - (cell.stack.length - 1) * 6,
-        duration: 0.5,
-        onComplete: () => {
-            cell.stack.forEach((c,i)=>{
-                c.x = rel.x;
-                c.y = rel.y - i*6;
-                pieceLayer.setChildIndex(c,
-                    pieceLayer.children.length-cell.stack.length+i
-                );
-            });
+    // Use piece-specific animation with original board state
+    animatePieceMovement(p, fromQ, fromR, q, r, occBefore, () => {
+        const rel=axialToPixel(q,r);
+        cell.stack.forEach((c,i)=>{
+            c.x = rel.x;
+            c.y = rel.y - i*6;
+            pieceLayer.setChildIndex(c,
+                pieceLayer.children.length-cell.stack.length+i
+            );
+        });
 
-            p.meta.q=q; p.meta.r=r;
+        p.meta.q=q; p.meta.r=r;
 
-            animating=false;
-            state.moveNumber++;
-            state.current = state.current==='white'?'black':'white';
-            updateHUD();
+        animating=false;
+        state.moveNumber++;
+        state.current = state.current==='white'?'black':'white';
+        updateHUD();
 
-            const winner = checkForWinner();
-            if (winner) {
-                state.gameOver = true;
-                setTimeout(() => {
-                    const banner = window.winBanner;
-                    if (banner) {
-                        if (winner === 'DRAW') {
-                            banner.text = `GAME OVER - DRAW!`;
-                        } else {
-                            banner.text = `GAME OVER - ${winner.toUpperCase()} WINS!`;
-                        }
-                        banner.visible = true;
+        const winner = checkForWinner();
+        if (winner) {
+            state.gameOver = true;
+            setTimeout(() => {
+                const banner = window.winBanner;
+                if (banner) {
+                    if (winner === 'DRAW') {
+                        banner.text = `GAME OVER - DRAW!`;
                     } else {
-                        console.log(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
-                        alert(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
+                        banner.text = `GAME OVER - ${winner.toUpperCase()} WINS!`;
                     }
-                }, 100);
-            }
+                    banner.visible = true;
+                } else {
+                    console.log(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
+                    alert(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
+                }
+            }, 100);
+        }
 
-            clearHighlights();
-            selected = null;
-            tray.forEach(p2=>p2.interactive = true);
-            clickSfx.play().catch(()=>{});
+        clearHighlights();
+        selected = null;
+        tray.forEach(p2=>p2.interactive = true);
+        clickSfx.play().catch(()=>{});
 
-            // add to move history
-            try{
-                const list = document.getElementById('moves-list');
+        // add to move history
+        try{
+            const list = document.getElementById('moves-list');
                 if(list){
                     const li = document.createElement('li');
                     li.className = 'history-entry';
@@ -857,7 +1587,9 @@ function commitMove(q,r){
                     }
                 }
             }catch(e){console.warn('move history update failed', e);} 
-        }
+            
+            // Check if board needs expansion after move
+            checkForBoardExpansion();
     });
 }
 
