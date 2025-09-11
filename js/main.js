@@ -104,6 +104,8 @@ window.addEventListener('load', () => {
     const music = document.getElementById('background-music');
     const playMusicButton = document.getElementById('play-music-button');
     const autoZoomToggle = document.getElementById('auto-zoom-toggle');
+    const moveHistoryToggle = document.getElementById('move-history-toggle');
+    const moveHistory = document.getElementById('move-history');
 
     // Handle window resize
     window.addEventListener('resize', resizeApp);
@@ -115,6 +117,12 @@ window.addEventListener('load', () => {
         if(AUTO_ZOOM_ENABLED) {
             autoZoomToFitPieces();
         }
+    });
+
+    // Move history toggle functionality for mobile
+    moveHistoryToggle.addEventListener('click', (e) => {
+        moveHistory.classList.toggle('expanded');
+        e.target.textContent = moveHistory.classList.contains('expanded') ? 'Hide' : 'History';
     });
 
     // Autoplay music

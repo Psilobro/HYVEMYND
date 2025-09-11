@@ -43,6 +43,11 @@ const PIECE_MAP = {
 };
 
 const tray = [];
+// Global mobile detection function
+function isMobileDevice() {
+    return window.innerWidth <= 900 && window.innerHeight <= 350;
+}
+
 const traySlots = []; // Array to hold the background slot graphics
 
 function createTraySlot(color, key, i, pieceLayer, x, y) {
@@ -152,18 +157,24 @@ function createPieces(pieceLayer, app) {
 
 // New function to layout trays in separate containers
 window.layoutTrays = function() {
+    console.log('layoutTrays called, mobile detection:', isMobileDevice());
     if (!window.whiteTrayApp || !window.blackTrayApp) {
         console.warn('Tray apps not initialized yet');
         return;
     }
 
+    // Mobile detection for responsive scaling - only for narrow fold screens
+    const isMobile = isMobileDevice();
+    
     const pieceSize = CELL_RADIUS * 2;
-    const trayPieceScale = 1.3; // Make tray pieces 30% larger than board pieces
+    const trayPieceScale = isMobile ? 0.6 : 1.3; // Even smaller pieces on mobile, larger on desktop
     const scaledPieceSize = pieceSize * trayPieceScale;
-    const pieceSpacing = scaledPieceSize * 0.8; // Slightly increased spacing for better balance
-    const typeGap = scaledPieceSize * 0.5; // Gap between different insect types  
-    const colGap = scaledPieceSize * 0.4; // Gap between columns
-    const queenOffset = scaledPieceSize * 1.4; // Queen offset above columns
+    const pieceSpacing = isMobile ? scaledPieceSize * 0.9 : scaledPieceSize * 0.8; // Even better spacing on mobile
+    const typeGap = isMobile ? scaledPieceSize * 0.5 : scaledPieceSize * 0.5; // Good gaps on mobile
+    const colGap = isMobile ? scaledPieceSize * 0.2 : scaledPieceSize * 0.4; // Smaller column gaps on mobile
+    const queenOffset = isMobile ? scaledPieceSize * 0.8 : scaledPieceSize * 1.4; // Smaller queen offset on mobile
+
+    // Clear existing graphics before redrawing
 
     // Clear existing pieces from tray apps (but preserve slots)
     // Remove all children to start fresh for now
@@ -174,13 +185,13 @@ window.layoutTrays = function() {
     const trayHeight = window.whiteTrayApp.renderer.height;
     const trayWidth = 220; // Updated to match CSS and main.js
     
-    // Start position (vertically centered)
-    const startY = (trayHeight - (pieceSpacing * 4 + typeGap)) / 2;
+    // Start position (adjusted for mobile - move pieces down by one piece length, then up by half)
+    const startY = isMobile ? 60 + scaledPieceSize - (scaledPieceSize * 0.5) : (trayHeight - (pieceSpacing * 4 + typeGap)) / 2;
 
     // Column positions for each tray - balanced spacing for larger pieces
     const leftColumnX = 50; // Increased margin to prevent clipping of scaled pieces
     const rightColumnX = 150; // Adjusted to maintain good spacing
-    const queenCenterX = trayWidth / 2; // Center queen on the entire tray width
+    const queenCenterX = isMobile ? (trayWidth / 2) - 10 : trayWidth / 2; // Move queen slightly left on mobile
     
     const whitePositions = {
         // Column 1: Ants and Spiders (left side)
@@ -273,8 +284,11 @@ function createTraySlotInApp(app, color, key, i, x, y) {
     
     const bg = new PIXI.Graphics();
     bg.beginFill(slotColors[key], 0.3);
-    // Scale the slot to match the larger tray pieces
-    drawRoundedTile(bg, CELL_RADIUS * 1.3);
+    // Scale the slot to be just slightly larger than the pieces (responsive sizing)
+    const isMobile = isMobileDevice();
+    const mobilePieceScale = 0.6; // Match the mobile piece scale from layoutTrays
+    const slotScale = isMobile ? mobilePieceScale + 0.1 : 1.3; // Just slightly larger than pieces
+    drawRoundedTile(bg, CELL_RADIUS * slotScale);
     bg.endFill();
     
     slotContainer.addChild(bg);
