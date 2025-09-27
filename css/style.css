@@ -44,8 +44,8 @@ html, body {
 #game-container {
     position: absolute;
     top: 0;
-    left: 250px; /* Space for white tray (220px width + 30px gap) */
-    right: 250px; /* Space for black tray + move history (220px width + 30px gap) */
+    left: 280px; /* More space for farther left white tray */
+    right: 320px; /* More space for farther right black tray + move history */
     bottom: 0;
     overflow: hidden;
 }
@@ -73,18 +73,20 @@ html, body {
 
 .player-tray {
     position: absolute;
-    top: 0;
+    top: -9%; /* Move up to -9% */
     bottom: 0;
     width: 220px; /* Increased width for better 2-column layout */
     pointer-events: all; /* Enable pointer events for piece selection */
+    transform: scale(0.73); /* Scale down to 73% */
+    transform-origin: top center;
 }
 
 #white-tray {
-    left: 235px; /* Moved right by tray width (15px + 220px) */
+    left: 155px; /* Adjusted positioning */
 }
 
 #black-tray {
-    right: 225px; /* 220px tray width + 5px gap from move history */
+    right: 185px; /* Adjusted positioning */
 }
 
 #hud {
@@ -100,7 +102,7 @@ html, body {
     left: 30%;
     transform: translateX(-50%);
     font-family: 'Beetype', sans-serif;
-    font-size: 80px;
+    font-size: 68px; /* Scaled down by 15% from 80px */
     color: #E6B84D;
     text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
     z-index: 15;
@@ -149,6 +151,44 @@ html, body {
     z-index: 4;
 }
 
+/* Enhanced move history styling */
+.history-entry {
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border-left: 3px solid transparent;
+    background: rgba(255,255,255,0.05);
+}
+
+.history-entry.white-move {
+    border-left-color: #FFFFFF;
+    background: rgba(255,255,255,0.35); /* Even whiter background */
+}
+
+.history-entry.black-move {
+    border-left-color: #333333;
+    background: rgba(0,0,0,0.7); /* Even blacker background */
+}
+
+.move-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    line-height: 1.3;
+}
+
+.move-number {
+    font-weight: bold;
+    color: var(--text); /* Use default text color instead of yellow */
+    min-width: 20px;
+}
+
+.piece-name {
+    font-weight: bold;
+    text-shadow: 1px 1px 1px #000000;
+}
+
 /* Move history helper visuals */
 #moves-list li { margin:6px 0; cursor:default; display:flex; align-items:center; }
 #moves-list .mini-path { width:72px; height:32px; margin-right:8px; flex:0 0 72px; }
@@ -184,6 +224,138 @@ html, body {
 /* Hide mobile toggle button on desktop */
 #move-history-toggle {
     display: none;
+}
+
+/* Tablet mode - for fold phones opened up and actual tablets */
+@media screen and (min-width: 769px) and (max-width: 850px) {
+    html, body {
+        overflow: visible !important; /* Allow content to extend beyond viewport */
+    }
+    
+    #game-title {
+        font-size: 48px !important; /* Slightly bigger letters */
+        top: 35px !important; /* Move down more */
+    }
+    
+    #game-container {
+        left: 200px !important;
+        right: 200px !important;
+        overflow: visible !important; /* Allow queen heads to show outside container */
+    }
+    
+    #app {
+        overflow: visible !important; /* Allow content to extend beyond app container */
+    }
+    
+    #board-viewport {
+        overflow: visible !important; /* Allow pieces to extend beyond viewport */
+    }
+    
+    #white-tray.player-tray {
+        left: 20px !important; /* Farther from board, closer to screen edge */
+        top: -10% !important; /* Slightly above the visible screen */
+        transform: scale(0.7) !important; /* 10% smaller than before */
+        transform-origin: left top !important;
+        width: 220px !important;
+        position: absolute !important;
+        z-index: 5 !important;
+        overflow: visible !important; /* Allow queen heads to show */
+    }
+    
+    #black-tray.player-tray {
+        right: 20px !important; /* Farther from board, closer to screen edge */
+        top: -10% !important; /* Slightly above the visible screen */
+        transform: scale(0.7) !important; /* 10% smaller than before */
+        transform-origin: right top !important;
+        width: 220px !important;
+        position: absolute !important;
+        z-index: 5 !important;
+        overflow: visible !important; /* Allow queen heads to show */
+    }
+    
+    #move-history {
+        right: 10px !important;
+        bottom: 10px !important; /* Position at bottom */
+        top: auto !important; /* Override top positioning */
+        width: 80px !important;
+        height: 30px !important;
+        max-height: 30px !important;
+        font-size: 12px !important;
+        z-index: 6 !important; /* Above trays */
+        overflow: hidden !important;
+        cursor: pointer !important;
+        text-align: center !important;
+        line-height: 30px !important;
+        transition: all 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: transparent !important; /* Hide actual content */
+    }
+    
+    #move-history #moves-list {
+        display: none !important; /* Hide moves list when minimized */
+    }
+    
+    #move-history h3 {
+        display: none !important; /* Hide header when minimized */
+    }
+    
+    #move-history.tablet-expanded {
+        width: 250px !important; /* Wider to accommodate longer piece names */
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important; /* Let inner container handle scrolling */
+        bottom: 10px !important; /* Keep at bottom, don't move up */
+        right: 10px !important; /* Stay at right edge */
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important; /* No padding on outer container */
+        margin: 0 !important;
+        box-sizing: border-box !important; /* Include padding in height */
+        z-index: 10 !important; /* Well above everything else */
+        color: var(--text) !important; /* Show actual content */
+        position: fixed !important; /* Ensure proper positioning */
+        display: block !important;
+    }
+    
+    #move-history::before {
+        content: "History" !important;
+        display: block !important;
+        color: var(--text) !important; /* Make button text visible */
+        position: absolute !important;
+        width: 100% !important;
+        text-align: center !important;
+    }
+    
+    #move-history.tablet-expanded::before {
+        display: none !important;
+    }
+    
+    #move-history.tablet-expanded h3 {
+        display: none !important; /* Hide "Move History" header when expanded */
+    }
+    
+    #move-history.tablet-expanded #moves-list {
+        display: block !important; /* Show moves list when expanded */
+        text-align: center !important; /* Center the move list content */
+        padding: 8px !important; /* Move padding here */
+        margin: 0 !important;
+        list-style: none !important; /* Remove any list styling */
+        height: 300px !important; /* Full height of container */
+        max-height: 300px !important;
+        overflow-y: scroll !important; /* Scrolling happens here */
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+        box-sizing: border-box !important;
+        background: rgba(0,0,0,0.5) !important; /* Match parent styling */
+        border-radius: 6px !important;
+    }
+    
+    #move-history.tablet-expanded .history-entry:first-child {
+        margin-top: 0 !important; /* Ensure first move starts at top */
+    }
 }
 
 /* Force landscape orientation on mobile */
@@ -240,8 +412,8 @@ html, body {
     
     /* Tray positioning - adjusted for fold screen */
     #white-tray.player-tray {
-        left: 10px !important;
-        top: 30px !important;
+        left: 50px !important; /* Closer to board */
+        top: 10px !important; /* Higher up */
         bottom: unset !important;
         width: 220px !important;
         height: 300px !important;
@@ -251,8 +423,8 @@ html, body {
     }
     
     #black-tray.player-tray {
-        right: 10px !important;
-        top: 30px !important;
+        right: 50px !important; /* Closer to board */
+        top: 10px !important; /* Higher up */
         bottom: unset !important;
         width: 220px !important;
         height: 300px !important;

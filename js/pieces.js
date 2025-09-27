@@ -43,9 +43,13 @@ const PIECE_MAP = {
 };
 
 const tray = [];
-// Global mobile detection function
+// Global mobile/tablet detection function
 function isMobileDevice() {
     return window.innerWidth <= 900 && window.innerHeight <= 350;
+}
+
+function isTabletDevice() {
+    return window.innerWidth <= 1200 && window.innerWidth >= 769;
 }
 
 const traySlots = []; // Array to hold the background slot graphics
@@ -163,16 +167,37 @@ window.layoutTrays = function() {
         return;
     }
 
-    // Mobile detection for responsive scaling - only for narrow fold screens
+    // Device detection for responsive scaling
     const isMobile = isMobileDevice();
+    const isTablet = isTabletDevice();
     
     const pieceSize = CELL_RADIUS * 2;
-    const trayPieceScale = isMobile ? 0.6 : 1.3; // Even smaller pieces on mobile, larger on desktop
+    let trayPieceScale;
+    if (isMobile) {
+        trayPieceScale = 0.6; // Smallest for mobile
+    } else if (isTablet) {
+        trayPieceScale = 1.1; // Slightly larger for tablet but will be CSS scaled to 0.6
+    } else {
+        trayPieceScale = 1.3; // Desktop size
+    }
     const scaledPieceSize = pieceSize * trayPieceScale;
-    const pieceSpacing = isMobile ? scaledPieceSize * 0.9 : scaledPieceSize * 0.8; // Even better spacing on mobile
-    const typeGap = isMobile ? scaledPieceSize * 0.5 : scaledPieceSize * 0.5; // Good gaps on mobile
-    const colGap = isMobile ? scaledPieceSize * 0.2 : scaledPieceSize * 0.4; // Smaller column gaps on mobile
-    const queenOffset = isMobile ? scaledPieceSize * 0.8 : scaledPieceSize * 1.4; // Smaller queen offset on mobile
+    let pieceSpacing, typeGap, colGap, queenOffset;
+    if (isMobile) {
+        pieceSpacing = scaledPieceSize * 0.9;
+        typeGap = scaledPieceSize * 0.5;
+        colGap = scaledPieceSize * 0.2;
+        queenOffset = scaledPieceSize * 0.8;
+    } else if (isTablet) {
+        pieceSpacing = scaledPieceSize * 0.8;
+        typeGap = scaledPieceSize * 0.5;
+        colGap = scaledPieceSize * 0.4;
+        queenOffset = scaledPieceSize * 1.0; // Even spacing with other pieces
+    } else {
+        pieceSpacing = scaledPieceSize * 0.8;
+        typeGap = scaledPieceSize * 0.5;
+        colGap = scaledPieceSize * 0.4;
+        queenOffset = scaledPieceSize * 1.4;
+    }
 
     // Clear existing graphics before redrawing
 
@@ -191,7 +216,14 @@ window.layoutTrays = function() {
     // Column positions for each tray - balanced spacing for larger pieces
     const leftColumnX = 50; // Increased margin to prevent clipping of scaled pieces
     const rightColumnX = 150; // Adjusted to maintain good spacing
-    const queenCenterX = isMobile ? (trayWidth / 2) - 10 : trayWidth / 2; // Move queen slightly left on mobile
+    let queenCenterX;
+    if (isMobile) {
+        queenCenterX = (trayWidth / 2) - 10; // Slightly left for mobile
+    } else if (isTablet) {
+        queenCenterX = (trayWidth / 2) - 5; // Slightly adjust for tablet to look centered
+    } else {
+        queenCenterX = trayWidth / 2; // Centered for desktop
+    }
     
     const whitePositions = {
         // Column 1: Ants and Spiders (left side)

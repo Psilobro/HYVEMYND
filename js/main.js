@@ -23,9 +23,16 @@ window.addEventListener('load', () => {
     window.glowLayer = glowLayer;
 
     // --- TRAY PIXI APPS ---
+    // Calculate tray height - account for tablet scaling
+    let trayHeight = window.innerHeight;
+    if (window.innerWidth >= 769 && window.innerWidth <= 1200) {
+        // For tablets, increase canvas height to account for 0.6 CSS scaling
+        trayHeight = window.innerHeight / 0.6;
+    }
+    
     whiteTrayApp = new PIXI.Application({
         width: 220,
-        height: window.innerHeight,
+        height: trayHeight,
         backgroundAlpha: 0,
         antialias: true
     });
@@ -33,7 +40,7 @@ window.addEventListener('load', () => {
 
     blackTrayApp = new PIXI.Application({
         width: 220,
-        height: window.innerHeight,
+        height: trayHeight,
         backgroundAlpha: 0,
         antialias: true
     });
@@ -113,7 +120,7 @@ window.addEventListener('load', () => {
     // Auto-zoom toggle functionality
     autoZoomToggle.addEventListener('click', (e) => {
         AUTO_ZOOM_ENABLED = !AUTO_ZOOM_ENABLED;
-        e.target.textContent = `Auto-Zoom: ${AUTO_ZOOM_ENABLED ? 'ON' : 'OFF'}`;
+    e.target.textContent = `Auto-Center: ${AUTO_ZOOM_ENABLED ? 'ON' : 'OFF'}`;
         if(AUTO_ZOOM_ENABLED) {
             autoZoomToFitPieces();
         }
@@ -124,6 +131,25 @@ window.addEventListener('load', () => {
         moveHistory.classList.toggle('expanded');
         e.target.textContent = moveHistory.classList.contains('expanded') ? 'Hide' : 'History';
     });
+
+    // Tablet-specific move history toggle - click the panel to show/hide history
+    moveHistory.addEventListener('click', (e) => {
+        // Only handle clicks in tablet mode (769px-850px)
+        if (window.innerWidth >= 769 && window.innerWidth <= 850) {
+            moveHistory.classList.toggle('tablet-expanded');
+        }
+    });
+
+    // Initialize tablet mode - ensure history starts minimized
+    function initializeTabletMode() {
+        if (window.innerWidth >= 769 && window.innerWidth <= 850) {
+            moveHistory.classList.remove('tablet-expanded');
+        }
+    }
+
+    // Check on load and resize
+    initializeTabletMode();
+    window.addEventListener('resize', initializeTabletMode);
 
     // Autoplay music
     music.play().then(() => {

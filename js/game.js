@@ -196,10 +196,9 @@ function expandBoard() {
     updateBoardViewport();
     
     // Auto-zoom to fit all pieces if enabled
-    // Temporarily disable to debug piece disappearance
-    // if(AUTO_ZOOM_ENABLED) {
-    //     autoZoomToFitPieces();
-    // }
+    if(AUTO_ZOOM_ENABLED) {
+        autoZoomToFitPieces();
+    }
 }
 
 function checkForBoardExpansion() {
@@ -415,40 +414,60 @@ function autoZoomToFitPieces() {
     
     const placedPieces = tray.filter(p => p.meta.placed);
     if(placedPieces.length === 0) return;
-    
-    // Find bounds of all placed pieces
+
+    // Collect all axial coordinates of placed pieces
+    const pieceCoords = placedPieces.map(p => ({q: p.meta.q, r: p.meta.r}));
+
+    // Set to hold all cells to include in bounds (placed + adjacent empties)
+    const boundCells = new Set();
+
+    // Add all placed piece coordinates
+    pieceCoords.forEach(({q, r}) => {
+        boundCells.add(`${q},${r}`);
+        // Add all adjacent cells
+        DIRS.forEach(dir => {
+            const nq = q + dir.dq;
+            const nr = r + dir.dr;
+            // Only add if not occupied by a placed piece
+            if (!boundCells.has(`${nq},${nr}`) && !tray.some(p => p.meta.placed && p.meta.q === nq && p.meta.r === nr)) {
+                boundCells.add(`${nq},${nr}`);
+            }
+        });
+    });
+
+    // Find bounds of all included cells
     let minQ = Infinity, maxQ = -Infinity;
     let minR = Infinity, maxR = -Infinity;
-    
-    placedPieces.forEach(piece => {
-        minQ = Math.min(minQ, piece.meta.q);
-        maxQ = Math.max(maxQ, piece.meta.q);
-        minR = Math.min(minR, piece.meta.r);
-        maxR = Math.max(maxR, piece.meta.r);
+    boundCells.forEach(key => {
+        const [q, r] = key.split(",").map(Number);
+        minQ = Math.min(minQ, q);
+        maxQ = Math.max(maxQ, q);
+        minR = Math.min(minR, r);
+        maxR = Math.max(maxR, r);
     });
-    
+
     // Convert to pixel bounds
     const topLeft = axialToPixel(minQ, minR);
     const bottomRight = axialToPixel(maxQ, maxR);
-    
+
     // Add padding
     const padding = CELL_RADIUS * 3;
     const boundsWidth = bottomRight.x - topLeft.x + padding * 2;
     const boundsHeight = bottomRight.y - topLeft.y + padding * 2;
-    
+
     // Calculate zoom to fit
     const scaleX = (app.renderer.width - 400) / boundsWidth; // Account for inventories
     const scaleY = app.renderer.height / boundsHeight;
     const targetZoom = Math.min(scaleX, scaleY, maxZoom);
-    
+
     // Center on the bounds
     const centerX = (topLeft.x + bottomRight.x) / 2;
     const centerY = (topLeft.y + bottomRight.y) / 2;
-    
+
     currentZoom = Math.max(minZoom, targetZoom);
     panX = -centerX * currentZoom;
     panY = -centerY * currentZoom;
-    
+
     applyTransform();
 }
 
@@ -962,23 +981,22 @@ function commitPlacement(q,r){
         const list = document.getElementById('moves-list');
         if(list){
             const li = document.createElement('li');
-            li.className = 'history-entry';
+            li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
             const mini = buildMiniPathSVG([[q,r]]); // single dot for placement
             const label = labelFromCenter(q,r);
             const moveNum = Math.max(1, state.moveNumber - 1);
-            const txt = document.createElement('div'); txt.className='move-text';
-            txt.textContent = `${moveNum}. ${p.meta.color} ${p.meta.key} placed at ${q},${r} (${label})`;
+            const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+            
+            const txt = document.createElement('div'); 
+            txt.className='move-text';
+            txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> placed at (${q},${r}) ${label}`;
+            
             li.appendChild(mini);
             li.appendChild(txt);
-            li.addEventListener('mouseenter', ()=> showOrientationOverlay(q,r));
-            li.addEventListener('mouseleave', ()=> hideOrientationOverlay());
+            // Hover overlay removed
             list.appendChild(li);
             
-            // Auto-scroll to bottom to show latest move
-            const historyPanel = document.getElementById('move-history');
-            if(historyPanel) {
-                historyPanel.scrollTop = historyPanel.scrollHeight;
-            }
+            // Don't auto-scroll - let user control scrolling manually
         }
     }catch(e){console.warn('move history update failed', e);} 
 
@@ -988,6 +1006,10 @@ function commitPlacement(q,r){
     
     // Check if board needs expansion after placement
     checkForBoardExpansion();
+    // Always auto-zoom after placement
+    if(AUTO_ZOOM_ENABLED) {
+        autoZoomToFitPieces();
+    }
 }
 
 function checkSurrounded(color) {
@@ -1533,12 +1555,16 @@ function commitMove(q,r){
         tray.forEach(p2=>p2.interactive = true);
         clickSfx.play().catch(()=>{});
 
+        // Always auto-zoom after move
+        if(AUTO_ZOOM_ENABLED) {
+            autoZoomToFitPieces();
+        }
         // add to move history
         try{
             const list = document.getElementById('moves-list');
                 if(list){
                     const li = document.createElement('li');
-                    li.className = 'history-entry';
+                    li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
                     let mini, txt;
                     const moveNum = Math.max(1, state.moveNumber - 1);
                     if(p.meta.key === 'S'){
@@ -1568,29 +1594,54 @@ function commitMove(q,r){
                             return directionLabelFromDelta(aq - prev[0], ar - prev[1]);
                         }).filter(Boolean).join(',');
                         txt = document.createElement('div'); txt.className='move-text';
-                        txt.textContent = `${moveNum}. ${p.meta.color} ${p.meta.key} ${oldKey} → ${q},${r} [${stepLabels}]`;
+                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+                        const newLabel = labelFromCenter(q,r);
+                        const oldCoords = oldKey.split(',').map(Number);
+                        txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r}) [${stepLabels}]`;
                     } else {
                         mini = buildMiniPathSVG([[q,r]]);
                         txt = document.createElement('div'); txt.className='move-text';
-                        txt.textContent = `${moveNum}. ${p.meta.color} ${p.meta.key} ${oldKey} → ${q},${r}`;
+                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+                        const newLabel = labelFromCenter(q,r);
+                        const oldCoords = oldKey.split(',').map(Number);
+                        txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
                     }
                     li.appendChild(mini);
                     li.appendChild(txt);
-                    li.addEventListener('mouseenter', ()=> showOrientationOverlay(p.meta.q, p.meta.r));
-                    li.addEventListener('mouseleave', ()=> hideOrientationOverlay());
+                    // Hover overlay removed
                     list.appendChild(li);
                     
-                    // Auto-scroll to bottom to show latest move
-                    const historyPanel = document.getElementById('move-history');
-                    if(historyPanel) {
-                        historyPanel.scrollTop = historyPanel.scrollHeight;
-                    }
+                    // Don't auto-scroll - let user control scrolling manually
                 }
             }catch(e){console.warn('move history update failed', e);} 
             
             // Check if board needs expansion after move
             checkForBoardExpansion();
     });
+}
+
+// Get full piece name and color for enhanced history display
+function getEnhancedPieceInfo(piece) {
+    const pieceNames = {
+        'Q': 'Queen',
+        'B': 'Beetle',
+        'A': 'Ant',
+        'G': 'Grasshopper',
+        'S': 'Spider'
+    };
+    
+    const pieceColors = {
+        'Q': '#FFD700', // Gold for Queen
+        'B': '#800080', // Purple for Beetle
+        'A': '#4169E1', // Blue for Ant
+        'G': '#32CD32', // Green for Grasshopper
+        'S': '#8B4513'  // Brown for Spider
+    };
+    
+    const fullName = pieceNames[piece.meta.key] || piece.meta.key;
+    const pieceColor = pieceColors[piece.meta.key] || '#FFFFFF';
+    
+    return { fullName, pieceColor };
 }
 
 // Build a tiny SVG visual showing a path (array of [q,r]) scaled to mini box
@@ -1650,34 +1701,7 @@ function lerp(a,b,t){ return a + (b-a)*t; }
 function axialToCube(q,r){ const x=q, z=r, y=-x-z; return {x,y,z}; }
 function cubeToAxial(x,y,z){ return [x,z]; }
 
-// orientation overlay helpers
-function showOrientationOverlay(q,r){
-    const el = document.getElementById('hex-orient-overlay');
-    if(!el) return;
-    // build simple SVG showing N,NE,SE,S,SW,NW around center
-    el.innerHTML = '';
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns,'svg');
-    svg.setAttribute('width',160); svg.setAttribute('height',160);
-    const cx = 80, cy = 80, R = 48;
-    const circle = document.createElementNS(ns,'circle');
-    circle.setAttribute('cx',cx); circle.setAttribute('cy',cy); circle.setAttribute('r',56);
-    svg.appendChild(circle);
-    const labels = [['N',0,-1],['NE',1,-1],['SE',1,0],['S',0,1],['SW',-1,1],['NW',-1,0]];
-    labels.forEach(([lab,dq,dr],i)=>{
-        const ang = -Math.PI/2 + i*(Math.PI/3);
-        const x = cx + Math.cos(ang)*R;
-        const y = cy + Math.sin(ang)*R;
-        const t = document.createElementNS(ns,'text');
-        t.setAttribute('x', x); t.setAttribute('y', y+4);
-        t.setAttribute('text-anchor','middle');
-        t.textContent = lab;
-        svg.appendChild(t);
-    });
-    el.appendChild(svg);
-    el.style.display = 'block';
-}
-function hideOrientationOverlay(){ const el=document.getElementById('hex-orient-overlay'); if(el) el.style.display='none'; }
+// Orientation overlay functions removed
 
 // Direction label helpers
 const LABEL_DIRS = [
