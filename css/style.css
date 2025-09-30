@@ -1,3 +1,157 @@
+/* Desktop tray positions */
+#white-tray.player-tray {
+    left: 155px;
+    right: auto;
+}
+#black-tray.player-tray {
+    right: 185px;
+    left: auto;
+}
+#move-history.expanded {
+    display: block !important;
+}
+/* Move history entry: all info inline, single line per turn */
+#moves-list li.history-entry {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 4px;
+    padding: 2px 0;
+    margin: 0;
+    min-height: 36px;
+    border-bottom: 1px solid rgba(230,184,77,0.08);
+    white-space: nowrap;
+    overflow: hidden;
+}
+#moves-list .mini-path {
+    width: 28px;
+    height: 14px;
+    margin-right: 4px;
+    flex: 0 0 28px;
+}
+#moves-list .move-text {
+    flex: 1;
+    font-size: 11px;
+    font-family: 'Milonga', serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0;
+}
+/* Move history hex button for turn number */
+.move-hex-btn {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Milonga', serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: #4B382A;
+    border: 2px solid #E6B84D;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;
+    transition: box-shadow 0.2s;
+    box-shadow: 0 1px 4px #e6b84d44;
+    outline: none;
+    padding: 0;
+}
+.move-hex-btn.gold-hex {
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    border: 2px solid #E6B84D;
+}
+.move-hex-btn .move-num {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+.move-hex-btn:active, .move-hex-btn:focus {
+    box-shadow: 0 0 8px #e6b84d88;
+    background: linear-gradient(135deg, #fffbe6 60%, #e6b84d 100%);
+}
+@font-face {
+    font-family: 'Milonga';
+    src: url('../assets/Fonts/Milonga-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+/* Hexagonal Go button for history replay */
+.go-hex-btn {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Milonga', serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: #4B382A;
+    border: 2px solid #E6B84D;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;
+    transition: box-shadow 0.2s;
+}
+.go-hex-btn:hover {
+    box-shadow: 0 0 8px #e6b84d88;
+    background: linear-gradient(135deg, #fffbe6 60%, #e6b84d 100%);
+}
+
+#history-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    padding-top: 4px;
+}
+#history-slider {
+    accent-color: #E6B84D;
+    position: relative;
+    z-index: 2;
+}
+
+#history-slider-ticks {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    margin-top: -10px;
+    z-index: 1;
+    pointer-events: none;
+}
+.slider-tick {
+    position: absolute;
+    width: 2px;
+    height: 10px;
+    background: #E6B84D;
+    top: 0;
+    border-radius: 1px;
+    opacity: 0.85;
+}
+
+#return-to-live {
+    background: #3ddc84;
+    color: #15171b;
+    border-radius: 6px;
+    border: none;
+    font-weight: bold;
+    font-family: 'Milonga', serif;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+}
 
 body {
   background: transparent;
@@ -81,19 +235,19 @@ html, body {
     transform-origin: top center;
 }
 
-#white-tray {
-    left: 155px; /* Adjusted positioning */
-}
-
-#black-tray {
-    right: 185px; /* Adjusted positioning */
-}
+/* Tray positions for desktop will be set in media queries only */
 
 #hud {
-    position:absolute; top:16px; left:16px;
-    background:rgba(0,0,0,0.5); padding:8px 12px;
-    border-radius:6px; font-weight:bold;
-    z-index: 10; /* Make sure it's above everything */
+    position: fixed;
+    top: 64px;
+    right: 10px;
+    width: 200px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    z-index: 20;
+    margin-bottom: 0;
 }
 
 #game-title {
@@ -117,6 +271,7 @@ html, body {
     border-radius: 6px;
     background: rgba(0,0,0,0.5);
     color: var(--text);
+    font-family: 'Milonga', serif;
     border: 1px solid var(--text);
     cursor: pointer;
     z-index: 10;
@@ -130,6 +285,7 @@ html, body {
     border-radius: 6px;
     background: rgba(0,0,0,0.5);
     color: var(--text);
+    font-family: 'Milonga', serif;
     border: 1px solid var(--text);
     cursor: pointer;
     font-size: 12px;
@@ -137,27 +293,50 @@ html, body {
 }
 
 #move-history {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    display: none;
+    position: fixed;
     right: 10px;
-    width: 200px;
-    max-height: 60vh;
-    overflow: auto;
+    bottom: 10px;
+    z-index: 20;
+    width: 250px;
+    height: 300px;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #E6B84D rgba(0,0,0,0.0);
     background: rgba(0,0,0,0.5);
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 14px;
-    z-index: 4;
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: var(--text);
 }
+
+/* Hide scrollbar unless scrolling (Webkit browsers) */
+#move-history::-webkit-scrollbar {
+    width: 0.5em;
+    background: transparent;
+}
+#move-history:hover::-webkit-scrollbar {
+    background: #222;
+}
+#move-history::-webkit-scrollbar-thumb {
+    background: #E6B84D;
+    border-radius: 4px;
+    opacity: 0.7;
+}
+/* ...existing code... */
 
 /* Enhanced move history styling */
 .history-entry {
-    margin-bottom: 8px;
-    padding: 6px 8px;
-    border-radius: 4px;
-    border-left: 3px solid transparent;
-    background: rgba(255,255,255,0.05);
+    margin-bottom: 0;
+    padding: 0 2px;
+    border-radius: 1px;
+    border-left: 2px solid transparent;
+    background: rgba(255,255,255,0.01);
+    display: flex;
+    align-items: center;
+    min-height: 22px;
+    flex-direction: row;
 }
 
 .history-entry.white-move {
@@ -172,27 +351,30 @@ html, body {
 
 .move-text {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
+    flex-direction: row;
+    vertical-align: middle;
     gap: 4px;
-    line-height: 1.3;
+    line-height: 1.1;
+    font-size: 11px;
+    font-family: 'Milonga', serif;
+    flex: 1;
 }
 
 .move-number {
     font-weight: bold;
-    color: var(--text); /* Use default text color instead of yellow */
-    min-width: 20px;
+    color: var(--text);
+    min-width: 16px;
 }
-
+#move-history h3 { margin: 0 0 6px 0; font-size: 14px; font-family: 'Milonga', serif; }
 .piece-name {
     font-weight: bold;
-    text-shadow: 1px 1px 1px #000000;
+    text-shadow: 0.5px 0.5px 0.5px #000000;
 }
 
 /* Move history helper visuals */
-#moves-list li { margin:6px 0; cursor:default; display:flex; align-items:center; }
-#moves-list .mini-path { width:72px; height:32px; margin-right:8px; flex:0 0 72px; }
-#moves-list .move-text { flex:1; font-size:13px; }
+/* ...existing code... */
+/* ...existing code... */
 
 /* Orientation overlay (labels N, NE, SE, S, SW, NW) */
 #hex-orient-overlay {
@@ -208,7 +390,13 @@ html, body {
 #hex-orient-overlay svg circle { fill: rgba(255,255,255,0.04); stroke: rgba(255,255,255,0.08); }
 
 #move-history h3 { margin: 0 0 6px 0; font-size: 14px }
-#moves-list { padding-left: 18px; margin: 0; }
+#moves-list {
+    padding-left: 8px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
 #play-music-button {
     position: absolute;
     top: 16px;
@@ -223,11 +411,36 @@ html, body {
 
 /* Hide mobile toggle button on desktop */
 #move-history-toggle {
-    display: none;
+    display: block !important;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 20;
+    background: #E6B84D;
+    color: #4B382A;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #E6B84D;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px #e6b84d44;
+    cursor: pointer;
 }
+
 
 /* Tablet mode - for fold phones opened up and actual tablets */
 @media screen and (min-width: 769px) and (max-width: 850px) {
+    #move-history h3,
+    #move-history::before,
+    #move-history.tablet-expanded h3,
+    #move-history.tablet-expanded::before {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+    }
     html, body {
         overflow: visible !important; /* Allow content to extend beyond viewport */
     }
@@ -252,50 +465,75 @@ html, body {
     }
     
     #white-tray.player-tray {
-        left: 20px !important; /* Farther from board, closer to screen edge */
-        top: -10% !important; /* Slightly above the visible screen */
-        transform: scale(0.7) !important; /* 10% smaller than before */
+        left: 32px !important;
+        right: auto !important;
+        top: -10% !important;
+        transform: scale(0.7) !important;
         transform-origin: left top !important;
         width: 220px !important;
         position: absolute !important;
         z-index: 5 !important;
-        overflow: visible !important; /* Allow queen heads to show */
+        overflow: visible !important;
+        display: block !important;
     }
-    
+
     #black-tray.player-tray {
-        right: 20px !important; /* Farther from board, closer to screen edge */
-        top: -10% !important; /* Slightly above the visible screen */
-        transform: scale(0.7) !important; /* 10% smaller than before */
+        right: 32px !important;
+        left: auto !important;
+        top: -10% !important;
+        transform: scale(0.7) !important;
         transform-origin: right top !important;
         width: 220px !important;
         position: absolute !important;
-        z-index: 5 !important;
-        overflow: visible !important; /* Allow queen heads to show */
+        z-index: 6 !important;
+        overflow: visible !important;
+        display: block !important;
     }
     
     #move-history {
+        display: none !important;
+        position: fixed !important;
         right: 10px !important;
-        bottom: 10px !important; /* Position at bottom */
-        top: auto !important; /* Override top positioning */
-        width: 80px !important;
-        height: 30px !important;
-        max-height: 30px !important;
-        font-size: 12px !important;
-        z-index: 6 !important; /* Above trays */
-        overflow: hidden !important;
-        cursor: pointer !important;
-        text-align: center !important;
-        line-height: 30px !important;
-        transition: all 0.3s ease !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        color: transparent !important; /* Hide actual content */
+        bottom: 10px !important;
+        z-index: 20 !important;
     }
+    #move-history.tablet-expanded {
+        display: block !important;
+        width: 250px !important;
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important;
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        color: var(--text) !important;
+        background: rgba(0,0,0,0.5) !important;
+        border-radius: 8px !important;
+    }
+    #move-history.tablet-expanded #moves-list,
+    #move-history.tablet-expanded #history-controls,
+    #move-history.tablet-expanded #history-slider,
+    #move-history.tablet-expanded #history-slider-ticks {
+        display: block !important;
+    }
+    #move-history:not(.tablet-expanded) #moves-list,
+    #move-history:not(.tablet-expanded) #history-controls,
+    #move-history:not(.tablet-expanded) #history-slider,
+    #move-history:not(.tablet-expanded) #history-slider-ticks {
+        display: none !important;
+    }
+        }
+        #move-history.tablet-expanded .history-entry:first-child {
+            margin-top: 0 !important;
+        }
+        #black-tray.player-tray {
+            color: inherit !important;
+            display: block !important;
+            overflow: visible !important;
+        }
     
-    #move-history #moves-list {
-        display: none !important; /* Hide moves list when minimized */
-    }
     
     #move-history h3 {
         display: none !important; /* Hide header when minimized */
@@ -319,14 +557,6 @@ html, body {
         display: block !important;
     }
     
-    #move-history::before {
-        content: "History" !important;
-        display: block !important;
-        color: var(--text) !important; /* Make button text visible */
-        position: absolute !important;
-        width: 100% !important;
-        text-align: center !important;
-    }
     
     #move-history.tablet-expanded::before {
         display: none !important;
@@ -356,7 +586,7 @@ html, body {
     #move-history.tablet-expanded .history-entry:first-child {
         margin-top: 0 !important; /* Ensure first move starts at top */
     }
-}
+
 
 /* Force landscape orientation on mobile */
 @media screen and (max-width: 768px) and (orientation: portrait) {
@@ -437,8 +667,28 @@ html, body {
     #move-history {
         display: none !important;
     }
+    #move-history.tablet-expanded {
+        display: block !important;
+        width: 250px !important;
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important;
+        bottom: 10px !important;
+        right: 10px !important;
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        z-index: 20 !important;
+        color: var(--text) !important;
+        position: fixed !important;
+        background: rgba(0,0,0,0.5) !important;
+        border-radius: 8px !important;
+    }
     
     #move-history.expanded {
+    display: block !important;
         display: block !important;
         position: fixed;
         top: 60px;
@@ -452,17 +702,28 @@ html, body {
     
     #move-history-toggle {
         display: block !important;
-        position: absolute;
-        top: 16px;
-        right: 280px;
-        padding: 8px 12px;
-        border-radius: 6px;
-        background: rgba(0,0,0,0.5);
-        color: var(--text);
-        border: 1px solid var(--text);
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 6px 16px;
+        border-radius: 8px;
+        background: #E6B84D;
+        color: #4B382A;
+        font-family: 'Milonga', serif;
+        font-size: 15px;
+        border: 2px solid #E6B84D;
+        box-shadow: 0 2px 8px #e6b84d44;
         cursor: pointer;
-        font-size: 12px;
-        z-index: 10;
+        z-index: 30;
+#move-history-toggle {
+    font-size: 13px !important;
+    padding: 4px 10px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 8px !important;
+}
     }
     
     #auto-zoom-toggle {

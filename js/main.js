@@ -1,3 +1,185 @@
+// --- HISTORY REPLAY LOGIC ---
+function renderHistoryControls() {
+    const movesList = document.getElementById('moves-list');
+    const slider = document.getElementById('history-slider');
+    const returnBtn = document.getElementById('return-to-live');
+    if (!movesList || !slider || !window.historySnapshots) return;
+
+    // Set slider range
+    slider.max = Math.max(0, window.historySnapshots.length - 1);
+    slider.value = window.historySnapshots.length - 1;
+
+    // --- DYNAMIC TICK MARKS ---
+    let ticks = document.getElementById('history-slider-ticks');
+    if (!ticks) {
+        ticks = document.createElement('div');
+        ticks.id = 'history-slider-ticks';
+        ticks.style.position = 'relative';
+        ticks.style.width = '100%';
+        ticks.style.height = '10px';
+        ticks.style.marginTop = '-10px';
+        slider.parentNode.insertBefore(ticks, slider.nextSibling);
+    }
+    ticks.innerHTML = '';
+    const numTicks = window.historySnapshots.length;
+    if (numTicks > 1) {
+        for (let i = 0; i < numTicks; i++) {
+            const tick = document.createElement('div');
+            tick.className = 'slider-tick';
+            tick.style.position = 'absolute';
+            tick.style.left = ((i / (numTicks - 1)) * 100) + '%';
+            tick.style.top = '0';
+            tick.style.width = '2px';
+            tick.style.height = '10px';
+            tick.style.background = '#E6B84D';
+            tick.style.transform = 'translateX(-1px)';
+            ticks.appendChild(tick);
+        }
+    }
+
+
+    // Slider handler
+    slider.oninput = function() {
+        showHistoryOverlay(Number(slider.value));
+    };
+
+    // Always scroll move history to bottom (most recent move)
+    const historyPanel = document.getElementById('move-history');
+    if (historyPanel) {
+        historyPanel.scrollTop = historyPanel.scrollHeight;
+    }
+
+    // Return to live button
+    returnBtn.onclick = function() {
+        hideHistoryOverlay();
+    };
+}
+
+function showHistoryOverlay(moveIdx) {
+    // Create overlay if not present
+    let overlay = document.getElementById('history-board-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'history-board-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.zIndex = '100';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.background = 'rgba(0,0,0,0.15)';
+        document.getElementById('game-container').appendChild(overlay);
+    }
+    overlay.innerHTML = '';
+    overlay.style.opacity = '0';
+    overlay.style.display = 'block';
+    // Fade in overlay
+    setTimeout(() => {
+        overlay.style.transition = 'opacity 350ms';
+        overlay.style.opacity = '1';
+    }, 10);
+
+    // Render board snapshot
+    const snap = window.historySnapshots[moveIdx];
+    if (!snap) return;
+
+    // Get board centering and scaling info
+    const cellRadius = window.CELL_RADIUS || 48;
+    const baseScale = window.baseScale || 1.0;
+    const glowBounds = window.glowBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    const app = window.app;
+    const containerRect = app ? { width: app.renderer.width, height: app.renderer.height } : { width: 900, height: 700 };
+    const centerX = containerRect.width / 2;
+    const centerY = containerRect.height / 2;
+    const boardCenterX = (glowBounds.minX + glowBounds.maxX) / 2;
+    const boardCenterY = (glowBounds.minY + glowBounds.maxY) / 2;
+
+    // Overlay SVG for all pieces
+    const overlaySVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    overlaySVG.setAttribute('width', containerRect.width);
+    overlaySVG.setAttribute('height', containerRect.height);
+    overlaySVG.style.position = 'absolute';
+    overlaySVG.style.left = '0';
+    overlaySVG.style.top = '0';
+    overlaySVG.style.pointerEvents = 'none';
+
+    // Render each piece as a hex at correct position
+    snap.pieces.forEach(piece => {
+        if (!piece.placed) return;
+        const p = axialToPixel(piece.q, piece.r);
+        // Center and scale to match board
+        const px = centerX - boardCenterX * baseScale + p.x * baseScale;
+        const py = centerY - boardCenterY * baseScale + p.y * baseScale - (piece.stackIndex || 0) * 6 * baseScale;
+        const color = getReplayPieceColor(piece.key, piece.color);
+        // Draw hexagon
+        const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        const hexPoints = getHexPoints(px, py, cellRadius * baseScale);
+        hex.setAttribute('points', hexPoints);
+        hex.setAttribute('fill', color);
+        hex.setAttribute('stroke', piece.color === 'white' ? '#fff' : '#222');
+    hex.setAttribute('stroke-width', '6');
+        overlaySVG.appendChild(hex);
+        // Piece label (centered)
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', px);
+        text.setAttribute('y', py + 7 * baseScale);
+        text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('font-size', 26 * baseScale);
+        text.setAttribute('fill', piece.color === 'white' ? '#222' : '#fff');
+    text.setAttribute('font-family', 'Milonga, serif');
+        text.textContent = piece.key;
+        overlaySVG.appendChild(text);
+    });
+    overlay.appendChild(overlaySVG);
+
+    // Show return button
+    document.getElementById('return-to-live').style.display = 'block';
+}
+
+// Helper to get hexagon points for SVG
+function getHexPoints(cx, cy, radius) {
+    // Flat-top hex orientation: rotate by 30deg so flat edge is at top
+    let points = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const x = cx + radius * Math.cos(angle);
+        const y = cy + radius * Math.sin(angle);
+        points.push(`${x},${y}`);
+    }
+    return points.join(' ');
+}
+
+function hideHistoryOverlay() {
+    const overlay = document.getElementById('history-board-overlay');
+    if (overlay) {
+        overlay.style.transition = 'opacity 350ms';
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 350);
+    }
+    document.getElementById('return-to-live').style.display = 'none';
+}
+
+function getReplayPieceColor(key, color) {
+    // Use same color logic as getEnhancedPieceInfo
+    if (key === 'Q') return '#FFD700';
+    if (key === 'B') return '#9000f0ff';
+    if (key === 'A') return '#1b4ad7ff';
+    if (key === 'G') return '#01a501ff';
+    if (key === 'S') return '#8B4513';
+    return color === 'white' ? '#fff' : '#333';
+}
+
+// Hook up rendering after each move history update
+const movesList = document.getElementById('moves-list');
+const observer = new MutationObserver(() => {
+    renderHistoryControls();
+});
+if (movesList) {
+    observer.observe(movesList, { childList: true });
+}
 let app, boardLayer, pieceLayer, glowLayer, whiteTrayApp, blackTrayApp;
 window.addEventListener('load', () => {
     // --- MAIN BOARD PIXI SETUP ---
@@ -37,6 +219,12 @@ window.addEventListener('load', () => {
         antialias: true
     });
     document.getElementById('white-tray').appendChild(whiteTrayApp.view);
+    whiteTrayApp.view.style.position = 'absolute';
+whiteTrayApp.view.style.left = '0px';
+whiteTrayApp.view.style.top = '30px';
+whiteTrayApp.view.style.transform = 'scale(1.0)';
+whiteTrayApp.view.style.transformOrigin = 'left top';
+whiteTrayApp.view.style.zIndex = '5';
 
     blackTrayApp = new PIXI.Application({
         width: 220,
@@ -45,20 +233,30 @@ window.addEventListener('load', () => {
         antialias: true
     });
     document.getElementById('black-tray').appendChild(blackTrayApp.view);
+    blackTrayApp.view.style.position = 'absolute';
+blackTrayApp.view.style.right = '0px';
+blackTrayApp.view.style.top = '30px';
+blackTrayApp.view.style.transform = 'scale(1.0)';
+blackTrayApp.view.style.transformOrigin = 'right top';
+blackTrayApp.view.style.zIndex = '6';
 
     window.whiteTrayApp = whiteTrayApp;
     window.blackTrayApp = blackTrayApp;
 
     const winBanner = new PIXI.Text('', {
-        fontSize: 64,
+        fontFamily: 'Milonga',
+        fontSize: Math.min(app.renderer.width, app.renderer.height) * 0.09,
         fill: '#ffffff',
         stroke: '#000000',
-        strokeThickness: 7,
-        align: 'center'
+        strokeThickness: 8,
+        align: 'center',
+        wordWrap: true,
+        wordWrapWidth: app.renderer.width * 0.8
     });
     winBanner.anchor.set(0.5);
     winBanner.position.set(app.renderer.width / 2, app.renderer.height / 2);
     winBanner.visible = false;
+    winBanner.resolution = 2;
     app.stage.addChild(winBanner);
     
     // Make winBanner globally accessible
@@ -126,28 +324,24 @@ window.addEventListener('load', () => {
         }
     });
 
-    // Move history toggle functionality for mobile
+    // Move history toggle for all modes
     moveHistoryToggle.addEventListener('click', (e) => {
-        moveHistory.classList.toggle('expanded');
-        e.target.textContent = moveHistory.classList.contains('expanded') ? 'Hide' : 'History';
-    });
-
-    // Tablet-specific move history toggle - click the panel to show/hide history
-    moveHistory.addEventListener('click', (e) => {
-        // Only handle clicks in tablet mode (769px-850px)
         if (window.innerWidth >= 769 && window.innerWidth <= 850) {
             moveHistory.classList.toggle('tablet-expanded');
+            e.target.textContent = moveHistory.classList.contains('tablet-expanded') ? 'Hide' : 'History';
+        } else {
+            moveHistory.classList.toggle('expanded');
+            e.target.textContent = moveHistory.classList.contains('expanded') ? 'Hide' : 'History';
         }
     });
 
-    // Initialize tablet mode - ensure history starts minimized
+    // Ensure tablet history panel starts minimized
     function initializeTabletMode() {
         if (window.innerWidth >= 769 && window.innerWidth <= 850) {
             moveHistory.classList.remove('tablet-expanded');
+            moveHistoryToggle.textContent = 'History';
         }
     }
-
-    // Check on load and resize
     initializeTabletMode();
     window.addEventListener('resize', initializeTabletMode);
 

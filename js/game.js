@@ -1,3 +1,28 @@
+// --- HISTORY SNAPSHOTS ---
+window.historySnapshots = [];
+
+function snapshotBoardState() {
+    // Deep copy of all placed pieces and their positions/stacks
+    const pieces = tray.map(p => ({
+        key: p.meta.key,
+        color: p.meta.color,
+        placed: p.meta.placed,
+        q: p.meta.q,
+        r: p.meta.r,
+        stackIndex: (() => {
+            if (!p.meta.placed) return null;
+            const cell = window.cells.get(`${p.meta.q},${p.meta.r}`);
+            if (!cell || !cell.stack) return null;
+            return cell.stack.indexOf(p);
+        })()
+    }));
+    // Also store move number and current player
+    window.historySnapshots.push({
+        pieces,
+        moveNumber: state.moveNumber,
+        current: state.current
+    });
+}
 // --- CONFIG ---
 window.CELL_RADIUS = 38;
 
@@ -7,7 +32,7 @@ window.AUTO_ZOOM_ENABLED = true; // Toggle for auto-zoom feature
 
 // Zoom variables
 let currentZoom = 1.0;
-let minZoom = 0.3;
+let minZoom = 1.0;
 let maxZoom = 3.0;
 let panX = 0;
 let panY = 0;
@@ -78,7 +103,7 @@ window.updateBoardViewport = function() {
     const baseScale = Math.min(scaleX, scaleY);
     
     // Ensure baseScale is never too small (minimum 0.1) and log for debugging
-    const safeBaseScale = Math.max(0.1, baseScale);
+    const safeBaseScale = Math.max(0.8, baseScale);
     console.log(`Board scale calculation: container=${containerRect.width}x${containerRect.height}, glow=${glowWidth}x${glowHeight}, baseScale=${baseScale}, safeBaseScale=${safeBaseScale}`);
     
     // Store the glow bounds and base scale globally
@@ -95,7 +120,7 @@ window.updateBoardViewport = function() {
         const boardCenterY = (minY + maxY) / 2;
         
         // Ensure board is always visible with minimum scale
-        const minVisibleScale = 0.3;
+        const minVisibleScale = 0.7;
         const finalScale = Math.max(minVisibleScale, safeBaseScale);
         
         // Reset zoom and position to 100%
@@ -120,14 +145,14 @@ window.updateBoardViewport = function() {
     }
     
     // Set zoom constraints - can only zoom in from glow boundary
-    window.minZoom = 1.0; // 100% = glow touches container edges
-    window.maxZoom = 3.0;
+    window.minZoom = .5; // 100% = glow touches container edges
+    window.maxZoom = 6.0;
 }
 
 // --- ZOOM SYSTEM ---
 function updateZoomConstraints() {
     // Minimum zoom is 1.0 (100% - board fits perfectly in container)
-    window.minZoom = 1.0;
+    window.minZoom = .5;
     window.maxZoom = 3.0; // Can zoom in up to 300%
     
     // Ensure current zoom is valid
@@ -791,6 +816,7 @@ function updateHUD(){
         hud.textContent = state.current.charAt(0).toUpperCase()
                        + state.current.slice(1)
                        + ' to move (turn '+state.moveNumber+')';
+        hud.style.fontFamily = 'Milonga, serif';
     } else {
         // Current player has no legal moves - pass turn
         passTurn();
@@ -957,6 +983,8 @@ function commitPlacement(q,r){
         state.current = state.current==='white'?'black':'white';
         updateHUD();
     }
+    // Take a snapshot of the board state after placement
+    snapshotBoardState();
     // win check: check both players for surrounded queens
     const winner = checkForWinner();
     if (winner) {
@@ -982,21 +1010,27 @@ function commitPlacement(q,r){
         if(list){
             const li = document.createElement('li');
             li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
-            const mini = buildMiniPathSVG([[q,r]]); // single dot for placement
             const label = labelFromCenter(q,r);
             const moveNum = Math.max(1, state.moveNumber - 1);
             const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-            
-            const txt = document.createElement('div'); 
-            txt.className='move-text';
-            txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> placed at (${q},${r}) ${label}`;
-            
-            li.appendChild(mini);
+
+            // Gold hex button for move number
+            const hexBtn = document.createElement('button');
+            hexBtn.className = 'move-hex-btn gold-hex';
+            hexBtn.title = `Preview board at move ${moveNum}`;
+            hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
+            hexBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (window.showHistoryOverlay) window.showHistoryOverlay(moveNum - 1);
+            };
+
+            const txt = document.createElement('div');
+            txt.className = 'move-text';
+            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> placed at (${q},${r}) ${label}`;
+
+            li.appendChild(hexBtn);
             li.appendChild(txt);
-            // Hover overlay removed
             list.appendChild(li);
-            
-            // Don't auto-scroll - let user control scrolling manually
         }
     }catch(e){console.warn('move history update failed', e);} 
 
@@ -1503,58 +1537,40 @@ function commitMove(q,r){
     oldCell.stack.forEach((c,i)=>{
         const rel=axialToPixel(oldCell.q,oldCell.r);
         c.x = rel.x;
-        c.y = rel.y - i*6;
-    });
-
-    const cell=window.cells.get(`${q},${r}`);
-    cell.stack.push(p);
-    
-    // Store original position for animation
-    const fromQ = p.meta.q;
-    const fromR = p.meta.r;
-
-    // Use piece-specific animation with original board state
-    animatePieceMovement(p, fromQ, fromR, q, r, occBefore, () => {
-        const rel=axialToPixel(q,r);
-        cell.stack.forEach((c,i)=>{
-            c.x = rel.x;
-            c.y = rel.y - i*6;
-            pieceLayer.setChildIndex(c,
-                pieceLayer.children.length-cell.stack.length+i
-            );
-        });
-
-        p.meta.q=q; p.meta.r=r;
-
-        animating=false;
-        state.moveNumber++;
-        state.current = state.current==='white'?'black':'white';
-        updateHUD();
-
-        const winner = checkForWinner();
-        if (winner) {
-            state.gameOver = true;
-            setTimeout(() => {
-                const banner = window.winBanner;
-                if (banner) {
-                    if (winner === 'DRAW') {
-                        banner.text = `GAME OVER - DRAW!`;
+                if(list){
+                    const li = document.createElement('li');
+                    li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
+                    const moveNum = Math.max(1, state.moveNumber - 1);
+                    // Gold hex button for move number
+                    const hexBtn = document.createElement('button');
+                    hexBtn.className = 'move-hex-btn gold-hex';
+                    hexBtn.title = `Preview board at move ${moveNum}`;
+                    hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
+                    hexBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.showHistoryOverlay) window.showHistoryOverlay(moveNum - 1);
+                    };
+                    let txt;
+                    if(p.meta.key === 'S'){
+                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+                        const newLabel = labelFromCenter(q,r);
+                        const oldCoords = oldKey.split(',').map(Number);
+                        txt = document.createElement('div'); txt.className='move-text';
+                        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
                     } else {
-                        banner.text = `GAME OVER - ${winner.toUpperCase()} WINS!`;
+                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+                        const newLabel = labelFromCenter(q,r);
+                        const oldCoords = oldKey.split(',').map(Number);
+                        txt = document.createElement('div'); txt.className='move-text';
+                        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
                     }
-                    banner.visible = true;
-                } else {
-                    console.log(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
-                    alert(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
+                    li.appendChild(hexBtn);
+                    li.appendChild(txt);
+                    list.appendChild(li);
                 }
-            }, 100);
-        }
 
-        clearHighlights();
-        selected = null;
-        tray.forEach(p2=>p2.interactive = true);
-        clickSfx.play().catch(()=>{});
-
+        // Take a snapshot of the board state after move
+        snapshotBoardState();
         // Always auto-zoom after move
         if(AUTO_ZOOM_ENABLED) {
             autoZoomToFitPieces();
@@ -1632,9 +1648,9 @@ function getEnhancedPieceInfo(piece) {
     
     const pieceColors = {
         'Q': '#FFD700', // Gold for Queen
-        'B': '#800080', // Purple for Beetle
-        'A': '#4169E1', // Blue for Ant
-        'G': '#32CD32', // Green for Grasshopper
+        'B': '#9000f0ff', // Purple for Beetle
+        'A': '#1b4ad7ff', // Blue for Ant
+        'G': '#01a501ff', // Green for Grasshopper
         'S': '#8B4513'  // Brown for Spider
     };
     

@@ -12,8 +12,11 @@
   <div id="game-title">HYVEMYND</div>
   <div id="hud">White to move</div>
   <div id="move-history">
-    <h3>Move History</h3>
     <ol id="moves-list"></ol>
+    <div id="history-controls" style="position:sticky;bottom:0;z-index:10;background:rgba(0,0,0,0.5);padding-top:4px;">
+      <input type="range" id="history-slider" min="0" value="0" step="1" style="width: 100%; margin: 8px 0;">
+      <button id="return-to-live" style="display:none; margin: 4px 0;">Return to Live</button>
+    </div>
   </div>
   <div id="game-container">
     <div id="app"></div>
