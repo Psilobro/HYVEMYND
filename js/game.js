@@ -1522,6 +1522,7 @@ function getSpiderPaths(q0, r0, occAllParam){
     if(found.ccw && !found.cw && found.startIdxCCW!==null){ paths.push(finalFromStartPath(found.startIdxCCW,-1)); }
 
     return paths;
+
 }
 
 function commitMove(q,r){
@@ -1641,17 +1642,25 @@ function commitMove(q,r){
                         const oldCoords = oldKey.split(',').map(Number);
                         txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
                     }
-                    li.appendChild(mini);
+                    const hexBtn = document.createElement('button');
+                    hexBtn.className = 'move-hex-btn gold-hex';
+                    hexBtn.title = `Preview board at move ${moveNum}`;
+                    hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
+                    li.appendChild(hexBtn);
                     li.appendChild(txt);
+                    
                     // Hover overlay removed
                     list.appendChild(li);
                     
                     // Don't auto-scroll - let user control scrolling manually
                 }
-            }catch(e){console.warn('move history update failed', e);} 
+            } catch(e) {
+                console.warn('move history update failed', e);
+            } 
             
             // Check if board needs expansion after move
             checkForBoardExpansion();
+            snapshotBoardState();
     });
 }
 
