@@ -1011,17 +1011,17 @@ function commitPlacement(q,r){
             const li = document.createElement('li');
             li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
             const label = labelFromCenter(q,r);
-            const moveNum = Math.max(1, state.moveNumber - 1);
+            const idx = window.historySnapshots.length - 1;
             const { fullName, pieceColor } = getEnhancedPieceInfo(p);
 
             // Gold hex button for move number
             const hexBtn = document.createElement('button');
             hexBtn.className = 'move-hex-btn gold-hex';
-            hexBtn.title = `Preview board at move ${moveNum}`;
-            hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
+            hexBtn.title = `Preview board at move ${idx + 1}`;
+            hexBtn.innerHTML = `<span class=\"move-num\">${idx + 1}</span>`;
             hexBtn.onclick = (e) => {
                 e.stopPropagation();
-                if (window.showHistoryOverlay) window.showHistoryOverlay(moveNum - 1);
+                if (window.showHistoryOverlay) window.showHistoryOverlay(idx);
             };
 
             const txt = document.createElement('div');
@@ -1591,76 +1591,46 @@ function commitMove(q,r){
         clickSfx.play().catch(()=>{});
 
 
-        // Always auto-zoom after move
-        if(AUTO_ZOOM_ENABLED) {
-            autoZoomToFitPieces();
-        }
-        // add to move history
-        try{
-            const list = document.getElementById('moves-list');
-                if(list){
-                    const li = document.createElement('li');
-                    li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
-                    let mini, txt;
-                    const moveNum = Math.max(1, state.moveNumber - 1);
-                    if(p.meta.key === 'S'){
-                        // attempt to get exact validated 3-step spider path using board occupancy before the move
-                        const start = oldKey.split(',').map(Number);
-                        const exactPaths = getSpiderPaths(start[0], start[1], occBefore);
-                        let path = null;
-                        if(exactPaths && exactPaths.length){
-                            // prefer the path that ends at the moved-to coordinate if present
-                            for(const pth of exactPaths){
-                                const last = pth[pth.length-1];
-                                if(last[0]===q && last[1]===r){ path = pth; break; }
-                            }
-                            // otherwise just pick the first exact path
-                            if(!path) path = exactPaths[0];
-                        }
-                        if(!path){
-                            // fallback: approximate stepwise path from old to new
-                            const end = [q,r];
-                            const steps = pathStepsBetween(start[0], start[1], end[0], end[1]);
-                            path = [[start[0],start[1]], ...steps.slice(0,3)];
-                        }
-                        mini = buildMiniPathSVG(path);
-                        const stepLabels = path.map(([aq,ar],i)=>{
-                            if(i===0) return null;
-                            const prev = path[i-1];
-                            return directionLabelFromDelta(aq - prev[0], ar - prev[1]);
-                        }).filter(Boolean).join(',');
-                        txt = document.createElement('div'); txt.className='move-text';
-                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-                        const newLabel = labelFromCenter(q,r);
-                        const oldCoords = oldKey.split(',').map(Number);
-                        txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r}) [${stepLabels}]`;
-                    } else {
-                        mini = buildMiniPathSVG([[q,r]]);
-                        txt = document.createElement('div'); txt.className='move-text';
-                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-                        const newLabel = labelFromCenter(q,r);
-                        const oldCoords = oldKey.split(',').map(Number);
-                        txt.innerHTML = `<span class="move-number">${moveNum}.</span> <span class="piece-name" style="color: ${pieceColor}">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
-                    }
-                    const hexBtn = document.createElement('button');
-                    hexBtn.className = 'move-hex-btn gold-hex';
-                    hexBtn.title = `Preview board at move ${moveNum}`;
-                    hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
-                    li.appendChild(hexBtn);
-                    li.appendChild(txt);
-                    
-                    // Hover overlay removed
-                    list.appendChild(li);
-                    
-                    // Don't auto-scroll - let user control scrolling manually
-                }
-            } catch(e) {
-                console.warn('move history update failed', e);
-            } 
+// Always auto-zoom after move
+if(AUTO_ZOOM_ENABLED) {
+    autoZoomToFitPieces();
+}
+
+// Take a snapshot of the board state after move
+snapshotBoardState();
+
+// add to move history
+try{
+    const list = document.getElementById('moves-list');
+    if(list){
+        const li = document.createElement('li');
+        li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
+        const idx = window.historySnapshots.length - 1;
+        // Gold hex button for move number
+        const hexBtn = document.createElement('button');
+        hexBtn.className = 'move-hex-btn gold-hex';
+        hexBtn.title = `Preview board at move ${idx + 1}`;
+        hexBtn.innerHTML = `<span class=\"move-num\">${idx + 1}</span>`;
+        hexBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.showHistoryOverlay) window.showHistoryOverlay(idx);
+        };
+        let txt;
+        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+        const oldCoords = oldKey.split(',').map(Number);
+        txt = document.createElement('div'); txt.className='move-text';
+        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+        li.appendChild(hexBtn);
+        li.appendChild(txt);
+        list.appendChild(li);
+    }
+} catch(e) {
+    console.warn('move history update failed', e);
+} 
             
-            // Check if board needs expansion after move
-            checkForBoardExpansion();
-            snapshotBoardState();
+// Check if board needs expansion after move
+checkForBoardExpansion();
+            
     });
 }
 
@@ -1808,15 +1778,15 @@ if(ix>=0) oldCell.stack.splice(ix,1);
                 if(list){
                     const li = document.createElement('li');
                     li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
-                    const moveNum = Math.max(1, state.moveNumber - 1);
+                    const idx = window.historySnapshots.length - 1;
                     // Gold hex button for move number
                     const hexBtn = document.createElement('button');
                     hexBtn.className = 'move-hex-btn gold-hex';
-                    hexBtn.title = `Preview board at move ${moveNum}`;
-                    hexBtn.innerHTML = `<span class=\"move-num\">${moveNum}</span>`;
+                    hexBtn.title = `Preview board at move ${idx + 1}`;
+                    hexBtn.innerHTML = `<span class=\"move-num\">${idx + 1}</span>`;
                     hexBtn.onclick = (e) => {
                         e.stopPropagation();
-                        if (window.showHistoryOverlay) window.showHistoryOverlay(moveNum - 1);
+                        if (window.showHistoryOverlay) window.showHistoryOverlay(idx);
                     };
                     let txt;
                     if(p.meta.key === 'S'){
