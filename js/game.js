@@ -1204,53 +1204,53 @@ function legalMoveZones(piece){
 
     const zones=new Set();
 
-    if(type==='B'){
-        DIRS.forEach(d=>{
-            const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`;
-            if(window.cells.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
+    if(type==='B'){ // If the piece is a Beetle
+        DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
+            const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`; // Calculate adjacent cell coordinates and create key string
+            if(window.cells.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k); // Add to legal zones if cell exists on board and hive stays connected after move
         });
     }
-    else if(type==='Q'){
-        DIRS.forEach(d=>{
-            const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`;
-            if(window.cells.has(k)
-               && !occAll.has(k)
-               && canSlide(q0,r0,x,y,occRem)
-               && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)
-            ) zones.add(k);
+    else if(type==='Q'){ // If the piece is a Queen
+        DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
+            const x=q0+d.dq, y=r0+d.dr, k=`${x},${y}`; // Calculate adjacent cell coordinates and create key string
+            if(window.cells.has(k) // Check if destination cell exists on the board
+               && !occAll.has(k) // Check if destination cell is not occupied by any piece
+               && canSlide(q0,r0,x,y,occRem) // Check if piece can slide to destination (no tight gaps blocking movement)
+               && wouldHiveRemainConnectedAfterMove(q0,r0,x,y) // Check if moving would keep the hive connected
+            ) zones.add(k); // Add destination to legal movement zones if all conditions are met
         });
     }
-    else if(type==='G'){
-        DIRS.forEach(d=>{
-            let x=q0+d.dq, y=r0+d.dr, jumped=0;
-            while(occAll.has(`${x},${y}`)){
-                jumped++;
-                x+=d.dq; y+=d.dr;
+    else if(type==='G'){ // If the piece is a Grasshopper
+        DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
+            let x=q0+d.dq, y=r0+d.dr, jumped=0; // Start at first adjacent cell and initialize jump counter
+            while(occAll.has(`${x},${y}`)){ // Continue jumping while there are pieces to jump over
+                jumped++; // Increment the number of pieces jumped over
+                x+=d.dq; y+=d.dr; // Move to the next cell in the same direction
             }
-            const k=`${x},${y}`;
-            if(jumped>0 && window.cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k);
+            const k=`${x},${y}`; // Create key for the landing cell (first empty cell after jumping)
+            if(jumped>0 && window.cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k); // Add to legal zones if at least one piece was jumped, landing cell exists and is empty, and hive stays connected
         });
     }
-    else if(type==='A'){
-        const queue=[[q0,r0]], vis=new Set();
-        while(queue.length){
-            const [cx,cy]=queue.shift();
-            DIRS.forEach(d=>{
-                const nx=cx+d.dq, ny=cy+d.dr, k=`${nx},${ny}`;
-                if(!window.cells.has(k)
-                   || occRem.has(k)
-                   || vis.has(k)
-                   || !canSlide(cx,cy,nx,ny,occRem)
-                ) return;
+    else if(type==='A'){ // If the piece is an Ant
+        const queue=[[q0,r0]], vis=new Set(); // Initialize BFS queue with starting position and visited set
+        while(queue.length){ // Continue BFS until all reachable cells are explored
+            const [cx,cy]=queue.shift(); // Dequeue the next cell to explore from
+            DIRS.forEach(d=>{ // Check all 6 adjacent directions from current cell
+                const nx=cx+d.dq, ny=cy+d.dr, k=`${nx},${ny}`; // Calculate neighbor coordinates and key
+                if(!window.cells.has(k) // Skip if cell doesn't exist on board
+                   || occRem.has(k) // Skip if cell is occupied (after simulating piece removal)
+                   || vis.has(k) // Skip if cell has already been visited in this search
+                   || !canSlide(cx,cy,nx,ny,occRem) // Skip if piece cannot slide to this neighbor (blocked by tight gaps)
+                ) return; // Exit early if any blocking condition is met
                 // ensure making this move would not break the hive
-                if(!wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) return;
-                vis.add(k);
-                queue.push([nx,ny]);
-                zones.add(k);
+                if(!wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) return; // Skip if moving to this cell would disconnect the hive
+                vis.add(k); // Mark this cell as visited to prevent revisiting
+                queue.push([nx,ny]); // Add this cell to the queue for further exploration
+                zones.add(k); // Add this cell to the set of legal destination zones
             });
         }
     }
-    else if(type==='S'){
+    else if(type==='S'){ // If the piece is a Spider
         return getSpiderMoves(q0, r0);
     }
 
@@ -1267,261 +1267,261 @@ function getSpiderMoves(q0, r0) {
     //    +3 and -3 indices along the ordered ring and validate the three
     //    slide steps with canSlide and touching-hive checks.
 
-    if (!hiveIntactAfterRemoval(q0, r0)) return [];
+    if (!hiveIntactAfterRemoval(q0, r0)) return []; // Early return if removing spider breaks hive connectivity - basic sanity check
 
-    const startKey = `${q0},${r0}`;
-    const cell = window.cells.get(startKey);
+    const startKey = `${q0},${r0}`; // Create string key for spider's starting position
+    const cell = window.cells.get(startKey); // Get the cell object at starting position
     // build occRem from current cells and simulate removal of the spider piece
-    const occAll = new Set();
-    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
-    const occRem = new Set(occAll);
-    if (!cell || !cell.stack || cell.stack.length <= 1) {
-        occRem.delete(startKey);
+    const occAll = new Set(); // Initialize set for all occupied cells
+    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); }); // Populate set with all occupied cell keys
+    const occRem = new Set(occAll); // Copy occupied set for simulation
+    if (!cell || !cell.stack || cell.stack.length <= 1) { // Check if spider is the only piece on its cell
+        occRem.delete(startKey); // Remove spider's cell from occupied set if it will be empty after removal
     }
 
     // collect perimeter candidates: empty cells adjacent to occRem
-    const perimeter = new Map(); // key -> {q,r,x,y}
-    let cx = 0, cy = 0, count = 0;
-    occRem.forEach(k => {
-        const [oq,or] = k.split(',').map(Number);
-        const pt = axialToPixel(oq,or);
-        cx += pt.x; cy += pt.y; count++;
+    const perimeter = new Map(); // key -> {q,r,x,y} - map to store perimeter cells with coordinates
+    let cx = 0, cy = 0, count = 0; // Variables for calculating centroid
+    occRem.forEach(k => { // Iterate over occupied cells to compute centroid
+        const [oq,or] = k.split(',').map(Number); // Parse coordinates from key
+        const pt = axialToPixel(oq,or); // Convert to pixel coordinates
+        cx += pt.x; cy += pt.y; count++; // Accumulate sums for centroid calculation
     });
-    if(count===0) return [];
-    cx /= count; cy /= count;
+    if(count===0) return []; // Edge case: no occupied cells, return empty moves
+    cx /= count; cy /= count; // Compute average centroid position
 
-    occRem.forEach(k=>{}); // no-op to keep parity
+    occRem.forEach(k=>{}); // no-op to keep parity - unnecessary placeholder, likely copy-paste artifact
 
     // build perimeter set
-    occRem.forEach(k=>{});
-    occRem.forEach(o => {});
+    occRem.forEach(k=>{}); // Another no-op - redundant and confusing
+    occRem.forEach(o => {}); // Yet another no-op - these seem like debugging leftovers or mistakes
 
     // iterate neighborhood around occupied cells
-    occRem.forEach(k => {
-        const [oq,or] = k.split(',').map(Number);
-        DIRS.forEach(d => {
-            const nq = oq + d.dq, nr = or + d.dr;
-            const nk = `${nq},${nr}`;
-            if(!window.cells.has(nk)) return;
-            if(occRem.has(nk)) return;
+    occRem.forEach(k => { // Loop through occupied cells again
+        const [oq,or] = k.split(',').map(Number); // Parse coordinates again
+        DIRS.forEach(d => { // Check all 6 directions from each occupied cell
+            const nq = oq + d.dq, nr = or + d.dr; // Calculate neighbor coordinates
+            const nk = `${nq},${nr}`; // Create neighbor key
+            if(!window.cells.has(nk)) return; // Skip if neighbor cell doesn't exist on board
+            if(occRem.has(nk)) return; // Skip if neighbor is occupied
             // ensure it touches hive (by virtue of adjacency above)
-            if(!perimeter.has(nk)){
-                const p = axialToPixel(nq,nr);
-                perimeter.set(nk, {q:nq,r:nr,x:p.x,y:p.y});
+            if(!perimeter.has(nk)){ // If not already in perimeter map
+                const p = axialToPixel(nq,nr); // Get pixel position
+                perimeter.set(nk, {q:nq,r:nr,x:p.x,y:p.y}); // Add to perimeter with coordinates
             }
         });
     });
 
-    if(perimeter.size===0) return [];
+    if(perimeter.size===0) return []; // No perimeter cells found, return empty moves
 
     // sort by angle around centroid
-    const arr = Array.from(perimeter.entries()).map(([k,v])=>{
-        const angle = Math.atan2(v.y - cy, v.x - cx);
-        return {key:k, angle, ...v};
+    const arr = Array.from(perimeter.entries()).map(([k,v])=>{ // Convert map to array for sorting
+        const angle = Math.atan2(v.y - cy, v.x - cx); // Calculate angle from centroid
+        return {key:k, angle, ...v}; // Return object with key, angle, and coordinates
     });
-    arr.sort((a,b)=>a.angle - b.angle);
-    const ring = arr.map(a=>a.key);
+    arr.sort((a,b)=>a.angle - b.angle); // Sort by angle - this creates the "ring" order
+    const ring = arr.map(a=>a.key); // Extract sorted keys into ring array
 
     // helper to verify a 3-step walk along the ring starting at index and stepDir
-    function validateWalkFrom(startIdx, stepDir){
-        const n = ring.length;
-        let curQ = q0, curR = r0;
-        for(let s=1;s<=3;s++){
+    function validateWalkFrom(startIdx, stepDir){ // Nested function to validate 3-step paths
+        const n = ring.length; // Length of perimeter ring
+        let curQ = q0, curR = r0; // Start from spider's position
+        for(let s=1;s<=3;s++){ // Loop for exactly 3 steps
             // first step should be the originNeighbor (startIdx), then startIdx+stepDir, etc.
-            const idx = (startIdx + (s-1)*stepDir + n) % n;
-            const [nx,ny] = ring[idx].split(',').map(Number);
+            const idx = (startIdx + (s-1)*stepDir + n) % n; // Calculate ring index with wraparound
+            const [nx,ny] = ring[idx].split(',').map(Number); // Get coordinates of next cell in ring
             // step must be to an adjacent hex
-            const neigh = DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny);
-            if(!neigh) return null;
-            if(!canSlide(curQ,curR,nx,ny,occRem)) return null;
+            const neigh = DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny); // Check if next cell is adjacent
+            if(!neigh) return null; // Invalid if not adjacent - spider can't jump
+            if(!canSlide(curQ,curR,nx,ny,occRem)) return null; // Check sliding rules
             // next hex must touch hive
-            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null;
-            curQ = nx; curR = ny;
+            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must stay touching occupied cells
+            curQ = nx; curR = ny; // Update current position
         }
-        return `${curQ},${curR}`;
+        return `${curQ},${curR}`; // Return final position as key
     }
 
     // find perimeter neighbors that touch the origin
-    const originNeighbors = [];
-    for(let i=0;i<DIRS.length;i++){
-        const nx = q0 + DIRS[i].dq, ny = r0 + DIRS[i].dr;
-        const k = `${nx},${ny}`;
-        if(perimeter.has(k)) originNeighbors.push(k);
+    const originNeighbors = []; // Array to hold perimeter cells adjacent to spider
+    for(let i=0;i<DIRS.length;i++){ // Check all 6 directions
+        const nx = q0 + DIRS[i].dq, ny = r0 + DIRS[i].dr; // Calculate neighbor coordinates
+        const k = `${nx},${ny}`; // Create key
+        if(perimeter.has(k)) originNeighbors.push(k); // Add if it's on perimeter
     }
 
-    const endpoints = new Set();
-    const n = ring.length;
+    const endpoints = new Set(); // Set to collect valid endpoint positions
+    const n = ring.length; // Ring length again
 
     // Try each origin neighbor as a start; pick the first start that yields
     // a valid 3-step walk in each direction. This ensures the spider 'hugs'
     // the hive and never backtracks.
-    let found = { cw: null, ccw: null, startIdxCW: null, startIdxCCW: null };
-    for(const startKey of originNeighbors){
-        const startIdx = ring.indexOf(startKey);
-        if(startIdx === -1) continue;
-        if(!found.ccw){
-            const ep = validateWalkFrom(startIdx, +1);
-            if(ep){ found.ccw = ep; found.startIdxCCW = startIdx; endpoints.add(ep); }
+    let found = { cw: null, ccw: null, startIdxCW: null, startIdxCCW: null }; // Track found paths
+    for(const startKey of originNeighbors){ // Loop through possible starting perimeter cells
+        const startIdx = ring.indexOf(startKey); // Find index in ring
+        if(startIdx === -1) continue; // Skip if not found (shouldn't happen)
+        if(!found.ccw){ // If no counterclockwise path found yet
+            const ep = validateWalkFrom(startIdx, +1); // Try clockwise (stepDir +1)
+            if(ep){ found.ccw = ep; found.startIdxCCW = startIdx; endpoints.add(ep); } // Add if valid
         }
-        if(!found.cw){
-            const ep = validateWalkFrom(startIdx, -1);
-            if(ep){ found.cw = ep; found.startIdxCW = startIdx; endpoints.add(ep); }
+        if(!found.cw){ // If no clockwise path found yet
+            const ep = validateWalkFrom(startIdx, -1); // Try counterclockwise (stepDir -1)
+            if(ep){ found.cw = ep; found.startIdxCW = startIdx; endpoints.add(ep); } // Add if valid
         }
-        if(found.cw && found.ccw) break;
+        if(found.cw && found.ccw) break; // Stop if both directions found
     }
 
-    function finalFromStart(startIdx, stepDir){
-        let last = null;
-        for(let s=1;s<=3;s++){
-            const idx = (startIdx + (s-1)*stepDir + n) % n;
-            last = ring[idx];
+    function finalFromStart(startIdx, stepDir){ // Helper to compute theoretical endpoint without validation
+        let last = null; // Variable to hold final key
+        for(let s=1;s<=3;s++){ // Loop 3 steps
+            const idx = (startIdx + (s-1)*stepDir + n) % n; // Calculate index
+            last = ring[idx]; // Update last position
         }
-        return last;
+        return last; // Return final key
     }
 
     // If only one direction had a strict path, include the theoretical
     // opposite endpoint computed from that working start index so both
     // directions are shown when the spider is not trapped.
-    if(found.cw && !found.ccw && found.startIdxCW !== null){
-        endpoints.add(finalFromStart(found.startIdxCW, +1));
+    if(found.cw && !found.ccw && found.startIdxCW !== null){ // If only clockwise found
+        endpoints.add(finalFromStart(found.startIdxCW, +1)); // Add theoretical counterclockwise endpoint
     }
-    if(found.ccw && !found.cw && found.startIdxCCW !== null){
-        endpoints.add(finalFromStart(found.startIdxCCW, -1));
+    if(found.ccw && !found.cw && found.startIdxCCW !== null){ // If only counterclockwise found
+        endpoints.add(finalFromStart(found.startIdxCCW, -1)); // Add theoretical clockwise endpoint
     }
 
     // Fallback: if endpoints empty, try original neighbor-index walker as a last resort
-    if(endpoints.size===0){
+    if(endpoints.size===0){ // If no valid endpoints found
         // previous simple walker: try starting at any adjacent empty cell and step by neighbor index
-        function neighborIndex(fromQ, fromR, toQ, toR){
-            for(let i=0;i<DIRS.length;i++){
-                if(fromQ+DIRS[i].dq===toQ && fromR+DIRS[i].dr===toR) return i;
+        function neighborIndex(fromQ, fromR, toQ, toR){ // Helper to find direction index between two points
+            for(let i=0;i<DIRS.length;i++){ // Loop through directions
+                if(fromQ+DIRS[i].dq===toQ && fromR+DIRS[i].dr===toR) return i; // Return index if matches
             }
-            return -1;
+            return -1; // Not found
         }
-        function walkDirection(dirStep){
-            let q=q0, r=r0;
+        function walkDirection(dirStep){ // Function to walk in a direction for 3 steps
+            let q=q0, r=r0; // Start from spider
             // find any neighbor index that touches the hive
-            let startIdx = -1;
-            for(let i=0;i<6;i++){
-                const nx = q + DIRS[i].dq, ny = r + DIRS[i].dr;
-                const k = `${nx},${ny}`;
-                if(!window.cells.has(k) || occRem.has(k)) continue;
-                if(DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))){ startIdx = i; break; }
+            let startIdx = -1; // Index of starting direction
+            for(let i=0;i<6;i++){ // Check all directions
+                const nx = q + DIRS[i].dq, ny = r + DIRS[i].dr; // Neighbor coordinates
+                const k = `${nx},${ny}`; // Key
+                if(!window.cells.has(k) || occRem.has(k)) continue; // Skip invalid
+                if(DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))){ startIdx = i; break; } // Find touching neighbor
             }
-            if(startIdx === -1) return null;
-            let idx = startIdx;
-            for(let step=0; step<3; step++){
-                idx = (idx + dirStep + 6) % 6;
-                const nx = q + DIRS[idx].dq, ny = r + DIRS[idx].dr;
-                const k = `${nx},${ny}`;
-                if(!window.cells.has(k) || occRem.has(k)) return null;
-                if(!canSlide(q,r,nx,ny,occRem)) return null;
-                if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null;
-                const common = DIRS.some(d2=>{
-                    const a = `${q + d2.dq},${r + d2.dr}`;
-                    const b = `${nx + d2.dq},${ny + d2.dr}`;
-                    return occRem.has(a) && occRem.has(b);
+            if(startIdx === -1) return null; // No valid start found
+            let idx = startIdx; // Current direction index
+            for(let step=0; step<3; step++){ // Loop 3 steps
+                idx = (idx + dirStep + 6) % 6; // Advance direction index with wraparound
+                const nx = q + DIRS[idx].dq, ny = r + DIRS[idx].dr; // Next position
+                const k = `${nx},${ny}`; // Key
+                if(!window.cells.has(k) || occRem.has(k)) return null; // Invalid cell
+                if(!canSlide(q,r,nx,ny,occRem)) return null; // Can't slide
+                if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must touch hive
+                const common = DIRS.some(d2=>{ // Check for common neighbor (sliding gate)
+                    const a = `${q + d2.dq},${r + d2.dr}`; // Neighbor of current
+                    const b = `${nx + d2.dq},${ny + d2.dr}`; // Neighbor of next
+                    return occRem.has(a) && occRem.has(b); // Both occupied
                 });
-                if(!common) return null;
-                q = nx; r = ny;
+                if(!common) return null; // No sliding gate, invalid
+                q = nx; r = ny; // Update position
             }
-            return `${q},${r}`;
+            return `${q},${r}`; // Return final position
         }
-        const cw = walkDirection(+1);
-        const ccw = walkDirection(-1);
-        if(cw) endpoints.add(cw);
-        if(ccw) endpoints.add(ccw);
+        const cw = walkDirection(+1); // Try clockwise
+        const ccw = walkDirection(-1); // Try counterclockwise
+        if(cw) endpoints.add(cw); // Add if valid
+        if(ccw) endpoints.add(ccw); // Add if valid
     }
 
     // For compatibility, prefer validated endpoints from getSpiderPaths
-    const paths = getSpiderPaths(q0, r0);
-    if(paths && paths.length) return paths.map(p=>`${p[p.length-1][0]},${p[p.length-1][1]}`);
-    return Array.from(endpoints);
+    const paths = getSpiderPaths(q0, r0); // Call the other spider path function
+    if(paths && paths.length) return paths.map(p=>`${p[p.length-1][0]},${p[p.length-1][1]}`); // Use its endpoints if available
+    return Array.from(endpoints); // Return collected endpoints as array
 }
 
 // Return exact validated 3-step spider paths (array of arrays of [q,r]).
 function getSpiderPaths(q0, r0, occAllParam){
     // occAllParam: optional Set of occupied keys representing board state before move
-    const startKey = `${q0},${r0}`;
-    let occAll;
-    if (occAllParam) {
-        occAll = new Set(occAllParam);
-    } else {
+    const startKey = `${q0},${r0}`; // Starting position key
+    let occAll; // Occupied set
+    if (occAllParam) { // If provided as parameter
+        occAll = new Set(occAllParam); // Use provided set
+    } else { // Otherwise build from current board
         // build occupancy from actual cell stacks like other functions
-        occAll = new Set();
-        window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
+        occAll = new Set(); // Initialize set
+        window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); }); // Populate from board
     }
     // remove the spider itself (it must move)
-    occAll.delete(startKey);
-    if(!isHiveConnected(occAll)) return [];
+    occAll.delete(startKey); // Remove spider's position
+    if(!isHiveConnected(occAll)) return []; // Hive not connected after removal, invalid
 
-    const occRem = new Set(occAll);
+    const occRem = new Set(occAll); // Copy for simulation
 
     // collect perimeter empty hexes
-    const perimeter = new Map();
-    let cx=0, cy=0, count=0;
-    occRem.forEach(k=>{
-        const [oq,or] = k.split(',').map(Number);
-        const p = axialToPixel(oq,or); cx += p.x; cy += p.y; count++;
+    const perimeter = new Map(); // Perimeter map
+    let cx=0, cy=0, count=0; // Centroid variables
+    occRem.forEach(k=>{ // Loop occupied cells
+        const [oq,or] = k.split(',').map(Number); // Parse coords
+        const p = axialToPixel(oq,or); cx += p.x; cy += p.y; count++; // Accumulate centroid
     });
-    if(count===0) return [];
-    cx/=count; cy/=count;
-    occRem.forEach(k=>{
-        const [oq,or] = k.split(',').map(Number);
-        DIRS.forEach(d=>{
-            const nq=oq+d.dq, nr=or+d.dr, nk=`${nq},${nr}`;
-            if(!window.cells.has(nk)) return; if(occRem.has(nk)) return;
-            if(!perimeter.has(nk)) perimeter.set(nk, {q:nq,r:nr,x:axialToPixel(nq,nr).x,y:axialToPixel(nq,nr).y});
+    if(count===0) return []; // No occupied cells
+    cx/=count; cy/=count; // Average centroid
+    occRem.forEach(k=>{ // Loop again (redundant?)
+        const [oq,or] = k.split(',').map(Number); // Parse again
+        DIRS.forEach(d=>{ // Check neighbors
+            const nq=oq+d.dq, nr=or+d.dr, nk=`${nq},${nr}`; // Neighbor key
+            if(!window.cells.has(nk)) return; if(occRem.has(nk)) return; // Skip invalid
+            if(!perimeter.has(nk)) perimeter.set(nk, {q:nq,r:nr,x:axialToPixel(nq,nr).x,y:axialToPixel(nq,nr).y}); // Add to perimeter
         });
     });
-    if(perimeter.size===0) return [];
-    const arr = Array.from(perimeter.entries()).map(([k,v])=>{ const angle=Math.atan2(v.y-cy, v.x-cx); return {key:k,angle,...v}; });
-    arr.sort((a,b)=>a.angle-b.angle);
-    const ring = arr.map(a=>a.key);
+    if(perimeter.size===0) return []; // No perimeter
+    const arr = Array.from(perimeter.entries()).map(([k,v])=>{ const angle=Math.atan2(v.y-cy, v.x-cx); return {key:k,angle,...v}; }); // Create array with angles
+    arr.sort((a,b)=>a.angle-b.angle); // Sort by angle
+    const ring = arr.map(a=>a.key); // Ring of keys
 
-    const n = ring.length;
-    function buildPathFrom(startIdx, stepDir){
-        let curQ=q0, curR=r0;
-        const path=[[curQ,curR]];
-        const visited = new Set([`${curQ},${curR}`]);
-        for(let s=1;s<=3;s++){
-            const idx = (startIdx + (s-1)*stepDir + n) % n;
-            const [nx,ny] = ring[idx].split(',').map(Number);
-            const key = `${nx},${ny}`;
+    const n = ring.length; // Ring length
+    function buildPathFrom(startIdx, stepDir){ // Function to build validated path
+        let curQ=q0, curR=r0; // Start position
+        const path=[[curQ,curR]]; // Path array starting with origin
+        const visited = new Set([`${curQ},${curR}`]); // Visited set
+        for(let s=1;s<=3;s++){ // 3 steps
+            const idx = (startIdx + (s-1)*stepDir + n) % n; // Ring index
+            const [nx,ny] = ring[idx].split(',').map(Number); // Next coordinates
+            const key = `${nx},${ny}`; // Key
             // must be adjacent
-            if(!DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny)) return null;
+            if(!DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny)) return null; // Not adjacent
             // cannot revisit a previously visited hex (no backtracking)
-            if(visited.has(key)) return null;
-            if(!canSlide(curQ,curR,nx,ny,occRem)) return null;
-            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null;
-            path.push([nx,ny]); visited.add(key); curQ=nx; curR=ny;
+            if(visited.has(key)) return null; // Backtracking not allowed
+            if(!canSlide(curQ,curR,nx,ny,occRem)) return null; // Can't slide
+            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must touch hive
+            path.push([nx,ny]); visited.add(key); curQ=nx; curR=ny; // Add to path and update
         }
-        return path;
+        return path; // Return full path array
     }
 
     // find origin neighbors on perimeter
-    const originNeighbors=[];
-    for(let i=0;i<DIRS.length;i++){ const nx=q0+DIRS[i].dq, ny=r0+DIRS[i].dr, k=`${nx},${ny}`; if(perimeter.has(k)) originNeighbors.push(k); }
+    const originNeighbors=[]; // Adjacent perimeter cells
+    for(let i=0;i<DIRS.length;i++){ const nx=q0+DIRS[i].dq, ny=r0+DIRS[i].dr, k=`${nx},${ny}`; if(perimeter.has(k)) originNeighbors.push(k); } // Collect adjacent perimeter
 
-    const paths = [];
-    let found={cw:null,ccw:null,startIdxCW:null,startIdxCCW:null};
-    for(const sk of originNeighbors){
-        const startIdx = ring.indexOf(sk); if(startIdx===-1) continue;
-        if(!found.ccw){ const pth = buildPathFrom(startIdx, +1); if(pth){ paths.push(pth); found.ccw=pth; found.startIdxCCW=startIdx; }}
-        if(!found.cw){ const pth = buildPathFrom(startIdx, -1); if(pth){ paths.push(pth); found.cw=pth; found.startIdxCW=startIdx; }}
-        if(found.cw && found.ccw) break;
+    const paths = []; // Array to collect valid paths
+    let found={cw:null,ccw:null,startIdxCW:null,startIdxCCW:null}; // Track found paths
+    for(const sk of originNeighbors){ // Loop starting cells
+        const startIdx = ring.indexOf(sk); if(startIdx===-1) continue; // Find ring index
+        if(!found.ccw){ const pth = buildPathFrom(startIdx, +1); if(pth){ paths.push(pth); found.ccw=pth; found.startIdxCCW=startIdx; }} // Try counterclockwise
+        if(!found.cw){ const pth = buildPathFrom(startIdx, -1); if(pth){ paths.push(pth); found.cw=pth; found.startIdxCW=startIdx; }} // Try clockwise
+        if(found.cw && found.ccw) break; // Stop if both found
     }
 
-    function finalFromStartPath(startIdx, stepDir){
-        const path = [[q0,r0]];
-        for(let s=1;s<=3;s++){ const idx=(startIdx + (s-1)*stepDir + n)%n; const [nx,ny]=ring[idx].split(',').map(Number); path.push([nx,ny]); }
-        return path;
+    function finalFromStartPath(startIdx, stepDir){ // Compute unvalidated path
+        const path = [[q0,r0]]; // Start with origin
+        for(let s=1;s<=3;s++){ const idx=(startIdx + (s-1)*stepDir + n)%n; const [nx,ny]=ring[idx].split(',').map(Number); path.push([nx,ny]); } // Add steps
+        return path; // Return path
     }
 
-    if(found.cw && !found.ccw && found.startIdxCW!==null){ paths.push(finalFromStartPath(found.startIdxCW,+1)); }
-    if(found.ccw && !found.cw && found.startIdxCCW!==null){ paths.push(finalFromStartPath(found.startIdxCCW,-1)); }
+    if(found.cw && !found.ccw && found.startIdxCW!==null){ paths.push(finalFromStartPath(found.startIdxCW,+1)); } // Add theoretical ccw if only cw found
+    if(found.ccw && !found.cw && found.startIdxCCW!==null){ paths.push(finalFromStartPath(found.startIdxCCW,-1)); } // Add theoretical cw if only ccw found
 
-    return paths;
+    return paths; // Return array of path arrays
 
 }
 
@@ -1616,10 +1616,19 @@ try{
             if (window.showHistoryOverlay) window.showHistoryOverlay(idx);
         };
         let txt;
-        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-        const oldCoords = oldKey.split(',').map(Number);
-        txt = document.createElement('div'); txt.className='move-text';
-        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+        if(p.meta.key === 'S'){
+            const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+            const newLabel = labelFromCenter(q,r);
+            const oldCoords = oldKey.split(',').map(Number);
+            txt = document.createElement('div'); txt.className='move-text';
+            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+        } else {
+            const { fullName, pieceColor } = getEnhancedPieceInfo(p);
+            const newLabel = labelFromCenter(q,r);
+            const oldCoords = oldKey.split(',').map(Number);
+            txt = document.createElement('div'); txt.className='move-text';
+            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+        }
         li.appendChild(hexBtn);
         li.appendChild(txt);
         list.appendChild(li);
@@ -1770,42 +1779,3 @@ function hexDistanceAxial(aq, ar, bq, br){
     const a = axialToCube(aq, ar), b = axialToCube(bq, br);
     return Math.max(Math.abs(a.x-b.x), Math.abs(a.y-b.y), Math.abs(a.z-b.z));
 }
-if(ix>=0) oldCell.stack.splice(ix,1);
-
-    oldCell.stack.forEach(c,i);
-        const rel=axialToPixel(oldCell.q,oldCell.r);
-        c.x = rel.x;
-                if(list){
-                    const li = document.createElement('li');
-                    li.className = `history-entry ${p.meta.color.toLowerCase()}-move`;
-                    const idx = window.historySnapshots.length - 1;
-                    // Gold hex button for move number
-                    const hexBtn = document.createElement('button');
-                    hexBtn.className = 'move-hex-btn gold-hex';
-                    hexBtn.title = `Preview board at move ${idx + 1}`;
-                    hexBtn.innerHTML = `<span class=\"move-num\">${idx + 1}</span>`;
-                    hexBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (window.showHistoryOverlay) window.showHistoryOverlay(idx);
-                    };
-                    let txt;
-                    if(p.meta.key === 'S'){
-                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-                        const newLabel = labelFromCenter(q,r);
-                        const oldCoords = oldKey.split(',').map(Number);
-                        txt = document.createElement('div'); txt.className='move-text';
-                        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
-                    } else {
-                        const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-                        const newLabel = labelFromCenter(q,r);
-                        const oldCoords = oldKey.split(',').map(Number);
-                        txt = document.createElement('div'); txt.className='move-text';
-                        txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
-                    }
-                    li.appendChild(hexBtn);
-                    li.appendChild(txt);
-                    list.appendChild(li);
-                }
-
-        // Take a snapshot of the board state after move
-        snapshotBoardState();

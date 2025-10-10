@@ -361,5 +361,11 @@ blackTrayApp.view.style.zIndex = '6';
             music.pause();
             e.target.textContent = 'Play Music';
         }
+        document.getElementById('save-btn').onclick = saveGameToLocalStorage;
+document.getElementById('load-btn').onclick = loadGameFromLocalStorage;
+document.getElementById('export-btn').onclick = exportGameToFile;
+document.getElementById('import-btn').onchange = function(e) {
+    if (e.target.files.length) importGameFromFile(e.target.files[0]);
+};
     });
 });

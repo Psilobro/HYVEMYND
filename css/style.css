@@ -253,7 +253,7 @@ html, body {
 #game-title {
     position: absolute;
     top: 5px;
-    left: 30%;
+    left: 22%;
     transform: translateX(-50%);
     font-family: 'Beetype', sans-serif;
     font-size: 68px; /* Scaled down by 15% from 80px */
@@ -587,6 +587,45 @@ html, body {
         margin-top: 0 !important; /* Ensure first move starts at top */
     }
 
+    #save-load-controls {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+#save-load-controls button,
+#save-load-controls label {
+  font-family: 'Milonga', serif;
+  font-size: 1.1em;
+  background: #222;
+  color: #FFD700;
+  border: 2px solid #FFD700;
+  border-radius: 8px;
+  padding: 6px 18px;
+  margin: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+#save-load-controls button:hover,
+#save-load-controls label:hover {
+  background: #FFD700;
+  color: #222;
+}
+
+#save-load-controls label {
+  display: inline-block;
+  cursor: pointer;
+}
+
+#save-load-controls input[type="file"] {
+  display: none;
+}
 
 /* Force landscape orientation on mobile */
 @media screen and (max-width: 768px) and (orientation: portrait) {

@@ -5,11 +5,12 @@
   <title>Hive • PIXI Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="preload" href="assets/Fonts/Beetype-Outline.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="assets/Fonts/Milonga-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <video autoplay muted loop playsinline id="bg-video" src="assets/videos/honeycells.mp4"></video>
-  <div id="game-title">HYVEMYND</div>
+  <div id="game-title" style="font-family: 'Milonga', serif;">HyveMynd</div>
   <div id="hud">White to move</div>
   <div id="move-history">
     <ol id="moves-list"></ol>
@@ -33,7 +34,18 @@
 <script>
   const bgVideo = document.getElementById('bg-video');
   bgVideo.playbackRate = 0.4; // 0.5 = half speed, 2 = double speed
+</script>
 
+<div id="save-load-controls">
+  <button id="save-btn" title="Save to browser">💾 Save</button>
+  <button id="load-btn" title="Load from browser">📂 Load</button>
+  <button id="export-btn" title="Export to file">⬇️ Export</button>
+  <label id="import-label" title="Import from file">
+    ⬆️ Import
+    <input type="file" id="import-btn" accept=".json" style="display:none;">
+  </label>
+</div>
+<script>
   // Optional: live tweak with + / - keys
   document.addEventListener('keydown', (e) => {
     if (e.key === '+') bgVideo.playbackRate += 0.1;
