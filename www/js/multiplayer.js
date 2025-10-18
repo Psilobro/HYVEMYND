@@ -86,6 +86,12 @@
         message: `Welcome to room ${data.roomId}! You are playing as ${data.playerColor}.`,
         isSystem: true
       });
+      
+      // Add visual player indicator
+      addPlayerIndicator(data.playerColor);
+      
+      // Show room info in modal
+      showRoomInfo(data);
     });
 
     socket.on('player-joined', (data) => {
@@ -124,6 +130,43 @@
 
     socket.on('player-typing', (data) => {
       window.ChatUI.showTyping(data);
+    });
+
+    socket.on('game-reset', (data) => {
+      console.log('Game reset by:', data.resetBy);
+      
+      // Reset the game to initial state
+      if (typeof resetGameToInitialState === 'function') {
+        resetGameToInitialState();
+      } else {
+        // Fallback: reload the page
+        window.location.reload();
+      }
+      
+      showNotification(`Game reset by ${data.resetBy}`, 'info');
+      window.ChatUI.addMessage({
+        message: `Game reset by ${data.resetBy}`,
+        isSystem: true
+      });
+    });
+
+    socket.on('player-left', (data) => {
+      console.log('Player left:', data.player.name);
+      showNotification(`${data.player.name} left the game`, 'warning');
+      window.ChatUI.addMessage({
+        message: `${data.player.name} left the game`,
+        isSystem: true
+      });
+      
+      // Update room info
+      const statusText = document.getElementById('status-text');
+      if (statusText) {
+        statusText.innerHTML = `
+          <strong>Room ${window.MULTIPLAYER.roomId}</strong><br>
+          You are: ${window.MULTIPLAYER.playerColor === 'white' ? '⚪ White' : '⚫ Black'}<br>
+          Players: ${data.players.length}/2 - Waiting for opponent...
+        `;
+      }
     });
 
     return socket;
@@ -290,12 +333,61 @@
     // Only show multiplayer HUD if in an active multiplayer game
     if (window.MULTIPLAYER.enabled && window.MULTIPLAYER.connected && window.MULTIPLAYER.roomId) {
       const status = window.MULTIPLAYER.connected ? 'Connected' : 'Disconnected';
-      const role = `Playing as ${window.MULTIPLAYER.playerColor}`;
-      const turn = window.MULTIPLAYER.isMyTurn ? 'Your turn' : 'Opponent\'s turn';
+      const colorEmoji = window.MULTIPLAYER.playerColor === 'white' ? '⚪' : '⚫';
+      const role = `${colorEmoji} You are ${window.MULTIPLAYER.playerColor}`;
+      const turn = window.MULTIPLAYER.isMyTurn ? '🎯 Your turn' : '⏳ Opponent\'s turn';
       
       hud.innerHTML = `${role} • ${status} • ${turn}`;
     }
     // In single player mode, let the original HUD function handle display
+  }
+
+  // Add visual player indicator
+  function addPlayerIndicator(playerColor) {
+    // Remove existing indicator
+    const existingIndicator = document.getElementById('player-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'player-indicator';
+    indicator.style.cssText = `
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      background: ${playerColor === 'white' ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)'};
+      color: ${playerColor === 'white' ? '#000' : '#E6B84D'};
+      padding: 10px 15px;
+      border-radius: 20px;
+      font-family: 'Beetype-Outline', monospace;
+      font-weight: bold;
+      border: 2px solid #E6B84D;
+      z-index: 1001;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    `;
+    indicator.innerHTML = `${playerColor === 'white' ? '⚪' : '⚫'} You are ${playerColor.toUpperCase()}`;
+    document.body.appendChild(indicator);
+  }
+
+  // Show room information
+  function showRoomInfo(data) {
+    const roomInfoSection = document.getElementById('game-link-section');
+    const statusText = document.getElementById('status-text');
+    
+    if (roomInfoSection) {
+      roomInfoSection.style.display = 'block';
+    }
+    
+    if (statusText) {
+      const playerCount = data.players ? data.players.length : 1;
+      statusText.innerHTML = `
+        <strong>Room ${data.roomId}</strong><br>
+        You are: ${data.playerColor === 'white' ? '⚪ White' : '⚫ Black'}<br>
+        Players: ${playerCount}/2
+      `;
+      statusText.style.color = '#E6B84D';
+    }
   }
 
   // Wrap existing commit functions to broadcast actions
@@ -423,6 +515,10 @@
           </div>
           <div id="connection-status" style="margin-top: 15px; padding: 10px; border-radius: 5px; background: #444;">
             <strong>Status:</strong> <span id="status-text">Waiting for opponent...</span>
+            <div style="margin-top: 10px;">
+              <button id="reset-game-btn" style="background: #FF6B6B; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-right: 10px;">🔄 Reset Game</button>
+              <button id="leave-room-btn" style="background: #666; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px;">🚪 Leave Room</button>
+            </div>
           </div>
           
           <!-- Chat Section -->
@@ -447,6 +543,8 @@
     document.getElementById('create-game-btn').addEventListener('click', createNewGame);
     document.getElementById('join-game-btn').addEventListener('click', joinExistingGame);
     document.getElementById('copy-link-btn').addEventListener('click', copyShareLink);
+    document.getElementById('reset-game-btn').addEventListener('click', resetGame);
+    document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
     
     // Close modal when clicking outside
     modal.addEventListener('click', (e) => {
@@ -636,6 +734,47 @@
       roomId,
       playerName: `Player ${Date.now() % 1000}`
     });
+  }
+
+  // Reset the game to initial state
+  function resetGame() {
+    if (!window.MULTIPLAYER.roomId || !window.MULTIPLAYER.socket) return;
+    
+    if (confirm('Reset the game for both players? This will clear the board and start over.')) {
+      window.MULTIPLAYER.socket.emit('reset-game', {
+        roomId: window.MULTIPLAYER.roomId
+      });
+    }
+  }
+
+  // Leave the current room
+  function leaveRoom() {
+    if (!window.MULTIPLAYER.roomId || !window.MULTIPLAYER.socket) return;
+    
+    if (confirm('Leave the game room? This will disconnect you from the multiplayer game.')) {
+      window.MULTIPLAYER.socket.emit('leave-room', {
+        roomId: window.MULTIPLAYER.roomId
+      });
+      
+      // Reset local multiplayer state
+      window.MULTIPLAYER.enabled = false;
+      window.MULTIPLAYER.roomId = null;
+      window.MULTIPLAYER.playerColor = null;
+      window.MULTIPLAYER.connected = false;
+      
+      // Remove player indicator
+      const indicator = document.getElementById('player-indicator');
+      if (indicator) indicator.remove();
+      
+      // Hide chat
+      window.ChatUI.hideChatButton();
+      
+      // Close modal
+      closeMultiplayerModal();
+      
+      // Refresh page to reset game state
+      window.location.reload();
+    }
   }
 
   // Initialize on page load

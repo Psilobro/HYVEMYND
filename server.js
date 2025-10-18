@@ -146,6 +146,48 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('reset-game', (data) => {
+    const { roomId } = data;
+    
+    if (!rooms.has(roomId)) return;
+    
+    const room = rooms.get(roomId);
+    const player = room.players.get(socket.id);
+    
+    // Reset game state
+    room.gameState = null;
+    room.history = [];
+    
+    // Broadcast reset to all players in room
+    io.to(roomId).emit('game-reset', {
+      resetBy: player?.name || 'Unknown',
+      timestamp: Date.now()
+    });
+    
+    console.log(`Game reset in room ${roomId} by ${player?.name}`);
+  });
+
+  socket.on('leave-room', (data) => {
+    const { roomId } = data;
+    
+    if (!rooms.has(roomId)) return;
+    
+    const room = rooms.get(roomId);
+    const player = room.players.get(socket.id);
+    
+    // Remove player from room
+    room.players.delete(socket.id);
+    socket.leave(roomId);
+    
+    // Notify other players
+    socket.to(roomId).emit('player-left', {
+      player: player,
+      players: Array.from(room.players.values())
+    });
+    
+    console.log(`Player ${socket.id} left room ${roomId}`);
+  });
+
   socket.on('disconnect', () => {
     // Mark player as disconnected in all rooms
     for (const [roomId, room] of rooms) {
