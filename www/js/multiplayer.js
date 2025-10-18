@@ -279,6 +279,9 @@
   function restoreGameState(gameState) {
     console.log('Restoring game state:', gameState);
     
+    // Set bypass flag to prevent turn checking during restoration
+    bypassTurnCheck = true;
+    
     // Clear existing cell stacks first
     window.cells.forEach(cell => {
       cell.stack = [];
@@ -343,6 +346,10 @@
     });
     
     console.log('Game state restoration complete');
+    
+    // Clear bypass flag after restoration
+    bypassTurnCheck = false;
+    
     updateHUD();
   }
 
