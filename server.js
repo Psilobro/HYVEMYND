@@ -105,6 +105,12 @@ io.on('connection', (socket) => {
       connected: true
     });
     
+    console.log(`Sending game state to rejoining player in room ${roomId}:`, {
+      moveNumber: room.gameState?.moveNumber || 0,
+      currentTurn: room.gameState?.current || 'white',
+      placedPieces: room.gameState?.pieces?.filter(p => p.placed).length || 0
+    });
+    
     socket.emit('room-joined', {
       roomId,
       playerColor,
@@ -128,6 +134,13 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     const player = room.players.get(socket.id);
     
+    console.log(`Updating room ${roomId} game state:`, {
+      action: action.type,
+      moveNumber: gameState.moveNumber,
+      currentTurn: gameState.current,
+      placedPieces: gameState.pieces.filter(p => p.placed).length
+    });
+    
     room.gameState = gameState;
     room.history.push({
       action,
@@ -136,6 +149,8 @@ io.on('connection', (socket) => {
       player: socket.id,
       playerName: player?.name || 'Unknown'
     });
+    
+    console.log(`Room ${roomId} now has ${room.history.length} moves in history`);
     
     // Broadcast to all other players in room
     socket.to(roomId).emit('game-action', {
