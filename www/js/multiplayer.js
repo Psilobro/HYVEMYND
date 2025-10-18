@@ -79,15 +79,27 @@
       updateMultiplayerHUD();
       updateModalStatus();
       checkIfMyTurn();
+      
+      // Show chat and add welcome message
+      window.ChatUI.showChatButton();
+      window.ChatUI.addMessage({
+        message: `Welcome to room ${data.roomId}! You are playing as ${data.playerColor}.`,
+        isSystem: true
+      });
     });
 
     socket.on('player-joined', (data) => {
       console.log('Another player joined:', data.player.name);
       showNotification(`${data.player.name} joined the game!`, 'success');
-      showChatSection();
-      addSystemMessage(`${data.player.name} joined the game`);
       updateMultiplayerHUD();
       updateModalStatus();
+      
+      // Add system message to chat
+      window.ChatUI.addMessage({
+        message: `${data.player.name} joined as ${data.player.color}`,
+        isSystem: true
+      });
+    });
     });
 
     socket.on('game-action', (data) => {
@@ -105,14 +117,14 @@
     });
 
     socket.on('chat-message', (data) => {
-      addChatMessage(data);
-      if (data.playerName !== getLocalPlayerName()) {
-        showNotification(`${data.playerName}: ${data.message}`, 'chat');
+      window.ChatUI.addMessage(data);
+      if (data.playerColor !== window.MULTIPLAYER.playerColor) {
+        showNotification(`💬 ${data.playerName}: ${data.message}`, 'chat');
       }
     });
 
     socket.on('player-typing', (data) => {
-      showTypingIndicator(data);
+      window.ChatUI.showTyping(data);
     });
 
     return socket;
@@ -791,8 +803,185 @@
     }
   };
 
+  // Chat UI System
+  const ChatUI = (() => {
+    let typingTimer;
+    let isTyping = false;
+    
+    const chatContainer = document.getElementById('chat-container');
+    const chatToggle = document.getElementById('chat-toggle');
+    const chatClose = document.getElementById('chat-close');
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+    const chatMessages = document.getElementById('chat-messages');
+    const typingIndicator = document.getElementById('typing-indicator');
+
+    function init() {
+      if (!chatContainer) return;
+      
+      // Chat toggle button
+      if (chatToggle) {
+        chatToggle.addEventListener('click', show);
+      }
+      
+      // Close button
+      if (chatClose) {
+        chatClose.addEventListener('click', hide);
+      }
+      
+      // Send message
+      if (chatSend) {
+        chatSend.addEventListener('click', sendMessage);
+      }
+      
+      // Enter to send
+      if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            sendMessage();
+          } else {
+            startTyping();
+          }
+        });
+        
+        chatInput.addEventListener('input', startTyping);
+        chatInput.addEventListener('blur', stopTyping);
+      }
+    }
+
+    function show() {
+      if (chatContainer) {
+        chatContainer.style.display = 'flex';
+      }
+      if (chatToggle) {
+        chatToggle.style.display = 'none';
+      }
+    }
+
+    function hide() {
+      if (chatContainer) {
+        chatContainer.style.display = 'none';
+      }
+      if (chatToggle) {
+        chatToggle.style.display = 'block';
+      }
+    }
+
+    function sendMessage() {
+      if (!chatInput || !window.MULTIPLAYER.socket || !window.MULTIPLAYER.roomId) return;
+      
+      const message = chatInput.value.trim();
+      if (!message) return;
+      
+      window.MULTIPLAYER.socket.emit('chat-message', {
+        roomId: window.MULTIPLAYER.roomId,
+        message: message
+      });
+      
+      chatInput.value = '';
+      stopTyping();
+    }
+
+    function startTyping() {
+      if (!isTyping && window.MULTIPLAYER.socket && window.MULTIPLAYER.roomId) {
+        isTyping = true;
+        window.MULTIPLAYER.socket.emit('player-typing', {
+          roomId: window.MULTIPLAYER.roomId,
+          isTyping: true
+        });
+      }
+      
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(stopTyping, 1000);
+    }
+
+    function stopTyping() {
+      if (isTyping && window.MULTIPLAYER.socket && window.MULTIPLAYER.roomId) {
+        isTyping = false;
+        window.MULTIPLAYER.socket.emit('player-typing', {
+          roomId: window.MULTIPLAYER.roomId,
+          isTyping: false
+        });
+      }
+      clearTimeout(typingTimer);
+    }
+
+    function addMessage(data) {
+      if (!chatMessages) return;
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'chat-message';
+      
+      if (data.isSystem) {
+        messageDiv.className += ' chat-message-system';
+        messageDiv.textContent = data.message;
+      } else {
+        const isMyMessage = data.playerColor === window.MULTIPLAYER.playerColor;
+        messageDiv.className += ` chat-message-${data.playerColor}`;
+        
+        const time = new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        messageDiv.innerHTML = `
+          <span class="chat-player-name">${data.playerName}:</span>
+          ${escapeHtml(data.message)}
+          <span class="chat-timestamp">${time}</span>
+        `;
+      }
+      
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function showTyping(data) {
+      if (!typingIndicator) return;
+      
+      // Don't show typing indicator for own messages
+      if (data.playerColor === window.MULTIPLAYER.playerColor) return;
+      
+      if (data.isTyping) {
+        typingIndicator.textContent = `${data.playerName} is typing...`;
+      } else {
+        typingIndicator.textContent = '';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showChatButton() {
+      if (chatToggle) {
+        chatToggle.style.display = 'block';
+      }
+    }
+
+    function hideChatButton() {
+      if (chatToggle) {
+        chatToggle.style.display = 'none';
+      }
+    }
+
+    return {
+      init,
+      show,
+      hide,
+      addMessage,
+      showTyping,
+      showChatButton,
+      hideChatButton
+    };
+  })();
+
+  // Initialize chat when page loads
+  window.addEventListener('load', () => {
+    ChatUI.init();
+  });
+
   // Export for global access
   window.initMultiplayer = initMultiplayer;
   window.joinRoom = joinRoom;
   window.showNotification = showNotification;
+  window.ChatUI = ChatUI;
+})();
 })();

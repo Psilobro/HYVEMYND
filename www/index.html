@@ -28,7 +28,22 @@
   <button id="auto-zoom-toggle">Auto-Center: ON</button>
   <button id="move-history-toggle">History</button>
   <button id="multiplayer-button">🌐 Multiplayer</button>
+  <button id="chat-toggle" style="display: none;">💬 Chat</button>
   <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
+  
+  <!-- Chat Container -->
+  <div id="chat-container" style="display: none;">
+    <div id="chat-header">
+      <span>💬 Game Chat</span>
+      <button id="chat-close">×</button>
+    </div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-container">
+      <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200">
+      <button id="chat-send">Send</button>
+    </div>
+    <div id="typing-indicator"></div>
+  </div>
   <div id="hex-orient-overlay" aria-hidden="true">
     <!-- SVG will be injected dynamically -->
   </div>
