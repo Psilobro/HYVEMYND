@@ -1,0 +1,781 @@
+/* global io, state, tray, selected, selectPlacement, selectMove, commitPlacement, commitMove, updateHUD, axialToPixel */
+
+(() => {
+  // Multiplayer configuration
+  window.MULTIPLAYER = {
+    enabled: false,
+    socket: null,
+    roomId: null,
+    playerColor: null,
+    isMyTurn: false,
+    connected: false
+  };
+
+  let actionQueue = [];
+  let processingAction = false;
+
+  // Initialize Socket.IO connection
+  function initMultiplayer() {
+    // Try to connect to the backend server
+    let socketUrl;
+    
+    // Check for deployed server URL first (you'll set this after deployment)
+    const deployedServerUrl = 'YOUR_RENDER_SERVER_URL'; // Replace this after Render deployment
+    
+    if (deployedServerUrl && deployedServerUrl !== 'YOUR_RENDER_SERVER_URL') {
+      // Use deployed server for internet play
+      socketUrl = deployedServerUrl;
+    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Local development
+      socketUrl = 'http://localhost:3000';
+    } else {
+      // Fallback to same origin
+      socketUrl = window.location.origin;
+    }
+    
+    console.log('Attempting to connect to:', socketUrl);
+    const socket = io(socketUrl);
+    window.MULTIPLAYER.socket = socket;
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      window.MULTIPLAYER.connected = true;
+      updateMultiplayerHUD();
+      updateModalStatus();
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      window.MULTIPLAYER.connected = false;
+      updateMultiplayerHUD();
+      updateModalStatus();
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection failed:', error);
+      window.MULTIPLAYER.connected = false;
+      updateModalStatus();
+      
+      // Show helpful error message
+      const statusText = document.getElementById('status-text');
+      if (statusText) {
+        statusText.textContent = 'Server not running - Start backend server first!';
+        statusText.style.color = '#ff6b6b';
+      }
+    });
+
+    socket.on('room-joined', (data) => {
+      window.MULTIPLAYER.roomId = data.roomId;
+      window.MULTIPLAYER.playerColor = data.playerColor;
+      window.MULTIPLAYER.enabled = true;
+      
+      console.log(`Joined room ${data.roomId} as ${data.playerColor}`);
+      
+      // Restore game state if rejoining
+      if (data.gameState) {
+        restoreGameState(data.gameState);
+      }
+      
+      updateMultiplayerHUD();
+      updateModalStatus();
+      checkIfMyTurn();
+    });
+
+    socket.on('player-joined', (data) => {
+      console.log('Another player joined:', data.player.name);
+      showNotification(`${data.player.name} joined the game!`, 'success');
+      showChatSection();
+      addSystemMessage(`${data.player.name} joined the game`);
+      updateMultiplayerHUD();
+      updateModalStatus();
+    });
+
+    socket.on('game-action', (data) => {
+      console.log('Received action from opponent:', data.action);
+      queueAction(data);
+      showNotification(`${data.playerName || 'Opponent'} made a move`, 'info');
+    });
+
+    socket.on('player-disconnected', (data) => {
+      console.log('Player disconnected');
+      showNotification('Opponent disconnected', 'warning');
+      addSystemMessage('Opponent disconnected');
+      updateMultiplayerHUD();
+      updateModalStatus();
+    });
+
+    socket.on('chat-message', (data) => {
+      addChatMessage(data);
+      if (data.playerName !== getLocalPlayerName()) {
+        showNotification(`${data.playerName}: ${data.message}`, 'chat');
+      }
+    });
+
+    socket.on('player-typing', (data) => {
+      showTypingIndicator(data);
+    });
+
+    return socket;
+  }
+
+  // Queue actions to process sequentially
+  function queueAction(actionData) {
+    actionQueue.push(actionData);
+    processActionQueue();
+  }
+
+  async function processActionQueue() {
+    if (processingAction || actionQueue.length === 0) return;
+    
+    processingAction = true;
+    
+    while (actionQueue.length > 0) {
+      const actionData = actionQueue.shift();
+      await applyOpponentAction(actionData);
+    }
+    
+    processingAction = false;
+  }
+
+  // Apply opponent's action to local game
+  function applyOpponentAction(actionData) {
+    return new Promise((resolve) => {
+      const { action } = actionData;
+      
+      // Find the piece by its metadata
+      const piece = tray.find(p => 
+        p.meta.key === action.pieceKey && 
+        p.meta.color === action.color &&
+        p.meta.id === action.pieceId
+      );
+      
+      if (!piece) {
+        console.warn('Could not find piece for opponent action:', action);
+        resolve();
+        return;
+      }
+
+      if (action.type === 'place') {
+        selectPlacement(piece);
+        commitPlacement(action.q, action.r);
+      } else if (action.type === 'move') {
+        selectMove(piece);
+        commitMove(action.q, action.r);
+      }
+      
+      // Wait for animations to complete
+      setTimeout(resolve, 600);
+    });
+  }
+
+  // Send action to other players
+  function broadcastAction(actionType, piece, q, r) {
+    if (!window.MULTIPLAYER.enabled || !window.MULTIPLAYER.socket) return;
+    
+    const action = {
+      type: actionType,
+      pieceKey: piece.meta.key,
+      pieceId: piece.meta.id,
+      color: piece.meta.color,
+      q, r,
+      timestamp: Date.now()
+    };
+    
+    const gameState = exportGameState();
+    
+    window.MULTIPLAYER.socket.emit('game-action', {
+      roomId: window.MULTIPLAYER.roomId,
+      action,
+      gameState
+    });
+  }
+
+  // Export current game state for sync
+  function exportGameState() {
+    return {
+      current: state.current,
+      moveNumber: state.moveNumber,
+      queenPlaced: { ...state.queenPlaced },
+      gameOver: state.gameOver,
+      pieces: tray.map(p => ({
+        id: p.meta.id,
+        key: p.meta.key,
+        color: p.meta.color,
+        placed: p.meta.placed,
+        q: p.meta.q,
+        r: p.meta.r
+      }))
+    };
+  }
+
+  // Restore game state from server
+  function restoreGameState(gameState) {
+    // Update global state
+    state.current = gameState.current;
+    state.moveNumber = gameState.moveNumber;
+    state.queenPlaced = gameState.queenPlaced;
+    state.gameOver = gameState.gameOver;
+    
+    // Update piece positions
+    gameState.pieces.forEach(savedPiece => {
+      const piece = tray.find(p => p.meta.id === savedPiece.id);
+      if (piece) {
+        piece.meta.placed = savedPiece.placed;
+        piece.meta.q = savedPiece.q;
+        piece.meta.r = savedPiece.r;
+        
+        if (savedPiece.placed) {
+          // Position piece on board
+          const pos = axialToPixel(savedPiece.q, savedPiece.r);
+          piece.x = pos.x;
+          piece.y = pos.y;
+          
+          // Update cell stack
+          const cell = window.cells.get(`${savedPiece.q},${savedPiece.r}`);
+          if (cell && !cell.stack.includes(piece)) {
+            cell.stack.push(piece);
+          }
+        }
+      }
+    });
+    
+    updateHUD();
+  }
+
+  // Check if it's the local player's turn
+  function checkIfMyTurn() {
+    if (!window.MULTIPLAYER.enabled) {
+      window.MULTIPLAYER.isMyTurn = true;
+      return;
+    }
+    
+    window.MULTIPLAYER.isMyTurn = (state.current === window.MULTIPLAYER.playerColor);
+  }
+
+  // Update HUD with multiplayer info
+  function updateMultiplayerHUD() {
+    const hud = document.getElementById('hud');
+    if (!hud) return;
+    
+    if (window.MULTIPLAYER.enabled) {
+      const status = window.MULTIPLAYER.connected ? 'Connected' : 'Disconnected';
+      const role = `Playing as ${window.MULTIPLAYER.playerColor}`;
+      const turn = window.MULTIPLAYER.isMyTurn ? 'Your turn' : 'Opponent\'s turn';
+      
+      hud.innerHTML = `${role} • ${status} • ${turn}`;
+    }
+  }
+
+  // Wrap existing commit functions to broadcast actions
+  const originalCommitPlacement = window.commitPlacement;
+  window.commitPlacement = function(q, r) {
+    // Only allow if it's the player's turn in multiplayer
+    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn) {
+      console.log('Not your turn!');
+      return;
+    }
+    
+    const piece = selected?.piece;
+    originalCommitPlacement(q, r);
+    
+    if (piece && window.MULTIPLAYER.enabled) {
+      broadcastAction('place', piece, q, r);
+    }
+  };
+
+  const originalCommitMove = window.commitMove;
+  window.commitMove = function(q, r) {
+    // Only allow if it's the player's turn in multiplayer
+    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn) {
+      console.log('Not your turn!');
+      return;
+    }
+    
+    const piece = selected?.piece;
+    originalCommitMove(q, r);
+    
+    if (piece && window.MULTIPLAYER.enabled) {
+      broadcastAction('move', piece, q, r);
+    }
+  };
+
+  // Wrap updateHUD to check turn status
+  const originalUpdateHUD = window.updateHUD;
+  window.updateHUD = function() {
+    originalUpdateHUD();
+    checkIfMyTurn();
+    updateMultiplayerHUD();
+  };
+
+  // Room management UI
+  function createMultiplayerModal() {
+    const modal = document.createElement('div');
+    modal.id = 'multiplayer-modal';
+    modal.style.cssText = `
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: #2a2a2a; border-radius: 10px; padding: 30px; max-width: 500px; width: 90%;
+      color: white; font-family: 'Milonga', serif; text-align: center; position: relative;
+    `;
+    
+    content.innerHTML = `
+      <button id="close-modal" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+      <h2 style="margin-top: 0; color: #E6B84D;">🌐 Multiplayer Game</h2>
+      
+      <div id="multiplayer-content">
+        <div id="create-game-section">
+          <p>Start a new multiplayer game and share the link with your friend!</p>
+          <div id="server-status" style="margin: 10px 0; padding: 8px; border-radius: 4px; font-size: 14px;">
+            <span id="server-status-text">Checking server...</span>
+          </div>
+          <button id="create-game-btn" style="background: #E6B84D; color: #000; border: none; padding: 12px 24px; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 10px;">
+            🎮 Create New Game
+          </button>
+        </div>
+        
+        <div id="join-game-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #555;">
+          <p>Or join an existing game:</p>
+          <input type="text" id="room-code-input" placeholder="Enter room code" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: #333; color: white; margin-right: 10px; font-size: 16px;">
+          <button id="join-game-btn" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+            Join Game
+          </button>
+        </div>
+        
+        <div id="game-link-section" style="display: none; margin-top: 20px; padding: 20px; background: #333; border-radius: 5px;">
+          <h3 style="color: #E6B84D; margin-top: 0;">Share This Link</h3>
+          <div style="display: flex; align-items: center; margin: 15px 0;">
+            <input type="text" id="share-link" readonly style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; font-family: monospace; font-size: 12px;">
+            <button id="copy-link-btn" style="background: #2196F3; color: white; border: none; padding: 10px 15px; border-radius: 5px; margin-left: 10px; cursor: pointer;">
+              📋 Copy
+            </button>
+          </div>
+          <p style="font-size: 14px; color: #ccc; margin: 0;">Send this link to your friend to start playing together!</p>
+          <div style="margin-top: 10px; padding: 8px; background: #444; border-radius: 3px; font-size: 12px; color: #aaa;">
+            Room Code: <span id="room-code-display" style="font-family: monospace; color: #E6B84D; font-weight: bold;"></span>
+          </div>
+          <div id="connection-status" style="margin-top: 15px; padding: 10px; border-radius: 5px; background: #444;">
+            <strong>Status:</strong> <span id="status-text">Waiting for opponent...</span>
+          </div>
+          
+          <!-- Chat Section -->
+          <div id="chat-section" style="margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 5px; display: none;">
+            <h4 style="color: #E6B84D; margin: 0 0 10px 0; font-size: 16px;">💬 Chat</h4>
+            <div id="chat-messages" style="height: 150px; overflow-y: auto; background: #1a1a1a; border: 1px solid #555; border-radius: 3px; padding: 8px; margin-bottom: 10px; font-size: 12px; line-height: 1.4;"></div>
+            <div style="display: flex; align-items: center;">
+              <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200" style="flex: 1; padding: 8px; border-radius: 3px; border: 1px solid #555; background: #333; color: white; font-size: 12px;">
+              <button id="send-chat-btn" style="background: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 3px; margin-left: 5px; cursor: pointer; font-size: 12px;">Send</button>
+            </div>
+            <div id="typing-indicator" style="height: 16px; font-size: 11px; color: #888; margin-top: 5px; font-style: italic;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+    
+    // Event listeners
+    document.getElementById('close-modal').addEventListener('click', closeMultiplayerModal);
+    document.getElementById('create-game-btn').addEventListener('click', createNewGame);
+    document.getElementById('join-game-btn').addEventListener('click', joinExistingGame);
+    document.getElementById('copy-link-btn').addEventListener('click', copyShareLink);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeMultiplayerModal();
+    });
+  }
+
+  function showMultiplayerModal() {
+    const modal = document.getElementById('multiplayer-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      updateModalStatus();
+    }
+  }
+
+  function closeMultiplayerModal() {
+    const modal = document.getElementById('multiplayer-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  function createNewGame() {
+    // Check if server is connected first
+    if (!window.MULTIPLAYER.connected) {
+      alert('Please start the backend server first!\n\nRun these commands:\ncd backend\nnpm install\nnpm run dev');
+      return;
+    }
+    
+    // Generate a friendly room code
+    const roomCode = generateFriendlyRoomCode();
+    
+    // Build the shareable URL
+    let gameUrl;
+    const deployedServerUrl = 'YOUR_RENDER_SERVER_URL'; // Replace after deployment
+    
+    if (deployedServerUrl && deployedServerUrl !== 'YOUR_RENDER_SERVER_URL') {
+      // Use deployed server URL for internet sharing
+      gameUrl = `${deployedServerUrl}/#${roomCode}`;
+    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Local development
+      gameUrl = `http://localhost:3000/#${roomCode}`;
+    } else {
+      // Fallback
+      gameUrl = `${window.location.protocol}//${window.location.host}/#${roomCode}`;
+    }
+    
+    console.log('Generated game URL:', gameUrl);
+    
+    // Update current URL and join room
+    window.location.hash = roomCode;
+    joinRoom(roomCode);
+    
+    // Show the share link section
+    const shareLinkInput = document.getElementById('share-link');
+    if (shareLinkInput) {
+      shareLinkInput.value = gameUrl;
+      console.log('Set share link value:', gameUrl);
+    }
+    
+    // Show the room code
+    const roomCodeDisplay = document.getElementById('room-code-display');
+    if (roomCodeDisplay) {
+      roomCodeDisplay.textContent = roomCode;
+    }
+    
+    const gameLinkSection = document.getElementById('game-link-section');
+    if (gameLinkSection) {
+      gameLinkSection.style.display = 'block';
+    }
+    
+    updateModalStatus();
+  }
+
+  function joinExistingGame() {
+    const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+    if (roomCode) {
+      window.location.hash = roomCode;
+      joinRoom(roomCode);
+      closeMultiplayerModal();
+    }
+  }
+
+  function copyShareLink() {
+    const linkInput = document.getElementById('share-link');
+    if (!linkInput || !linkInput.value) {
+      console.error('No share link to copy');
+      return;
+    }
+    
+    console.log('Copying link:', linkInput.value);
+    
+    // Modern clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(linkInput.value).then(() => {
+        showCopySuccess();
+      }).catch(err => {
+        console.error('Failed to copy with modern API:', err);
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
+    
+    function fallbackCopy() {
+      try {
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999); // For mobile devices
+        document.execCommand('copy');
+        showCopySuccess();
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+        // Show the link for manual copying
+        alert(`Copy this link manually:\n\n${linkInput.value}`);
+      }
+    }
+    
+    function showCopySuccess() {
+      const copyBtn = document.getElementById('copy-link-btn');
+      if (copyBtn) {
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✅ Copied!';
+        copyBtn.style.background = '#4CAF50';
+        
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+          copyBtn.style.background = '#2196F3';
+        }, 2000);
+      }
+    }
+  }
+
+  function generateFriendlyRoomCode() {
+    // Generate a 6-character room code with letters and numbers (avoiding confusing characters)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  function updateModalStatus() {
+    const statusText = document.getElementById('status-text');
+    const serverStatusText = document.getElementById('server-status-text');
+    const serverStatus = document.getElementById('server-status');
+    const createGameBtn = document.getElementById('create-game-btn');
+    
+    // Update server status
+    if (serverStatusText && serverStatus) {
+      if (window.MULTIPLAYER.connected) {
+        serverStatusText.textContent = '✅ Server connected - Ready for multiplayer!';
+        serverStatus.style.background = '#1a5f1a';
+        serverStatus.style.color = '#90ee90';
+        if (createGameBtn) createGameBtn.disabled = false;
+      } else {
+        serverStatusText.textContent = '❌ Server not running - Start backend server first';
+        serverStatus.style.background = '#5f1a1a';
+        serverStatus.style.color = '#ff9090';
+        if (createGameBtn) createGameBtn.disabled = true;
+      }
+    }
+    
+    if (!statusText) return;
+    
+    if (window.MULTIPLAYER.enabled) {
+      if (window.MULTIPLAYER.connected) {
+        statusText.textContent = `Connected as ${window.MULTIPLAYER.playerColor} player`;
+        statusText.style.color = '#4CAF50';
+      } else {
+        statusText.textContent = 'Connecting...';
+        statusText.style.color = '#FFA500';
+      }
+    } else {
+      statusText.textContent = 'Waiting for opponent...';
+      statusText.style.color = '#ccc';
+    }
+  }
+
+  // Join a multiplayer room
+  function joinRoom(roomId) {
+    if (!window.MULTIPLAYER.socket) {
+      initMultiplayer();
+    }
+    
+    window.MULTIPLAYER.socket.emit('join-room', {
+      roomId,
+      playerName: `Player ${Date.now() % 1000}`
+    });
+  }
+
+  // Initialize on page load
+  window.addEventListener('load', () => {
+    createMultiplayerModal();
+    
+    // Set up multiplayer button
+    const multiplayerBtn = document.getElementById('multiplayer-button');
+    if (multiplayerBtn) {
+      multiplayerBtn.addEventListener('click', () => {
+        showMultiplayerModal();
+        // Try to connect when modal opens
+        if (!window.MULTIPLAYER.socket) {
+          initMultiplayer();
+        }
+      });
+    }
+    
+    // Auto-join if there's a room code in the URL
+    let roomCode = window.location.hash.slice(1);
+    if (roomCode) {
+      // Auto-join the room after a short delay
+      setTimeout(() => {
+        initMultiplayer();
+        setTimeout(() => joinRoom(roomCode), 500);
+      }, 1000);
+    }
+  });
+
+  // Chat functionality
+  function showChatSection() {
+    const chatSection = document.getElementById('chat-section');
+    if (chatSection) {
+      chatSection.style.display = 'block';
+    }
+  }
+
+  function addChatMessage(data) {
+    const messagesDiv = document.getElementById('chat-messages');
+    if (!messagesDiv) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = 'margin-bottom: 5px; padding: 3px 0; border-bottom: 1px solid #333;';
+    
+    const time = new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const colorClass = data.playerColor === 'white' ? '#E6B84D' : '#90CAF9';
+    
+    messageEl.innerHTML = `
+      <span style="color: ${colorClass}; font-weight: bold;">${data.playerName}</span>
+      <span style="color: #666; font-size: 10px; margin-left: 5px;">${time}</span><br>
+      <span style="color: #ddd;">${escapeHtml(data.message)}</span>
+    `;
+    
+    messagesDiv.appendChild(messageEl);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  function addSystemMessage(message) {
+    const messagesDiv = document.getElementById('chat-messages');
+    if (!messagesDiv) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = 'margin-bottom: 5px; padding: 3px; color: #888; font-style: italic; text-align: center; font-size: 11px;';
+    messageEl.textContent = `• ${message} •`;
+    
+    messagesDiv.appendChild(messageEl);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input || !input.value.trim() || !window.MULTIPLAYER.roomId) return;
+    
+    window.MULTIPLAYER.socket.emit('chat-message', {
+      roomId: window.MULTIPLAYER.roomId,
+      message: input.value.trim()
+    });
+    
+    input.value = '';
+    stopTyping();
+  }
+
+  let typingTimeout;
+  function startTyping() {
+    if (typingTimeout) return; // Already typing
+    
+    window.MULTIPLAYER.socket.emit('player-typing', {
+      roomId: window.MULTIPLAYER.roomId,
+      isTyping: true
+    });
+    
+    typingTimeout = setTimeout(stopTyping, 3000);
+  }
+
+  function stopTyping() {
+    if (!typingTimeout) return;
+    
+    clearTimeout(typingTimeout);
+    typingTimeout = null;
+    
+    window.MULTIPLAYER.socket.emit('player-typing', {
+      roomId: window.MULTIPLAYER.roomId,
+      isTyping: false
+    });
+  }
+
+  function showTypingIndicator(data) {
+    const indicator = document.getElementById('typing-indicator');
+    if (!indicator) return;
+    
+    if (data.isTyping) {
+      indicator.textContent = `${data.playerName} is typing...`;
+    } else {
+      indicator.textContent = '';
+    }
+  }
+
+  function getLocalPlayerName() {
+    // You could make this customizable later
+    return `Player ${Date.now() % 1000}`;
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Notifications system
+  function showNotification(message, type = 'info') {
+    // Create notification container if it doesn't exist
+    let container = document.getElementById('notification-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'notification-container';
+      container.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10001;
+        max-width: 300px; font-family: 'Milonga', serif;
+      `;
+      document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    const colors = {
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#F44336',
+      info: '#2196F3',
+      chat: '#9C27B0'
+    };
+    
+    notification.style.cssText = `
+      background: ${colors[type] || colors.info}; color: white; padding: 12px 16px;
+      border-radius: 5px; margin-bottom: 10px; font-size: 14px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transform: translateX(320px); transition: transform 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    // Slide in
+    setTimeout(() => {
+      notification.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Remove after 4 seconds
+    setTimeout(() => {
+      notification.style.transform = 'translateX(320px)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 4000);
+  }
+
+  // Set up chat event listeners when modal is created
+  const originalCreateModal = createMultiplayerModal;
+  createMultiplayerModal = function() {
+    originalCreateModal();
+    
+    // Chat input listeners
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat-btn');
+    
+    if (chatInput) {
+      chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendChatMessage();
+        } else {
+          startTyping();
+        }
+      });
+      
+      chatInput.addEventListener('blur', stopTyping);
+    }
+    
+    if (sendBtn) {
+      sendBtn.addEventListener('click', sendChatMessage);
+    }
+  };
+
+  // Export for global access
+  window.initMultiplayer = initMultiplayer;
+  window.joinRoom = joinRoom;
+  window.showNotification = showNotification;
+})();

@@ -1,0 +1,48 @@
+// SPIDER: exactly three slides with one-hive rule
+    else if (type === 'S') {
+        if (!hiveIntactAfterRemoval(q0,r0)) return [];
+        const k0=`${q0},${r0}`;
+        const cell = cells.get(k0);
+        const top = cell.stack.pop();
+        const ends=new Set();
+        const stk=[[q0,r0,0,new Set([k0])]];
+        while(stk.length){
+            const [cx,cy,d,vis] = stk.pop();
+            if (d === 3){
+                ends.add(`${cx},${cy}`);
+                continue;
+            }
+            DIRS.forEach(({dq, dr})=>{
+                const nx=cx+dq, ny=cy+dr;
+                const k1=`${nx},${ny}`;
+                if (cells.has(k1) && !occAll.has(k1) && !vis.has(k1) && canSlide(cx,cy,nx,ny,occRem)){
+                    const testSet = new Set(occRem);
+                    testSet.add(k1);
+                    if (isHiveConnected(testSet)){
+                        const nv = new Set(vis);
+                        nv.add(k1);
+                        stk.push([nx,ny,d+1,nv]);
+                    }
+                }
+            });
+        }
+        cell.stack.push(top);
+        let arr = Array.from(ends).map(s=>s.split(",").map(Number));
+        if (arr.length > 2){
+            arr = arr.sort((a,b)=>{
+                const angA = Math.atan2(a[1] - r0, a[0] - q0);
+                const angB = Math.atan2(b[1] - r0, b[0] - q0);
+                return angA - angB;
+            });
+            arr = [arr[0], arr[arr.length-1]];
+        }
+        return arr.map(p=>`${p[0]},${p[1]}`);
+    }
+
+    // filter out moves that break hive connectivity  
+    return Array.from(zones).filter(k=>{
+        const test=new Set(occRem);
+        test.add(k);
+        return isHiveConnected(test);
+    });
+}

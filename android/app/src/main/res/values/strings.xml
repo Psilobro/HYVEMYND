@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HYVEMYND</string>
+    <string name="title_activity_main">HYVEMYND</string>
+    <string name="package_name">com.marlowe.hyvemynd</string>
+    <string name="custom_url_scheme">com.marlowe.hyvemynd</string>
+</resources>
