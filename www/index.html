@@ -89,11 +89,21 @@
         console.log('Multiplayer button found in DOM');
         // Add a simple test click handler
         btn.onclick = function() {
-          alert('Multiplayer button clicked! This means the button works.');
-          if (window.showMultiplayerModal) {
+          console.log('Multiplayer button clicked! Trying to show modal...');
+          
+          // Check if functions are available
+          if (typeof window.showMultiplayerModal === 'function') {
+            console.log('showMultiplayerModal function found - calling it');
             window.showMultiplayerModal();
+          } else if (typeof window.createMultiplayerModal === 'function') {
+            console.log('createMultiplayerModal function found - creating modal first');
+            window.createMultiplayerModal();
+            if (typeof window.showMultiplayerModal === 'function') {
+              window.showMultiplayerModal();
+            }
           } else {
-            console.error('showMultiplayerModal function not found');
+            console.error('Neither showMultiplayerModal nor createMultiplayerModal functions found');
+            alert('Modal functions not loaded yet. Please refresh the page and try again.');
           }
         };
       } else {

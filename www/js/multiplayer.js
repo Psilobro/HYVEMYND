@@ -1000,5 +1000,6 @@
   window.joinRoom = joinRoom;
   window.showNotification = showNotification;
   window.ChatUI = ChatUI;
-})();
+  window.showMultiplayerModal = showMultiplayerModal;
+  window.createMultiplayerModal = createMultiplayerModal;
 })();
