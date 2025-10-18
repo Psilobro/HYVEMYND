@@ -268,7 +268,8 @@
 
   // Check if it's the local player's turn
   function checkIfMyTurn() {
-    if (!window.MULTIPLAYER.enabled) {
+    // Always allow moves in single player mode
+    if (!window.MULTIPLAYER.enabled || !window.MULTIPLAYER.connected || !window.MULTIPLAYER.roomId) {
       window.MULTIPLAYER.isMyTurn = true;
       return;
     }
@@ -286,13 +287,15 @@
     const hud = document.getElementById('hud');
     if (!hud) return;
     
-    if (window.MULTIPLAYER.enabled) {
+    // Only show multiplayer HUD if in an active multiplayer game
+    if (window.MULTIPLAYER.enabled && window.MULTIPLAYER.connected && window.MULTIPLAYER.roomId) {
       const status = window.MULTIPLAYER.connected ? 'Connected' : 'Disconnected';
       const role = `Playing as ${window.MULTIPLAYER.playerColor}`;
       const turn = window.MULTIPLAYER.isMyTurn ? 'Your turn' : 'Opponent\'s turn';
       
       hud.innerHTML = `${role} • ${status} • ${turn}`;
     }
+    // In single player mode, let the original HUD function handle display
   }
 
   // Wrap existing commit functions to broadcast actions
@@ -300,8 +303,16 @@
 
   const originalCommitPlacement = window.commitPlacement;
   window.commitPlacement = function(q, r) {
+    // Only enforce turn restrictions if in an active multiplayer game with another player
+    const inActiveMultiplayerGame = window.MULTIPLAYER.enabled && 
+                                   window.MULTIPLAYER.connected && 
+                                   window.MULTIPLAYER.roomId;
+    
     console.log('commitPlacement called:', {
       enabled: window.MULTIPLAYER.enabled,
+      connected: window.MULTIPLAYER.connected,
+      roomId: window.MULTIPLAYER.roomId,
+      inActiveGame: inActiveMultiplayerGame,
       isMyTurn: window.MULTIPLAYER.isMyTurn,
       bypass: bypassTurnCheck,
       playerColor: window.MULTIPLAYER.playerColor,
@@ -309,9 +320,9 @@
       selectedPiece: selected?.piece?.meta
     });
     
-    // Only allow if it's the player's turn in multiplayer (unless bypassing for opponent)
-    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
-      console.log('Not your turn! Current turn:', state.current, 'Your color:', window.MULTIPLAYER.playerColor);
+    // Only block if in active multiplayer and not your turn (unless bypassing for opponent)
+    if (inActiveMultiplayerGame && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
+      console.log('Multiplayer: Not your turn! Current turn:', state.current, 'Your color:', window.MULTIPLAYER.playerColor);
       return;
     }
     
@@ -319,8 +330,8 @@
     console.log('Calling original commitPlacement for piece:', piece?.meta);
     originalCommitPlacement(q, r);
     
-    // Only broadcast if this is the local player's action (not opponent sync)
-    if (piece && window.MULTIPLAYER.enabled && !bypassTurnCheck) {
+    // Only broadcast if in active multiplayer and this is the local player's action
+    if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
       console.log('Broadcasting placement action for piece:', piece.meta);
       broadcastAction('place', piece, q, r);
     }
@@ -328,17 +339,22 @@
 
   const originalCommitMove = window.commitMove;
   window.commitMove = function(q, r) {
-    // Only allow if it's the player's turn in multiplayer (unless bypassing for opponent)
-    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
-      console.log('Not your turn!');
+    // Only enforce turn restrictions if in an active multiplayer game with another player
+    const inActiveMultiplayerGame = window.MULTIPLAYER.enabled && 
+                                   window.MULTIPLAYER.connected && 
+                                   window.MULTIPLAYER.roomId;
+    
+    // Only block if in active multiplayer and not your turn (unless bypassing for opponent)
+    if (inActiveMultiplayerGame && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
+      console.log('Multiplayer: Not your turn!');
       return;
     }
     
     const piece = selected?.piece;
     originalCommitMove(q, r);
     
-    // Only broadcast if this is the local player's action (not opponent sync)
-    if (piece && window.MULTIPLAYER.enabled && !bypassTurnCheck) {
+    // Only broadcast if in active multiplayer and this is the local player's action
+    if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
       broadcastAction('move', piece, q, r);
     }
   };
@@ -347,8 +363,12 @@
   const originalUpdateHUD = window.updateHUD;
   window.updateHUD = function() {
     originalUpdateHUD();
-    checkIfMyTurn();
-    updateMultiplayerHUD();
+    
+    // Only update multiplayer HUD if in an active multiplayer game
+    if (window.MULTIPLAYER.enabled && window.MULTIPLAYER.connected && window.MULTIPLAYER.roomId) {
+      checkIfMyTurn();
+      updateMultiplayerHUD();
+    }
   };
 
   // Room management UI
