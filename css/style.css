@@ -1,0 +1,784 @@
+/* Desktop tray positions */
+#white-tray.player-tray {
+    left: 155px;
+    right: auto;
+}
+#black-tray.player-tray {
+    right: 185px;
+    left: auto;
+}
+#move-history.expanded {
+    display: block !important;
+}
+/* Move history entry: all info inline, single line per turn */
+#moves-list li.history-entry {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 4px;
+    padding: 2px 0;
+    margin: 0;
+    min-height: 36px;
+    border-bottom: 1px solid rgba(230,184,77,0.08);
+    white-space: nowrap;
+    overflow: hidden;
+}
+#moves-list .mini-path {
+    width: 28px;
+    height: 14px;
+    margin-right: 4px;
+    flex: 0 0 28px;
+}
+#moves-list .move-text {
+    flex: 1;
+    font-size: 11px;
+    font-family: 'Milonga', serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0;
+}
+/* Move history hex button for turn number */
+.move-hex-btn {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Milonga', serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: #4B382A;
+    border: 2px solid #E6B84D;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;
+    transition: box-shadow 0.2s;
+    box-shadow: 0 1px 4px #e6b84d44;
+    outline: none;
+    padding: 0;
+}
+.move-hex-btn.gold-hex {
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    border: 2px solid #E6B84D;
+}
+.move-hex-btn .move-num {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+.move-hex-btn:active, .move-hex-btn:focus {
+    box-shadow: 0 0 8px #e6b84d88;
+    background: linear-gradient(135deg, #fffbe6 60%, #e6b84d 100%);
+}
+@font-face {
+    font-family: 'Milonga';
+    src: url('../assets/Fonts/Milonga-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+/* Hexagonal Go button for history replay */
+.go-hex-btn {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #e6b84d 60%, #fffbe6 100%);
+    clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Milonga', serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: #4B382A;
+    border: 2px solid #E6B84D;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;
+    transition: box-shadow 0.2s;
+}
+.go-hex-btn:hover {
+    box-shadow: 0 0 8px #e6b84d88;
+    background: linear-gradient(135deg, #fffbe6 60%, #e6b84d 100%);
+}
+
+#history-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    padding-top: 4px;
+}
+#history-slider {
+    accent-color: #E6B84D;
+    position: relative;
+    z-index: 2;
+}
+
+#history-slider-ticks {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    margin-top: -10px;
+    z-index: 1;
+    pointer-events: none;
+}
+.slider-tick {
+    position: absolute;
+    width: 2px;
+    height: 10px;
+    background: #E6B84D;
+    top: 0;
+    border-radius: 1px;
+    opacity: 0.85;
+}
+
+#return-to-live {
+    background: #3ddc84;
+    color: #15171b;
+    border-radius: 6px;
+    border: none;
+    font-weight: bold;
+    font-family: 'Milonga', serif;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+body {
+  background: transparent;
+}
+
+@font-face {
+    font-family: 'Beetype';
+    src: url('../assets/Fonts/Beetype-Outline.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Mad Beef';
+    src: url('../assets/Fonts/Mad Beef.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+#bg-video {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  min-width: 100%;
+  min-height: 100%;
+  z-index: -1;
+  transform: scale(1); /* bigger = zoom in, smaller = zoom out */
+  transform-origin: center center; /* zoom from the middle */
+}
+
+:root {
+    --bg: #0e0f12;
+    --dark: #15171b;
+    --highlight: #3ddc84;
+    --text: #e9edf3;
+}
+html, body {
+    width:100%; height:100%; margin:0; padding:0;
+    overflow:hidden; color:var(--text); font-family:sans-serif;
+}
+
+#game-container {
+    position: absolute;
+    top: 0;
+    left: 280px; /* More space for farther left white tray */
+    right: 320px; /* More space for farther right black tray + move history */
+    bottom: 0;
+    overflow: hidden;
+}
+
+#app { 
+    position: absolute; 
+    width: 100%;
+    height: 100%;
+}
+
+#board-viewport {
+    position: absolute;
+    /* Dynamic sizing - will be set by JavaScript based on board perimeter */
+    overflow: hidden;
+    /* No visual styling - invisible viewport */
+    background: transparent;
+    pointer-events: all;
+}
+
+#app { 
+    position: absolute; 
+    width: 100%;
+    height: 100%;
+}
+
+.player-tray {
+    position: absolute;
+    top: -9%; /* Move up to -9% */
+    bottom: 0;
+    width: 220px; /* Increased width for better 2-column layout */
+    pointer-events: all; /* Enable pointer events for piece selection */
+    transform: scale(0.73); /* Scale down to 73% */
+    transform-origin: top center;
+}
+
+/* Tray positions for desktop will be set in media queries only */
+
+#hud {
+    position: fixed;
+    top: 64px;
+    right: 10px;
+    width: 200px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    z-index: 20;
+    margin-bottom: 0;
+}
+
+#game-title {
+    position: absolute;
+    top: 5px;
+    left: 22%;
+    transform: translateX(-50%);
+    font-family: 'Beetype', sans-serif;
+    font-size: 68px; /* Scaled down by 15% from 80px */
+    color: #E6B84D;
+    text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000;
+    z-index: 15;
+    pointer-events: none;
+    letter-spacing: 2px;
+}
+#play-music-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.5);
+    color: var(--text);
+    font-family: 'Milonga', serif;
+    border: 1px solid var(--text);
+    cursor: pointer;
+    z-index: 10;
+}
+
+#auto-zoom-toggle {
+    position: absolute;
+    top: 16px;
+    right: 140px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.5);
+    color: var(--text);
+    font-family: 'Milonga', serif;
+    border: 1px solid var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 10;
+}
+
+#move-history {
+    display: none;
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 20;
+    width: 250px;
+    height: 300px;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #E6B84D rgba(0,0,0,0.0);
+    background: rgba(0,0,0,0.5);
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: var(--text);
+}
+
+/* Hide scrollbar unless scrolling (Webkit browsers) */
+#move-history::-webkit-scrollbar {
+    width: 0.5em;
+    background: transparent;
+}
+#move-history:hover::-webkit-scrollbar {
+    background: #222;
+}
+#move-history::-webkit-scrollbar-thumb {
+    background: #E6B84D;
+    border-radius: 4px;
+    opacity: 0.7;
+}
+/* ...existing code... */
+
+/* Enhanced move history styling */
+.history-entry {
+    margin-bottom: 0;
+    padding: 0 2px;
+    border-radius: 1px;
+    border-left: 2px solid transparent;
+    background: rgba(255,255,255,0.01);
+    display: flex;
+    align-items: center;
+    min-height: 22px;
+    flex-direction: row;
+}
+
+.history-entry.white-move {
+    border-left-color: #FFFFFF;
+    background: rgba(255,255,255,0.35); /* Even whiter background */
+}
+
+.history-entry.black-move {
+    border-left-color: #333333;
+    background: rgba(0,0,0,0.7); /* Even blacker background */
+}
+
+.move-text {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    vertical-align: middle;
+    gap: 4px;
+    line-height: 1.1;
+    font-size: 11px;
+    font-family: 'Milonga', serif;
+    flex: 1;
+}
+
+.move-number {
+    font-weight: bold;
+    color: var(--text);
+    min-width: 16px;
+}
+#move-history h3 { margin: 0 0 6px 0; font-size: 14px; font-family: 'Milonga', serif; }
+.piece-name {
+    font-weight: bold;
+    text-shadow: 0.5px 0.5px 0.5px #000000;
+}
+
+/* Move history helper visuals */
+/* ...existing code... */
+/* ...existing code... */
+
+/* Orientation overlay (labels N, NE, SE, S, SW, NW) */
+#hex-orient-overlay {
+    position: absolute;
+    pointer-events: none;
+    width: 160px; height: 160px;
+    right: calc(200px + 32px); /* place left of move history */
+    top: 80px;
+    z-index: 6;
+    display: none;
+}
+#hex-orient-overlay svg text { fill: var(--text); font-size:12px; font-weight:600; }
+#hex-orient-overlay svg circle { fill: rgba(255,255,255,0.04); stroke: rgba(255,255,255,0.08); }
+
+#move-history h3 { margin: 0 0 6px 0; font-size: 14px }
+#moves-list {
+    padding-left: 8px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+#play-music-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.5);
+    color: var(--text);
+    border: 1px solid var(--text);
+    cursor: pointer;
+}
+
+/* Hide mobile toggle button on desktop */
+#move-history-toggle {
+    display: block !important;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 20;
+    background: #E6B84D;
+    color: #4B382A;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #E6B84D;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px #e6b84d44;
+    cursor: pointer;
+}
+
+
+/* Tablet mode - for fold phones opened up and actual tablets */
+@media screen and (min-width: 769px) and (max-width: 850px) {
+    #move-history h3,
+    #move-history::before,
+    #move-history.tablet-expanded h3,
+    #move-history.tablet-expanded::before {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+    }
+    html, body {
+        overflow: visible !important; /* Allow content to extend beyond viewport */
+    }
+    
+    #game-title {
+        font-size: 48px !important; /* Slightly bigger letters */
+        top: 35px !important; /* Move down more */
+    }
+    
+    #game-container {
+        left: 200px !important;
+        right: 200px !important;
+        overflow: visible !important; /* Allow queen heads to show outside container */
+    }
+    
+    #app {
+        overflow: visible !important; /* Allow content to extend beyond app container */
+    }
+    
+    #board-viewport {
+        overflow: visible !important; /* Allow pieces to extend beyond viewport */
+    }
+    
+    #white-tray.player-tray {
+        left: 32px !important;
+        right: auto !important;
+        top: -10% !important;
+        transform: scale(0.7) !important;
+        transform-origin: left top !important;
+        width: 220px !important;
+        position: absolute !important;
+        z-index: 5 !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    #black-tray.player-tray {
+        right: 32px !important;
+        left: auto !important;
+        top: -10% !important;
+        transform: scale(0.7) !important;
+        transform-origin: right top !important;
+        width: 220px !important;
+        position: absolute !important;
+        z-index: 6 !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+    
+    #move-history {
+        display: none !important;
+        position: fixed !important;
+        right: 10px !important;
+        bottom: 10px !important;
+        z-index: 20 !important;
+    }
+    #move-history.tablet-expanded {
+        display: block !important;
+        width: 250px !important;
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important;
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        color: var(--text) !important;
+        background: rgba(0,0,0,0.5) !important;
+        border-radius: 8px !important;
+    }
+    #move-history.tablet-expanded #moves-list,
+    #move-history.tablet-expanded #history-controls,
+    #move-history.tablet-expanded #history-slider,
+    #move-history.tablet-expanded #history-slider-ticks {
+        display: block !important;
+    }
+    #move-history:not(.tablet-expanded) #moves-list,
+    #move-history:not(.tablet-expanded) #history-controls,
+    #move-history:not(.tablet-expanded) #history-slider,
+    #move-history:not(.tablet-expanded) #history-slider-ticks {
+        display: none !important;
+    }
+        }
+        #move-history.tablet-expanded .history-entry:first-child {
+            margin-top: 0 !important;
+        }
+        #black-tray.player-tray {
+            color: inherit !important;
+            display: block !important;
+            overflow: visible !important;
+        }
+    
+    
+    #move-history h3 {
+        display: none !important; /* Hide header when minimized */
+    }
+    
+    #move-history.tablet-expanded {
+        width: 250px !important; /* Wider to accommodate longer piece names */
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important; /* Let inner container handle scrolling */
+        bottom: 10px !important; /* Keep at bottom, don't move up */
+        right: 10px !important; /* Stay at right edge */
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important; /* No padding on outer container */
+        margin: 0 !important;
+        box-sizing: border-box !important; /* Include padding in height */
+        z-index: 10 !important; /* Well above everything else */
+        color: var(--text) !important; /* Show actual content */
+        position: fixed !important; /* Ensure proper positioning */
+        display: block !important;
+    }
+    
+    
+    #move-history.tablet-expanded::before {
+        display: none !important;
+    }
+    
+    #move-history.tablet-expanded h3 {
+        display: none !important; /* Hide "Move History" header when expanded */
+    }
+    
+    #move-history.tablet-expanded #moves-list {
+        display: block !important; /* Show moves list when expanded */
+        text-align: center !important; /* Center the move list content */
+        padding: 8px !important; /* Move padding here */
+        margin: 0 !important;
+        list-style: none !important; /* Remove any list styling */
+        height: 300px !important; /* Full height of container */
+        max-height: 300px !important;
+        overflow-y: scroll !important; /* Scrolling happens here */
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+        box-sizing: border-box !important;
+        background: rgba(0,0,0,0.5) !important; /* Match parent styling */
+        border-radius: 6px !important;
+    }
+    
+    #move-history.tablet-expanded .history-entry:first-child {
+        margin-top: 0 !important; /* Ensure first move starts at top */
+    }
+
+    #save-load-controls {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+#save-load-controls button,
+#save-load-controls label {
+  font-family: 'Milonga', serif;
+  font-size: 1.1em;
+  background: #222;
+  color: #FFD700;
+  border: 2px solid #FFD700;
+  border-radius: 8px;
+  padding: 6px 18px;
+  margin: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+#save-load-controls button:hover,
+#save-load-controls label:hover {
+  background: #FFD700;
+  color: #222;
+}
+
+#save-load-controls label {
+  display: inline-block;
+  cursor: pointer;
+}
+
+#save-load-controls input[type="file"] {
+  display: none;
+}
+
+/* Force landscape orientation on mobile */
+@media screen and (max-width: 768px) and (orientation: portrait) {
+    body::before {
+        content: "Please rotate your device to landscape mode";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        text-align: center;
+        z-index: 9999;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    
+    #game-container,
+    #white-tray,
+    #black-tray,
+    #hud,
+    #move-history,
+    #game-title,
+    #play-music-button,
+    #auto-zoom-toggle {
+        display: none;
+    }
+}
+
+/* Mobile landscape mode - specifically for fold phones in narrow landscape */
+@media screen and (max-width: 900px) and (max-height: 350px) and (orientation: landscape) {
+    /* Ensure no clipping on mobile */
+    html, body {
+        overflow: visible !important;
+    }
+    
+    /* Make title much smaller */
+    #game-title {
+        font-size: 24px !important;
+        top: 3px !important;
+    }
+    
+    /* Game container - much smaller margins for scaled trays */
+    #game-container {
+        left: 130px !important;
+        right: 130px !important;
+    }
+    
+    /* Tray positioning - adjusted for fold screen */
+    #white-tray.player-tray {
+        left: 50px !important; /* Closer to board */
+        top: 10px !important; /* Higher up */
+        bottom: unset !important;
+        width: 220px !important;
+        height: 300px !important;
+        overflow: visible !important;
+        position: fixed !important;
+        z-index: 5 !important;
+    }
+    
+    #black-tray.player-tray {
+        right: 50px !important; /* Closer to board */
+        top: 10px !important; /* Higher up */
+        bottom: unset !important;
+        width: 220px !important;
+        height: 300px !important;
+        overflow: visible !important;
+        position: fixed !important;
+        z-index: 5 !important;
+    }
+    
+    /* Hide full move history on mobile, show toggle button instead */
+    #move-history {
+        display: none !important;
+    }
+    #move-history.tablet-expanded {
+        display: block !important;
+        width: 250px !important;
+        height: 300px !important;
+        max-height: 300px !important;
+        overflow: visible !important;
+        bottom: 10px !important;
+        right: 10px !important;
+        text-align: left !important;
+        line-height: normal !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        z-index: 20 !important;
+        color: var(--text) !important;
+        position: fixed !important;
+        background: rgba(0,0,0,0.5) !important;
+        border-radius: 8px !important;
+    }
+    
+    #move-history.expanded {
+    display: block !important;
+        display: block !important;
+        position: fixed;
+        top: 60px;
+        right: 10px;
+        width: 200px;
+        max-height: 300px;
+        font-size: 12px;
+        z-index: 30;
+        background: rgba(0,0,0,0.9);
+    }
+    
+    #move-history-toggle {
+        display: block !important;
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 6px 16px;
+        border-radius: 8px;
+        background: #E6B84D;
+        color: #4B382A;
+        font-family: 'Milonga', serif;
+        font-size: 15px;
+        border: 2px solid #E6B84D;
+        box-shadow: 0 2px 8px #e6b84d44;
+        cursor: pointer;
+        z-index: 30;
+#move-history-toggle {
+    font-size: 13px !important;
+    padding: 4px 10px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 8px !important;
+}
+    }
+    
+    #auto-zoom-toggle {
+        right: 140px !important;
+        font-size: 12px !important;
+    }
+    
+    #play-music-button {
+        font-size: 12px !important;
+    }
+    
+    #move-history h3 {
+        font-size: 12px !important;
+    }
+    
+    #hud {
+        font-size: 16px !important;
+    }
+}

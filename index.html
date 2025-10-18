@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hive • PIXI Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="preload" href="assets/Fonts/Beetype-Outline.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="assets/Fonts/Milonga-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <video autoplay muted loop playsinline id="bg-video" src="assets/videos/honeycells.mp4"></video>
+  <div id="game-title" style="font-family: 'Milonga', serif;">HyveMynd</div>
+  <div id="hud">White to move</div>
+  <div id="move-history">
+    <ol id="moves-list"></ol>
+    <div id="history-controls" style="position:sticky;bottom:0;z-index:10;background:rgba(0,0,0,0.5);padding-top:4px;">
+      <input type="range" id="history-slider" min="0" value="0" step="1" style="width: 100%; margin: 8px 0;">
+      <button id="return-to-live" style="display:none; margin: 4px 0;">Return to Live</button>
+    </div>
+  </div>
+  <div id="game-container">
+    <div id="app"></div>
+  </div>
+  <div id="white-tray" class="player-tray"></div>
+  <div id="black-tray" class="player-tray"></div>
+  <button id="play-music-button">Play Music</button>
+  <button id="auto-zoom-toggle">Auto-Center: ON</button>
+  <button id="move-history-toggle">History</button>
+  <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
+  <div id="hex-orient-overlay" aria-hidden="true">
+    <!-- SVG will be injected dynamically -->
+  </div>
+<script>
+  const bgVideo = document.getElementById('bg-video');
+  bgVideo.playbackRate = 0.4; // 0.5 = half speed, 2 = double speed
+</script>
+
+<div id="save-load-controls">
+  <button id="save-btn" title="Save to browser">💾 Save</button>
+  <button id="load-btn" title="Load from browser">📂 Load</button>
+  <button id="export-btn" title="Export to file">⬇️ Export</button>
+  <label id="import-label" title="Import from file">
+    ⬆️ Import
+    <input type="file" id="import-btn" accept=".json" style="display:none;">
+  </label>
+</div>
+<script>
+  // Optional: live tweak with + / - keys
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '+') bgVideo.playbackRate += 0.1;
+    if (e.key === '-') bgVideo.playbackRate = Math.max(0.1, bgVideo.playbackRate - 0.1);
+    console.log(`Video speed: ${bgVideo.playbackRate.toFixed(2)}x`);
+  });
+</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.10/browser/pixi.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/game.js"></script>
+  <script src="js/pieces.js"></script>
+  <script src="js/resize.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
