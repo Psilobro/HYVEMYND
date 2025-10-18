@@ -605,18 +605,35 @@
 
   // Initialize on page load
   window.addEventListener('load', () => {
-    createMultiplayerModal();
+    console.log('Multiplayer script loaded - setting up modal and button');
+    
+    try {
+      createMultiplayerModal();
+      console.log('Multiplayer modal created successfully');
+    } catch (error) {
+      console.error('Error creating multiplayer modal:', error);
+    }
     
     // Set up multiplayer button
     const multiplayerBtn = document.getElementById('multiplayer-button');
+    console.log('Multiplayer button found:', multiplayerBtn);
+    
     if (multiplayerBtn) {
       multiplayerBtn.addEventListener('click', () => {
-        showMultiplayerModal();
-        // Try to connect when modal opens
-        if (!window.MULTIPLAYER.socket) {
-          initMultiplayer();
+        console.log('Multiplayer button clicked!');
+        try {
+          showMultiplayerModal();
+          // Try to connect when modal opens
+          if (!window.MULTIPLAYER.socket) {
+            initMultiplayer();
+          }
+        } catch (error) {
+          console.error('Error showing multiplayer modal:', error);
         }
       });
+      console.log('Multiplayer button event listener attached');
+    } else {
+      console.error('Multiplayer button not found!');
     }
     
     // Auto-join if there's a room code in the URL

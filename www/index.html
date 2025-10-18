@@ -78,5 +78,28 @@
   <script src="js/main.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <script src="js/multiplayer.js"></script>
+  
+  <!-- Debug script for multiplayer button -->
+  <script>
+    // Simple fallback test for multiplayer button
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM loaded - checking multiplayer button');
+      const btn = document.getElementById('multiplayer-button');
+      if (btn) {
+        console.log('Multiplayer button found in DOM');
+        // Add a simple test click handler
+        btn.onclick = function() {
+          alert('Multiplayer button clicked! This means the button works.');
+          if (window.showMultiplayerModal) {
+            window.showMultiplayerModal();
+          } else {
+            console.error('showMultiplayerModal function not found');
+          }
+        };
+      } else {
+        console.error('Multiplayer button NOT found in DOM');
+      }
+    });
+  </script>
 </body>
 </html>
