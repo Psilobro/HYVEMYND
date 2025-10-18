@@ -73,10 +73,14 @@ io.on('connection', (socket) => {
     } else {
       // New player - assign color based on existing colors
       const existingColors = new Set(Array.from(room.players.values()).map(p => p.color));
+      console.log(`Assigning color for new player. Existing players: ${room.players.size}, Existing colors:`, Array.from(existingColors));
+      
       if (!existingColors.has('white')) {
         playerColor = 'white';
+        console.log('Assigned white (first player)');
       } else if (!existingColors.has('black')) {
         playerColor = 'black';
+        console.log('Assigned black (second player)');
       } else {
         // Room is full
         socket.emit('room-full', { roomId });
