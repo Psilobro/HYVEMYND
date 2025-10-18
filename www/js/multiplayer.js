@@ -274,6 +274,11 @@
     }
     
     window.MULTIPLAYER.isMyTurn = (state.current === window.MULTIPLAYER.playerColor);
+    console.log('Turn check:', {
+      current: state.current,
+      playerColor: window.MULTIPLAYER.playerColor,
+      isMyTurn: window.MULTIPLAYER.isMyTurn
+    });
   }
 
   // Update HUD with multiplayer info
@@ -295,17 +300,28 @@
 
   const originalCommitPlacement = window.commitPlacement;
   window.commitPlacement = function(q, r) {
+    console.log('commitPlacement called:', {
+      enabled: window.MULTIPLAYER.enabled,
+      isMyTurn: window.MULTIPLAYER.isMyTurn,
+      bypass: bypassTurnCheck,
+      playerColor: window.MULTIPLAYER.playerColor,
+      currentTurn: state.current,
+      selectedPiece: selected?.piece?.meta
+    });
+    
     // Only allow if it's the player's turn in multiplayer (unless bypassing for opponent)
     if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
-      console.log('Not your turn!');
+      console.log('Not your turn! Current turn:', state.current, 'Your color:', window.MULTIPLAYER.playerColor);
       return;
     }
     
     const piece = selected?.piece;
+    console.log('Calling original commitPlacement for piece:', piece?.meta);
     originalCommitPlacement(q, r);
     
     // Only broadcast if this is the local player's action (not opponent sync)
     if (piece && window.MULTIPLAYER.enabled && !bypassTurnCheck) {
+      console.log('Broadcasting placement action for piece:', piece.meta);
       broadcastAction('place', piece, q, r);
     }
   };
