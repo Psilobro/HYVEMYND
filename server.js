@@ -55,6 +55,12 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     socket.join(roomId);
     
+    // Count connected players and get existing colors
+    const connectedPlayers = Array.from(room.players.values()).filter(p => p.connected);
+    const existingColors = new Set(connectedPlayers.map(p => p.color));
+    
+    console.log(`Room ${roomId} status: ${connectedPlayers.length} connected players, colors:`, Array.from(existingColors));
+    
     // Check if this player is rejoining (same name, was disconnected)
     let existingPlayer = null;
     for (const [playerId, player] of room.players) {
@@ -71,9 +77,12 @@ io.on('connection', (socket) => {
       room.players.delete(existingPlayer.id);
       console.log(`Player ${playerName} rejoining room ${roomId} as ${playerColor}`);
     } else {
-      // New player - assign color based on existing colors
-      const existingColors = new Set(Array.from(room.players.values()).map(p => p.color));
-      console.log(`Assigning color for new player. Existing players: ${room.players.size}, Existing colors:`, Array.from(existingColors));
+      // New player - assign color based on connected players only
+      if (connectedPlayers.length >= 2) {
+        // Room is full with connected players
+        socket.emit('room-full', { roomId });
+        return;
+      }
       
       if (!existingColors.has('white')) {
         playerColor = 'white';
@@ -82,7 +91,7 @@ io.on('connection', (socket) => {
         playerColor = 'black';
         console.log('Assigned black (second player)');
       } else {
-        // Room is full
+        // This shouldn't happen with the connected check above, but just in case
         socket.emit('room-full', { roomId });
         return;
       }
