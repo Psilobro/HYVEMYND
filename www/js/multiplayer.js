@@ -100,7 +100,6 @@
         isSystem: true
       });
     });
-    });
 
     socket.on('game-action', (data) => {
       console.log('Received action from opponent:', data.action);
