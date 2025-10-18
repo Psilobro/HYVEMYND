@@ -137,6 +137,7 @@ function makePiece(color, key, i, pieceLayer, app){
 
     pieceContainer.meta = {
         color, key, i,
+        id: `${color}_${key}_${i}`, // Unique identifier for multiplayer sync
         placed:false, q:null, r:null
     };
     pieceContainer.interactive=true;

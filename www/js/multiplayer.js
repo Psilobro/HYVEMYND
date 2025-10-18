@@ -142,18 +142,25 @@
     return new Promise((resolve) => {
       const { action } = actionData;
       
-      // Find the piece by its metadata
+      // Find the piece by its metadata - use the unique id
       const piece = tray.find(p => 
-        p.meta.key === action.pieceKey && 
-        p.meta.color === action.color &&
-        p.meta.id === action.pieceId
+        p.meta.id === action.pieceId ||
+        (p.meta.key === action.pieceKey && 
+         p.meta.color === action.color &&
+         p.meta.i === action.pieceIndex)
       );
       
       if (!piece) {
         console.warn('Could not find piece for opponent action:', action);
+        console.log('Available pieces:', tray.map(p => ({ id: p.meta.id, key: p.meta.key, color: p.meta.color, i: p.meta.i })));
         resolve();
         return;
       }
+
+      console.log('Applying opponent action:', action.type, 'for piece', piece.meta.id);
+
+      // Set bypass flag to allow opponent moves
+      bypassTurnCheck = true;
 
       if (action.type === 'place') {
         selectPlacement(piece);
@@ -162,6 +169,9 @@
         selectMove(piece);
         commitMove(action.q, action.r);
       }
+      
+      // Reset bypass flag
+      bypassTurnCheck = false;
       
       // Wait for animations to complete
       setTimeout(resolve, 600);
@@ -176,12 +186,15 @@
       type: actionType,
       pieceKey: piece.meta.key,
       pieceId: piece.meta.id,
+      pieceIndex: piece.meta.i, // Fallback for piece identification
       color: piece.meta.color,
       q, r,
       timestamp: Date.now()
     };
     
     const gameState = exportGameState();
+    
+    console.log('Broadcasting action:', action);
     
     window.MULTIPLAYER.socket.emit('game-action', {
       roomId: window.MULTIPLAYER.roomId,
@@ -267,10 +280,12 @@
   }
 
   // Wrap existing commit functions to broadcast actions
+  let bypassTurnCheck = false; // Flag to allow opponent moves
+
   const originalCommitPlacement = window.commitPlacement;
   window.commitPlacement = function(q, r) {
-    // Only allow if it's the player's turn in multiplayer
-    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn) {
+    // Only allow if it's the player's turn in multiplayer (unless bypassing for opponent)
+    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
       console.log('Not your turn!');
       return;
     }
@@ -278,15 +293,16 @@
     const piece = selected?.piece;
     originalCommitPlacement(q, r);
     
-    if (piece && window.MULTIPLAYER.enabled) {
+    // Only broadcast if this is the local player's action (not opponent sync)
+    if (piece && window.MULTIPLAYER.enabled && !bypassTurnCheck) {
       broadcastAction('place', piece, q, r);
     }
   };
 
   const originalCommitMove = window.commitMove;
   window.commitMove = function(q, r) {
-    // Only allow if it's the player's turn in multiplayer
-    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn) {
+    // Only allow if it's the player's turn in multiplayer (unless bypassing for opponent)
+    if (window.MULTIPLAYER.enabled && !window.MULTIPLAYER.isMyTurn && !bypassTurnCheck) {
       console.log('Not your turn!');
       return;
     }
@@ -294,7 +310,8 @@
     const piece = selected?.piece;
     originalCommitMove(q, r);
     
-    if (piece && window.MULTIPLAYER.enabled) {
+    // Only broadcast if this is the local player's action (not opponent sync)
+    if (piece && window.MULTIPLAYER.enabled && !bypassTurnCheck) {
       broadcastAction('move', piece, q, r);
     }
   };
