@@ -277,31 +277,56 @@
 
   // Restore game state from server
   function restoreGameState(gameState) {
+    // Clear existing cell stacks first
+    window.cells.forEach(cell => {
+      cell.stack = [];
+    });
+    
     // Update global state
     state.current = gameState.current;
     state.moveNumber = gameState.moveNumber;
     state.queenPlaced = gameState.queenPlaced;
     state.gameOver = gameState.gameOver;
     
-    // Update piece positions
+    // First pass: Update piece metadata only
     gameState.pieces.forEach(savedPiece => {
       const piece = tray.find(p => p.meta.id === savedPiece.id);
       if (piece) {
         piece.meta.placed = savedPiece.placed;
         piece.meta.q = savedPiece.q;
         piece.meta.r = savedPiece.r;
-        
-        if (savedPiece.placed) {
-          // Position piece on board
+      }
+    });
+    
+    // Second pass: Position pieces on board and rebuild stacks
+    gameState.pieces.forEach(savedPiece => {
+      if (savedPiece.placed) {
+        const piece = tray.find(p => p.meta.id === savedPiece.id);
+        if (piece) {
+          // Ensure the cell exists
+          const cellKey = `${savedPiece.q},${savedPiece.r}`;
+          if (!window.cells.has(cellKey)) {
+            window.cells.set(cellKey, { 
+              gfx: null, 
+              q: savedPiece.q, 
+              r: savedPiece.r, 
+              stack: [] 
+            });
+          }
+          
+          const cell = window.cells.get(cellKey);
+          cell.stack.push(piece);
+          
+          // Position piece on board with correct stack height
           const pos = axialToPixel(savedPiece.q, savedPiece.r);
           piece.x = pos.x;
-          piece.y = pos.y;
+          piece.y = pos.y - (cell.stack.length - 1) * 6; // Stack height offset
           
-          // Update cell stack
-          const cell = window.cells.get(`${savedPiece.q},${savedPiece.r}`);
-          if (cell && !cell.stack.includes(piece)) {
-            cell.stack.push(piece);
+          // Ensure piece is added to the board's piece layer
+          if (piece.parent === window.whiteApp.stage || piece.parent === window.blackApp.stage) {
+            piece.parent.removeChild(piece);
           }
+          window.pieceLayer.addChild(piece);
         }
       }
     });
