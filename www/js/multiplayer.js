@@ -318,6 +318,10 @@
     const placedPieces = gameState.pieces.filter(p => p.placed);
     console.log(`Placing ${placedPieces.length} pieces on board`);
     
+    // Temporarily disable any event handlers that might trigger during restoration
+    const originalAnimating = window.animating;
+    window.animating = true; // Prevent any game actions during restoration
+    
     placedPieces.forEach(savedPiece => {
       const piece = tray.find(p => p.meta.id === savedPiece.id);
       if (piece) {
@@ -338,18 +342,33 @@
         
         // Position piece on board with correct stack height
         const pos = axialToPixel(savedPiece.q, savedPiece.r);
+        
+        // Remove piece from current parent without triggering events
+        if (piece.parent) {
+          piece.parent.removeChild(piece);
+        }
+        
+        // Set position and add to board layer
         piece.x = pos.x;
         piece.y = pos.y - (cell.stack.length - 1) * 6; // Stack height offset
         
-        // Ensure piece is added to the board's piece layer
-        if (piece.parent === window.whiteApp.stage || piece.parent === window.blackApp.stage) {
-          piece.parent.removeChild(piece);
-        }
+        // Temporarily disable interactivity during restoration
+        const wasInteractive = piece.interactive;
+        piece.interactive = false;
+        
         window.pieceLayer.addChild(piece);
+        
+        // Restore interactivity after a short delay
+        setTimeout(() => {
+          piece.interactive = wasInteractive;
+        }, 100);
         
         console.log(`Placed piece ${savedPiece.id} at (${pos.x}, ${piece.y}) in cell ${cellKey}, stack size: ${cell.stack.length}`);
       }
     });
+    
+    // Restore original animating state
+    window.animating = originalAnimating;
     
     console.log('Game state restoration complete');
     
