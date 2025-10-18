@@ -64,6 +64,12 @@
       }
     });
 
+    socket.on('room-full', (data) => {
+      alert(`Room ${data.roomId} is full! Only 2 players allowed per room.`);
+      window.MULTIPLAYER.enabled = false;
+      updateModalStatus();
+    });
+
     socket.on('room-joined', (data) => {
       window.MULTIPLAYER.roomId = data.roomId;
       window.MULTIPLAYER.playerColor = data.playerColor;

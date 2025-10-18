@@ -55,8 +55,35 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     socket.join(roomId);
     
-    // Assign color based on join order
-    const playerColor = room.players.size === 0 ? 'white' : 'black';
+    // Check if this player is rejoining (same name, was disconnected)
+    let existingPlayer = null;
+    for (const [playerId, player] of room.players) {
+      if (player.name === playerName && !player.connected) {
+        existingPlayer = { id: playerId, ...player };
+        break;
+      }
+    }
+    
+    let playerColor;
+    if (existingPlayer) {
+      // Rejoining player - reuse their color and remove old entry
+      playerColor = existingPlayer.color;
+      room.players.delete(existingPlayer.id);
+      console.log(`Player ${playerName} rejoining room ${roomId} as ${playerColor}`);
+    } else {
+      // New player - assign color based on existing colors
+      const existingColors = new Set(Array.from(room.players.values()).map(p => p.color));
+      if (!existingColors.has('white')) {
+        playerColor = 'white';
+      } else if (!existingColors.has('black')) {
+        playerColor = 'black';
+      } else {
+        // Room is full
+        socket.emit('room-full', { roomId });
+        return;
+      }
+      console.log(`New player ${playerName} joining room ${roomId} as ${playerColor}`);
+    }
     
     room.players.set(socket.id, {
       id: socket.id,
