@@ -493,8 +493,11 @@
     
     // Only broadcast if in active multiplayer and this is the local player's action
     if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
-      console.log('Broadcasting placement action for piece:', piece.meta);
-      broadcastAction('place', piece, q, r);
+      // Delay slightly to ensure game state is fully updated after animations/HUD
+      setTimeout(() => {
+        console.log('Broadcasting placement action for piece:', piece.meta);
+        broadcastAction('place', piece, q, r);
+      }, 100);
     }
   };
 
@@ -516,7 +519,11 @@
     
     // Only broadcast if in active multiplayer and this is the local player's action
     if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
-      broadcastAction('move', piece, q, r);
+      // Delay slightly to ensure game state is fully updated after animations/HUD
+      setTimeout(() => {
+        console.log('Broadcasting move action for piece:', piece.meta);
+        broadcastAction('move', piece, q, r);
+      }, 100);
     }
   };
 
