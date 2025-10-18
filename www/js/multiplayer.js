@@ -434,7 +434,7 @@
     
     // Build the shareable URL
     let gameUrl;
-    const deployedServerUrl = 'YOUR_RENDER_SERVER_URL'; // Replace after deployment
+    const deployedServerUrl = 'https://hyvemynd-backend.onrender.com'; // Render deployment URL
     
     if (deployedServerUrl && deployedServerUrl !== 'YOUR_RENDER_SERVER_URL') {
       // Use deployed server URL for internet sharing
