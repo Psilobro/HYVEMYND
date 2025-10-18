@@ -20,7 +20,7 @@
     let socketUrl;
     
     // Check for deployed server URL first (you'll set this after deployment)
-    const deployedServerUrl = 'YOUR_RENDER_SERVER_URL'; // Replace this after Render deployment
+    const deployedServerUrl = 'https://hyvemynd-backend.onrender.com'; // Replace this after Render deployment
     
     if (deployedServerUrl && deployedServerUrl !== 'YOUR_RENDER_SERVER_URL') {
       // Use deployed server for internet play
