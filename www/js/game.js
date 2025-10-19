@@ -271,9 +271,8 @@ function setupZoomControls(app) {
     });
     
     app.view.addEventListener('touchmove', (e) => {
-        e.preventDefault();
         if(e.touches.length === 2) {
-            // Pinch zoom
+            // Pinch zoom - don't prevent default to allow native gesture recognition
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             const currentDistance = Math.sqrt(
@@ -290,7 +289,8 @@ function setupZoomControls(app) {
             }
             lastTouchDistance = currentDistance;
         } else if(e.touches.length === 1 && isDragging) {
-            // Pan
+            // Pan - prevent default to avoid page scroll
+            e.preventDefault();
             const deltaX = e.touches[0].clientX - lastPointerX;
             const deltaY = e.touches[0].clientY - lastPointerY;
             pan(deltaX, deltaY);

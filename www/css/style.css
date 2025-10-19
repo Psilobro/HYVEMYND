@@ -202,6 +202,7 @@ html, body {
     right: 320px; /* More space for farther right black tray + move history */
     bottom: 0;
     overflow: hidden;
+    touch-action: manipulation; /* Allow pinch-to-zoom on mobile */
 }
 
 #app { 
@@ -217,12 +218,18 @@ html, body {
     /* No visual styling - invisible viewport */
     background: transparent;
     pointer-events: all;
+    touch-action: manipulation; /* Allow pinch-to-zoom on mobile */
 }
 
 #app { 
     position: absolute; 
     width: 100%;
     height: 100%;
+}
+
+/* Allow pinch-to-zoom on PIXI canvas elements */
+canvas {
+    touch-action: manipulation;
 }
 
 .player-tray {
