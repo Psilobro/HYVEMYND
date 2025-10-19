@@ -255,13 +255,16 @@ function setupZoomControls(app) {
     // Touch pinch zoom
     let lastTouchDistance = 0;
     app.view.addEventListener('touchstart', (e) => {
+        console.log('touchstart:', e.touches.length, 'touches');
         if(e.touches.length === 2) {
+            e.preventDefault(); // Prevent default for 2-finger gestures
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             lastTouchDistance = Math.sqrt(
                 Math.pow(touch2.clientX - touch1.clientX, 2) +
                 Math.pow(touch2.clientY - touch1.clientY, 2)
             );
+            console.log('pinch start, distance:', lastTouchDistance);
         } else if(e.touches.length === 1) {
             // Start dragging
             isDragging = true;
@@ -272,7 +275,9 @@ function setupZoomControls(app) {
     
     app.view.addEventListener('touchmove', (e) => {
         if(e.touches.length === 2) {
-            // Pinch zoom - don't prevent default to allow native gesture recognition
+            // Pinch zoom - prevent default to capture the gesture
+            e.preventDefault();
+            console.log('pinch move detected');
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             const currentDistance = Math.sqrt(
@@ -282,6 +287,7 @@ function setupZoomControls(app) {
             
             if(lastTouchDistance > 0) {
                 const zoomFactor = currentDistance / lastTouchDistance;
+                console.log('zoom factor:', zoomFactor);
                 const rect = boardViewport.getBoundingClientRect();
                 const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
                 const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
