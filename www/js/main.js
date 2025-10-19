@@ -84,18 +84,21 @@ function showHistoryOverlay(moveIdx) {
     const snap = window.historySnapshots[moveIdx];
     if (!snap) return;
 
-    // Get board centering and scaling info
+    // Get current board transform state to sync overlay with it
     const cellRadius = window.CELL_RADIUS || 48;
-    const baseScale = window.baseScale || 1.0;
-    const glowBounds = window.glowBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
     const app = window.app;
-    const containerRect = app ? { width: app.renderer.width, height: app.renderer.height } : { width: 900, height: 700 };
-    const centerX = containerRect.width / 2;
-    const centerY = containerRect.height / 2;
-    const boardCenterX = (glowBounds.minX + glowBounds.maxX) / 2;
-    const boardCenterY = (glowBounds.minY + glowBounds.maxY) / 2;
+    const pieceLayer = window.pieceLayer;
+    
+    if (!app || !pieceLayer) return;
+    
+    // Use the actual current scale and position from the live board
+    const currentScale = pieceLayer.scale.x; // pieceLayer scale
+    const currentPosX = pieceLayer.position.x; // pieceLayer position
+    const currentPosY = pieceLayer.position.y;
+    
+    const containerRect = { width: app.renderer.width, height: app.renderer.height };
 
-    // Overlay SVG for all pieces
+    // Create SVG overlay that will transform exactly like the board
     const overlaySVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     overlaySVG.setAttribute('width', containerRect.width);
     overlaySVG.setAttribute('height', containerRect.height);
@@ -104,33 +107,43 @@ function showHistoryOverlay(moveIdx) {
     overlaySVG.style.top = '0';
     overlaySVG.style.pointerEvents = 'none';
 
-    // Render each piece as a hex at correct position
+    // Create a group that will be transformed to match the board
+    const transformGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    transformGroup.setAttribute('transform', `translate(${currentPosX}, ${currentPosY}) scale(${currentScale})`);
+
+    // Render each piece as a hex at correct position (in board coordinates)
     snap.pieces.forEach(piece => {
         if (!piece.placed) return;
+        
+        // Use board coordinates directly - transform will handle the positioning
         const p = axialToPixel(piece.q, piece.r);
-        // Center and scale to match board
-        const px = centerX - boardCenterX * baseScale + p.x * baseScale;
-        const py = centerY - boardCenterY * baseScale + p.y * baseScale - (piece.stackIndex || 0) * 6 * baseScale;
+        const px = p.x;
+        const py = p.y - (piece.stackIndex || 0) * 6; // Stack offset in board units
+        
         const color = getReplayPieceColor(piece.key, piece.color);
+        
         // Draw hexagon
         const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        const hexPoints = getHexPoints(px, py, cellRadius * baseScale);
+        const hexPoints = getHexPoints(px, py, cellRadius);
         hex.setAttribute('points', hexPoints);
         hex.setAttribute('fill', color);
         hex.setAttribute('stroke', piece.color === 'white' ? '#fff' : '#222');
-    hex.setAttribute('stroke-width', '6');
-        overlaySVG.appendChild(hex);
+        hex.setAttribute('stroke-width', '6');
+        transformGroup.appendChild(hex);
+        
         // Piece label (centered)
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', px);
-        text.setAttribute('y', py + 7 * baseScale);
+        text.setAttribute('y', py + 7);
         text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', 26 * baseScale);
+        text.setAttribute('font-size', 26);
         text.setAttribute('fill', piece.color === 'white' ? '#222' : '#fff');
-    text.setAttribute('font-family', 'Milonga, serif');
+        text.setAttribute('font-family', 'Milonga, serif');
         text.textContent = piece.key;
-        overlaySVG.appendChild(text);
+        transformGroup.appendChild(text);
     });
+    
+    overlaySVG.appendChild(transformGroup);
     overlay.appendChild(overlaySVG);
 
     // Show return button
