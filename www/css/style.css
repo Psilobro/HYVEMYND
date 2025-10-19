@@ -239,7 +239,7 @@ html, body {
 
 #hud {
     position: fixed;
-    bottom: 60px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
     width: 200px;
