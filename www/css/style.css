@@ -456,7 +456,7 @@ canvas {
     
     #game-title {
         font-size: 48px !important; /* Slightly bigger letters */
-        top: 35px !important; /* Move down more */
+        top: 0px !important; /* Move to top edge of screen */
     }
     
     #game-container {
