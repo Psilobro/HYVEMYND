@@ -827,6 +827,54 @@ canvas {
     border-color: #f4c965;
 }
 
+/* AI Single Mode button - positioned to the left of multiplayer */
+#single-mode-button {
+    display: block !important;
+    position: fixed;
+    left: 150px; /* To the left of multiplayer button */
+    bottom: 12px;
+    z-index: 20;
+    background: #E6B84D;
+    color: #4B382A;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #E6B84D;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px #e6b84d44;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#single-mode-button:hover {
+    background: #f4c965;
+    border-color: #f4c965;
+}
+
+/* Return to Sandbox button - positioned near Single Mode button */
+#return-to-sandbox-button {
+    display: none !important; /* Hidden by default */
+    position: fixed;
+    left: 150px; /* Same position as Single Mode */
+    bottom: 12px;
+    z-index: 20;
+    background: #4CAF50;
+    color: white;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#return-to-sandbox-button:hover {
+    background: #66BB6A;
+    border-color: #66BB6A;
+}
+
 #chat-container {
     position: fixed;
     bottom: 20px;
@@ -1095,7 +1143,7 @@ canvas {
     /* History overlay - keep it available on all screen sizes */
     
     /* Make bottom buttons smaller on very small screens */
-    #multiplayer-button, #chat-toggle, #move-history-toggle {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button {
         padding: 4px 12px !important;
         font-size: 13px !important;
         bottom: 8px !important;
@@ -1107,6 +1155,14 @@ canvas {
     
     #move-history-toggle {
         right: 8px !important;
+    }
+    
+    #single-mode-button, #return-to-sandbox-button {
+        left: 8px !important; /* Move AI buttons to far left on mobile */
+    }
+    
+    #multiplayer-button {
+        left: 140px !important; /* Adjust multiplayer button position */
     }
 }
 
@@ -1123,9 +1179,17 @@ canvas {
         max-height: calc(100vh - 80px) !important;
     }
     
-    #multiplayer-button, #chat-toggle, #move-history-toggle {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button {
         padding: 3px 10px !important;
         font-size: 12px !important;
         bottom: 5px !important;
+    }
+    
+    #single-mode-button, #return-to-sandbox-button {
+        left: 5px !important;
+    }
+    
+    #multiplayer-button {
+        left: 120px !important;
     }
 }
