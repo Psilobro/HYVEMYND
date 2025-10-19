@@ -493,11 +493,16 @@
     
     // Only broadcast if in active multiplayer and this is the local player's action
     if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
-      // Delay slightly to ensure game state is fully updated after animations/HUD
+      // Delay to ensure game state is fully updated after animations/HUD/turn switch
       setTimeout(() => {
         console.log('Broadcasting placement action for piece:', piece.meta);
+        console.log('Current game state before broadcast:', {
+          moveNumber: state.moveNumber,
+          current: state.current,
+          placedPieces: tray.filter(p => p.meta.placed).length
+        });
         broadcastAction('place', piece, q, r);
-      }, 100);
+      }, 500);
     }
   };
 
@@ -519,11 +524,16 @@
     
     // Only broadcast if in active multiplayer and this is the local player's action
     if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
-      // Delay slightly to ensure game state is fully updated after animations/HUD
+      // Delay to ensure game state is fully updated after animations/HUD/turn switch
       setTimeout(() => {
         console.log('Broadcasting move action for piece:', piece.meta);
+        console.log('Current game state before broadcast:', {
+          moveNumber: state.moveNumber,
+          current: state.current,
+          placedPieces: tray.filter(p => p.meta.placed).length
+        });
         broadcastAction('move', piece, q, r);
-      }, 100);
+      }, 500);
     }
   };
 
