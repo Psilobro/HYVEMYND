@@ -252,67 +252,148 @@ function setupZoomControls(app) {
         zoomAt(appX, appY, zoomFactor);
     });
     
-    // Touch pinch zoom
-    let lastTouchDistance = 0;
-    app.view.addEventListener('touchstart', (e) => {
-        console.log('touchstart:', e.touches.length, 'touches');
-        if(e.touches.length === 2) {
-            e.preventDefault(); // Prevent default for 2-finger gestures
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            lastTouchDistance = Math.sqrt(
-                Math.pow(touch2.clientX - touch1.clientX, 2) +
-                Math.pow(touch2.clientY - touch1.clientY, 2)
-            );
-            console.log('pinch start, distance:', lastTouchDistance);
-        } else if(e.touches.length === 1) {
-            // Start dragging
-            isDragging = true;
-            lastPointerX = e.touches[0].clientX;
-            lastPointerY = e.touches[0].clientY;
-        }
-    });
+    // Touch pinch zoom - improved approach
+    let touches = new Map();
+    let initialDistance = 0;
+    let isZooming = false;
     
-    app.view.addEventListener('touchmove', (e) => {
-        if(e.touches.length === 2) {
-            // Pinch zoom - prevent default to capture the gesture
-            e.preventDefault();
-            console.log('pinch move detected');
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const currentDistance = Math.sqrt(
-                Math.pow(touch2.clientX - touch1.clientX, 2) +
-                Math.pow(touch2.clientY - touch1.clientY, 2)
-            );
+    // Test function for desktop - call from console: testPinchZoom()
+    window.testPinchZoom = function() {
+        console.log('Testing pinch zoom...');
+        const rect = boardViewport.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        console.log('Calling zoomAt with:', centerX, centerY, 1.2);
+        zoomAt(centerX, centerY, 1.2);
+    };
+    
+    // Use pointer events for better mobile support
+    if (window.PointerEvent) {
+        console.log('Using pointer events');
+        
+        app.view.addEventListener('pointerdown', (e) => {
+            touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
             
-            if(lastTouchDistance > 0) {
-                const zoomFactor = currentDistance / lastTouchDistance;
-                console.log('zoom factor:', zoomFactor);
-                const rect = boardViewport.getBoundingClientRect();
-                const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
-                const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
-                zoomAt(centerX, centerY, zoomFactor);
+            if (touches.size === 2) {
+                console.log('Two pointers detected - starting zoom mode');
+                isZooming = true;
+                const touchArray = Array.from(touches.values());
+                initialDistance = Math.sqrt(
+                    Math.pow(touchArray[1].x - touchArray[0].x, 2) +
+                    Math.pow(touchArray[1].y - touchArray[0].y, 2)
+                );
+            } else if (touches.size === 1) {
+                isDragging = true;
+                lastPointerX = e.clientX;
+                lastPointerY = e.clientY;
             }
-            lastTouchDistance = currentDistance;
-        } else if(e.touches.length === 1 && isDragging) {
-            // Pan - prevent default to avoid page scroll
-            e.preventDefault();
-            const deltaX = e.touches[0].clientX - lastPointerX;
-            const deltaY = e.touches[0].clientY - lastPointerY;
-            pan(deltaX, deltaY);
-            lastPointerX = e.touches[0].clientX;
-            lastPointerY = e.touches[0].clientY;
-        }
-    });
-    
-    app.view.addEventListener('touchend', (e) => {
-        if(e.touches.length < 2) {
-            lastTouchDistance = 0;
-        }
-        if(e.touches.length === 0) {
-            isDragging = false;
-        }
-    });
+        });
+        
+        app.view.addEventListener('pointermove', (e) => {
+            if (touches.has(e.pointerId)) {
+                touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                
+                if (isZooming && touches.size === 2) {
+                    e.preventDefault();
+                    console.log('Pointer zoom move');
+                    const touchArray = Array.from(touches.values());
+                    const currentDistance = Math.sqrt(
+                        Math.pow(touchArray[1].x - touchArray[0].x, 2) +
+                        Math.pow(touchArray[1].y - touchArray[0].y, 2)
+                    );
+                    
+                    if (initialDistance > 0) {
+                        const zoomFactor = currentDistance / initialDistance;
+                        console.log('zoom factor:', zoomFactor);
+                        const rect = boardViewport.getBoundingClientRect();
+                        const centerX = ((touchArray[0].x + touchArray[1].x) / 2) - rect.left;
+                        const centerY = ((touchArray[0].y + touchArray[1].y) / 2) - rect.top;
+                        zoomAt(centerX, centerY, zoomFactor);
+                        initialDistance = currentDistance;
+                    }
+                } else if (isDragging && touches.size === 1) {
+                    e.preventDefault();
+                    const deltaX = e.clientX - lastPointerX;
+                    const deltaY = e.clientY - lastPointerY;
+                    pan(deltaX, deltaY);
+                    lastPointerX = e.clientX;
+                    lastPointerY = e.clientY;
+                }
+            }
+        });
+        
+        app.view.addEventListener('pointerup', (e) => {
+            touches.delete(e.pointerId);
+            if (touches.size < 2) {
+                isZooming = false;
+                initialDistance = 0;
+            }
+            if (touches.size === 0) {
+                isDragging = false;
+            }
+        });
+        
+    } else {
+        console.log('Using fallback touch events');
+        // Fallback to touch events
+        let lastTouchDistance = 0;
+        
+        app.view.addEventListener('touchstart', (e) => {
+            console.log('touchstart:', e.touches.length, 'touches');
+            if(e.touches.length === 2) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastTouchDistance = Math.sqrt(
+                    Math.pow(touch2.clientX - touch1.clientX, 2) +
+                    Math.pow(touch2.clientY - touch1.clientY, 2)
+                );
+                console.log('pinch start, distance:', lastTouchDistance);
+            } else if(e.touches.length === 1) {
+                isDragging = true;
+                lastPointerX = e.touches[0].clientX;
+                lastPointerY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+        
+        app.view.addEventListener('touchmove', (e) => {
+            if(e.touches.length === 2) {
+                e.preventDefault();
+                console.log('pinch move detected');
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.sqrt(
+                    Math.pow(touch2.clientX - touch1.clientX, 2) +
+                    Math.pow(touch2.clientY - touch1.clientY, 2)
+                );
+                
+                if(lastTouchDistance > 0) {
+                    const zoomFactor = currentDistance / lastTouchDistance;
+                    console.log('zoom factor:', zoomFactor);
+                    const rect = boardViewport.getBoundingClientRect();
+                    const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
+                    const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
+                    zoomAt(centerX, centerY, zoomFactor);
+                }
+                lastTouchDistance = currentDistance;
+            } else if(e.touches.length === 1 && isDragging) {
+                e.preventDefault();
+                const deltaX = e.touches[0].clientX - lastPointerX;
+                const deltaY = e.touches[0].clientY - lastPointerY;
+                pan(deltaX, deltaY);
+                lastPointerX = e.touches[0].clientX;
+                lastPointerY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+        
+        app.view.addEventListener('touchend', (e) => {
+            if(e.touches.length < 2) {
+                lastTouchDistance = 0;
+            }
+            if(e.touches.length === 0) {
+                isDragging = false;
+            }
+        }, { passive: false });
+    }
     
     // Mouse drag for desktop
     app.view.addEventListener('mousedown', (e) => {
