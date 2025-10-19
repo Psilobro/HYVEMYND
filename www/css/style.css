@@ -1083,10 +1083,7 @@ canvas {
         font-size: 14px !important;
     }
     
-    /* History overlay - smaller for mobile landscape */
-    #history-board-overlay {
-        display: none !important; /* Hide complex history overlay on small screens */
-    }
+    /* History overlay - keep it available on all screen sizes */
     
     /* Make bottom buttons smaller on very small screens */
     #multiplayer-button, #chat-toggle, #move-history-toggle {
