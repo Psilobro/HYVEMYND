@@ -104,32 +104,66 @@ window.AIEngine.checkAndMakeMove = function() {
  * Core MCTS algorithm to find the best move
  */
 window.AIEngine.findBestMove = function() {
-  const gameState = this.captureGameState();
-  const rootNode = new MCTSNode(gameState, null, null);
+  console.log('🤖 Starting move search...');
   
+  const gameState = this.captureGameState();
+  console.log('🤖 Current game state:', gameState);
+  
+  // First check if we have any legal moves available
+  const availableMoves = this.generateLegalMoves(gameState);
+  console.log(`🤖 Found ${availableMoves.length} legal moves`);
+  
+  if (availableMoves.length === 0) {
+    console.log('🤖 No legal moves available!');
+    return null;
+  }
+  
+  // If only one move, return it immediately
+  if (availableMoves.length === 1) {
+    console.log('🤖 Only one legal move, selecting it:', availableMoves[0]);
+    return availableMoves[0];
+  }
+  
+  const rootNode = new MCTSNode(gameState, null, null);
   const iterations = this.iterationsPerMove[this.difficulty];
+  
+  console.log(`🤖 Running ${iterations} MCTS iterations...`);
   
   // Run MCTS iterations
   for (let i = 0; i < iterations; i++) {
-    const leaf = this.selectLeaf(rootNode);
-    const child = this.expandNode(leaf);
-    const result = this.simulate(child || leaf);
-    this.backpropagate(child || leaf, result);
+    try {
+      const leaf = this.selectLeaf(rootNode);
+      const child = this.expandNode(leaf);
+      const result = this.simulate(child || leaf);
+      this.backpropagate(child || leaf, result);
+    } catch (error) {
+      console.warn(`🤖 Error in MCTS iteration ${i}:`, error);
+    }
   }
+  
+  console.log(`🤖 MCTS completed. Root has ${rootNode.children.length} children.`);
   
   // Select best move based on visit count
   let bestChild = null;
   let bestVisits = -1;
   
   for (const child of rootNode.children) {
-    console.log(`Move ${child.move.type} to ${child.move.q},${child.move.r}: ${child.visits} visits, ${(child.wins/child.visits*100).toFixed(1)}% win rate`);
+    const winRate = child.visits > 0 ? (child.wins/child.visits*100).toFixed(1) : '0.0';
+    console.log(`🤖 Move ${child.move.type} ${child.move.piece?.key || '?'} to ${child.move.q},${child.move.r}: ${child.visits} visits, ${winRate}% win rate`);
+    
     if (child.visits > bestVisits) {
       bestVisits = child.visits;
       bestChild = child;
     }
   }
   
-  return bestChild ? bestChild.move : null;
+  if (bestChild) {
+    console.log('🤖 Selected best move:', bestChild.move);
+    return bestChild.move;
+  } else {
+    console.log('🤖 No best move found, falling back to first available move');
+    return availableMoves[0];
+  }
 };
 
 /**
@@ -217,6 +251,101 @@ window.AIEngine.generateLegalMoves = function(gameState) {
   const moves = [];
   const currentColor = gameState.currentPlayer;
   
+  console.log(`🤖 Generating moves for ${currentColor}, game state:`, gameState);
+  
+  // For the root node, use live game state functions
+  // For simulated states, use simplified move generation
+  const isRootNode = gameState === this.captureGameState() || 
+                    JSON.stringify(gameState) === JSON.stringify(this.captureGameState());
+  
+  if (isRootNode) {
+    // Use live game functions for accurate move generation
+    return this.generateLiveGameMoves(currentColor);
+  } else {
+    // Use simplified simulation moves for internal MCTS nodes
+    return this.generateSimulationMoves(gameState, currentColor);
+  }
+};
+
+/**
+ * Generate moves using live game state functions
+ */
+window.AIEngine.generateLiveGameMoves = function(currentColor) {
+  const moves = [];
+  
+  console.log(`🤖 Using live game functions for ${currentColor}`);
+  
+  // Get available pieces from actual tray
+  const availablePieces = window.tray ? window.tray.filter(p => 
+    p.color === currentColor && !p.placed
+  ) : [];
+  
+  // Get placed pieces from actual tray
+  const placedPieces = window.tray ? window.tray.filter(p => 
+    p.color === currentColor && p.placed
+  ) : [];
+  
+  console.log(`🤖 Available pieces: ${availablePieces.length}, Placed pieces: ${placedPieces.length}`);
+  
+  // Generate placement moves using live game function
+  try {
+    if (typeof legalPlacementZones === 'function') {
+      const placementZones = legalPlacementZones(currentColor);
+      console.log(`🤖 Legal placement zones:`, placementZones);
+      
+      for (const destKey of placementZones) {
+        const [q, r] = destKey.split(',').map(Number);
+        
+        for (const piece of availablePieces) {
+          moves.push({
+            type: 'place',
+            piece: piece,
+            q: q,
+            r: r
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('🤖 Error in placement move generation:', error);
+  }
+  
+  // Generate movement moves using live game function
+  try {
+    if (typeof legalMoveZones === 'function') {
+      for (const piece of placedPieces) {
+        try {
+          const moveZones = legalMoveZones(piece);
+          const zones = Array.isArray(moveZones) ? moveZones : Array.from(moveZones || []);
+          
+          for (const destKey of zones) {
+            const [q, r] = destKey.split(',').map(Number);
+            moves.push({
+              type: 'move',
+              piece: piece,
+              q: q,
+              r: r
+            });
+          }
+        } catch (pieceError) {
+          console.warn('🤖 Error generating moves for piece:', piece, pieceError);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('🤖 Error in movement move generation:', error);
+  }
+  
+  console.log(`🤖 Generated ${moves.length} total moves`);
+  return moves;
+};
+
+/**
+ * Generate moves for simulation (simplified)
+ */
+window.AIEngine.generateSimulationMoves = function(gameState, currentColor) {
+  const moves = [];
+  
   // Get available pieces for placement
   const availablePieces = gameState.tray.filter(p => 
     p.color === currentColor && !p.placed
@@ -227,13 +356,31 @@ window.AIEngine.generateLegalMoves = function(gameState) {
     p.color === currentColor && p.placed
   );
   
-  // Generate placement moves
-  if (typeof legalPlacementZones === 'function') {
-    const placementZones = legalPlacementZones(currentColor);
-    for (const destKey of placementZones) {
+  // Simple placement generation - just adjacent to existing pieces
+  if (availablePieces.length > 0) {
+    const placedPieces = gameState.tray.filter(p => p.placed);
+    const adjacentSpots = new Set();
+    
+    for (const piece of placedPieces) {
+      const neighbors = this.getNeighborCoords(piece.q || piece.meta?.q || 0, piece.r || piece.meta?.r || 0);
+      for (const [nq, nr] of neighbors) {
+        const key = `${nq},${nr}`;
+        const occupied = gameState.tray.some(p => p.placed && 
+          (p.q === nq || p.meta?.q === nq) && (p.r === nr || p.meta?.r === nr));
+        if (!occupied) {
+          adjacentSpots.add(key);
+        }
+      }
+    }
+    
+    // If no pieces placed yet, allow placement at origin
+    if (placedPieces.length === 0) {
+      adjacentSpots.add('0,0');
+    }
+    
+    for (const destKey of adjacentSpots) {
       const [q, r] = destKey.split(',').map(Number);
-      
-      for (const piece of availablePieces) {
+      for (const piece of availablePieces.slice(0, 3)) { // Limit for simulation
         moves.push({
           type: 'place',
           piece: piece,
@@ -244,24 +391,22 @@ window.AIEngine.generateLegalMoves = function(gameState) {
     }
   }
   
-  // Generate movement moves
-  if (typeof legalMoveZones === 'function') {
-    for (const piece of placedPieces) {
-      try {
-        const moveZones = legalMoveZones(piece);
-        const zones = Array.isArray(moveZones) ? moveZones : Array.from(moveZones || []);
-        
-        for (const destKey of zones) {
-          const [q, r] = destKey.split(',').map(Number);
-          moves.push({
-            type: 'move',
-            piece: piece,
-            q: q,
-            r: r
-          });
-        }
-      } catch (error) {
-        console.warn('Error generating moves for piece:', piece, error);
+  // Simple movement generation - adjacent empty spots
+  for (const piece of placedPieces.slice(0, 3)) { // Limit for simulation
+    const pieceQ = piece.q || piece.meta?.q || 0;
+    const pieceR = piece.r || piece.meta?.r || 0;
+    const neighbors = this.getNeighborCoords(pieceQ, pieceR);
+    
+    for (const [nq, nr] of neighbors) {
+      const occupied = gameState.tray.some(p => p.placed && 
+        (p.q === nq || p.meta?.q === nq) && (p.r === nr || p.meta?.r === nr));
+      if (!occupied) {
+        moves.push({
+          type: 'move',
+          piece: piece,
+          q: nq,
+          r: nr
+        });
       }
     }
   }
@@ -514,16 +659,51 @@ window.AIEngine.calculateMoveWeight = function(move, gameState) {
 window.AIEngine.executeMove = function(move) {
   console.log(`🤖 AI executing ${move.type}:`, move);
   
+  if (!move || !move.type) {
+    console.error('🤖 Invalid move provided:', move);
+    return;
+  }
+  
   if (move.type === 'place') {
     if (typeof selectPlacement === 'function' && typeof commitPlacement === 'function') {
-      selectPlacement(move.piece);
-      setTimeout(() => commitPlacement(move.q, move.r), 200);
+      console.log(`🤖 Placing ${move.piece?.key || '?'} at ${move.q},${move.r}`);
+      try {
+        selectPlacement(move.piece);
+        setTimeout(() => {
+          try {
+            commitPlacement(move.q, move.r);
+            console.log('🤖 Placement completed successfully');
+          } catch (error) {
+            console.error('🤖 Error in commitPlacement:', error);
+          }
+        }, 300);
+      } catch (error) {
+        console.error('🤖 Error in selectPlacement:', error);
+      }
+    } else {
+      console.error('🤖 Placement functions not available');
     }
   } else if (move.type === 'move') {
     if (typeof selectMove === 'function' && typeof commitMove === 'function') {
-      selectMove(move.piece);
-      setTimeout(() => commitMove(move.q, move.r), 200);
+      console.log(`🤖 Moving ${move.piece?.key || '?'} to ${move.q},${move.r}`);
+      try {
+        selectMove(move.piece);
+        setTimeout(() => {
+          try {
+            commitMove(move.q, move.r);
+            console.log('🤖 Movement completed successfully');
+          } catch (error) {
+            console.error('🤖 Error in commitMove:', error);
+          }
+        }, 300);
+      } catch (error) {
+        console.error('🤖 Error in selectMove:', error);
+      }
+    } else {
+      console.error('🤖 Movement functions not available');
     }
+  } else {
+    console.error('🤖 Unknown move type:', move.type);
   }
 };
 
