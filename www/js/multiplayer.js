@@ -520,20 +520,33 @@
     }
     
     const piece = selected?.piece;
+    
+    // Store the destination for later broadcast
+    const moveDestination = { q, r };
+    
     originalCommitMove(q, r);
     
     // Only broadcast if in active multiplayer and this is the local player's action
     if (piece && inActiveMultiplayerGame && !bypassTurnCheck) {
-      // Delay to ensure game state is fully updated after animations/HUD/turn switch
-      setTimeout(() => {
-        console.log('Broadcasting move action for piece:', piece.meta);
-        console.log('Current game state before broadcast:', {
-          moveNumber: state.moveNumber,
-          current: state.current,
-          placedPieces: tray.filter(p => p.meta.placed).length
-        });
-        broadcastAction('move', piece, q, r);
-      }, 500);
+      // Wait for animation to complete - check when piece coordinates are actually updated
+      const checkAnimationComplete = () => {
+        if (piece.meta.q === moveDestination.q && piece.meta.r === moveDestination.r && !window.animating) {
+          console.log('Animation complete, broadcasting move action for piece:', piece.meta);
+          console.log('Final game state before broadcast:', {
+            moveNumber: state.moveNumber,
+            current: state.current,
+            piecePosition: `${piece.meta.q},${piece.meta.r}`,
+            placedPieces: tray.filter(p => p.meta.placed).length
+          });
+          broadcastAction('move', piece, moveDestination.q, moveDestination.r);
+        } else {
+          // Check again in 100ms
+          setTimeout(checkAnimationComplete, 100);
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(checkAnimationComplete, 200);
     }
   };
 
