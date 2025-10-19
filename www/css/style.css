@@ -1014,8 +1014,15 @@ canvas {
     align-items: center;
 }
 
-/* Mobile responsive chat */
+/* Mobile responsive styles */
 @media (max-width: 768px) {
+    /* Move title to left edge on all mobile devices */
+    #game-title {
+        left: 8px !important;
+        transform: none !important; /* Remove centering transform */
+        font-size: 28px !important; /* Slightly larger for regular mobile */
+    }
+    
     #chat-container {
         width: calc(100vw - 20px);
         height: 350px;
