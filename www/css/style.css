@@ -1030,6 +1030,16 @@ canvas {
     }
 }
 
+/* Mobile landscape and small screens - make popups smaller */
+@media (max-height: 500px) {
+    #chat-container {
+        height: 280px !important;
+        bottom: 5px !important;
+        top: auto !important;
+        max-height: calc(100vh - 80px);
+    }
+}
+
 @media (max-width: 480px) {
     #chat-container {
         height: 300px;
@@ -1048,5 +1058,68 @@ canvas {
     #chat-input, #chat-send {
         font-size: 12px;
         padding: 8px 10px;
+    }
+}
+
+/* Mobile responsive styling for all popups */
+@media (max-height: 500px) {
+    /* Multiplayer modal - make smaller for mobile landscape */
+    #multiplayer-modal > div {
+        max-width: 400px !important;
+        width: 85% !important;
+        padding: 20px !important;
+        max-height: calc(100vh - 100px) !important;
+        overflow-y: auto !important;
+        font-size: 14px !important;
+    }
+    
+    #multiplayer-modal h2 {
+        font-size: 18px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    #multiplayer-modal button {
+        padding: 8px 16px !important;
+        font-size: 14px !important;
+    }
+    
+    /* History overlay - smaller for mobile landscape */
+    #history-board-overlay {
+        display: none !important; /* Hide complex history overlay on small screens */
+    }
+    
+    /* Make bottom buttons smaller on very small screens */
+    #multiplayer-button, #chat-toggle, #move-history-toggle {
+        padding: 4px 12px !important;
+        font-size: 13px !important;
+        bottom: 8px !important;
+    }
+    
+    #chat-toggle {
+        right: 110px !important; /* Adjust spacing */
+    }
+    
+    #move-history-toggle {
+        right: 8px !important;
+    }
+}
+
+/* Very small mobile screens */
+@media (max-height: 400px) {
+    #chat-container {
+        height: 220px !important;
+        max-height: calc(100vh - 60px) !important;
+    }
+    
+    #multiplayer-modal > div {
+        max-width: 350px !important;
+        padding: 15px !important;
+        max-height: calc(100vh - 80px) !important;
+    }
+    
+    #multiplayer-button, #chat-toggle, #move-history-toggle {
+        padding: 3px 10px !important;
+        font-size: 12px !important;
+        bottom: 5px !important;
     }
 }
