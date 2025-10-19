@@ -636,10 +636,12 @@ canvas {
         overflow: visible !important;
     }
     
-    /* Make title much smaller */
+    /* Make title much smaller and move to top left edge */
     #game-title {
         font-size: 24px !important;
-        top: 3px !important;
+        top: 8px !important;
+        left: 8px !important;
+        transform: none !important; /* Remove centering transform */
     }
     
     /* Game container - much smaller margins for scaled trays */
