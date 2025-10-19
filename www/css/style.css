@@ -801,6 +801,30 @@ canvas {
     border-color: #f4c965;
 }
 
+/* Multiplayer button - positioned in lower left */
+#multiplayer-button {
+    display: block !important;
+    position: fixed;
+    left: 12px; /* Position in lower left corner */
+    bottom: 12px;
+    z-index: 20;
+    background: #E6B84D;
+    color: #4B382A;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #E6B84D;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px #e6b84d44;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#multiplayer-button:hover {
+    background: #f4c965;
+    border-color: #f4c965;
+}
+
 #chat-container {
     position: fixed;
     bottom: 20px;
