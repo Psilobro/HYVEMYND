@@ -757,7 +757,7 @@ html, body {
     }
     
     #chat-toggle {
-        right: 90px !important; /* Position to left of history button on mobile */
+        right: 110px !important; /* Position to left of history button on mobile */
         bottom: 16px !important;
         font-size: 13px !important;
         padding: 4px 10px !important;
@@ -796,7 +796,7 @@ html, body {
 #chat-toggle {
     display: block !important;
     position: fixed;
-    right: 100px; /* Position to the left of history button */
+    right: 120px; /* Position to the left of history button */
     bottom: 12px;
     z-index: 20;
     background: #E6B84D;
@@ -814,7 +814,6 @@ html, body {
 #chat-toggle:hover {
     background: #f4c965;
     border-color: #f4c965;
-    box-shadow: 0 4px 12px #e6b84d66;
 }
 
 #chat-container {
