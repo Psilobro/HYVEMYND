@@ -11,20 +11,27 @@ window.AIEngine = {
   thinking: false,
   thinkingTime: 1500, // ms delay for move calculation
   
-  // MCTS Parameters
+  // MCTS Parameters - Hybrid Time/Iteration Approach
   explorationConstant: Math.sqrt(2),
   simulationDepth: 25,
   iterationsPerMove: {
-    easy: 10,      // Basic play with Queen by turn 3
-    medium: 30,    // Enhanced strategy + deeper analysis  
-    hard: 60       // Expert-level with advanced tactics
+    easy: 50,        // Reasonable for quick play
+    medium: 200,     // Good strategic depth  
+    hard: 1000       // Very strong play
+  },
+  
+  // Time limits (ms) - backup constraint
+  timeLimit: {
+    easy: 2000,      // 2 second max
+    medium: 5000,    // 5 second max
+    hard: 10000      // 10 second max
   },
   
   // Strategy depth by difficulty
   strategyDepth: {
-    easy: 1,       // Basic immediate threats
-    medium: 2,     // Look ahead 2 moves, tactical patterns
-    hard: 3        // Deep analysis, complex patterns
+    easy: 1,         // Basic immediate threats
+    medium: 2,       // Look ahead 2 moves, tactical patterns
+    hard: 3          // Deep analysis, complex patterns
   },
   
   // Game state cache
@@ -86,9 +93,9 @@ window.AIEngine.checkAndMakeMove = function() {
   hud.textContent = `🤖 AI is thinking...`;
   hud.style.background = 'rgba(0,0,0,0.8)';
   
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
-      const move = this.findBestMove();
+      const move = await this.findBestMove();
       if (move) {
         this.executeMove(move);
       } else {
@@ -113,9 +120,10 @@ window.AIEngine.checkAndMakeMove = function() {
 /**
  * Core MCTS algorithm to find the best move
  */
-window.AIEngine.findBestMove = function() {
+window.AIEngine.findBestMove = async function() {
   console.log('🤖 Starting move search...');
   
+  const hud = document.getElementById('hud'); // For progress updates
   const gameState = this.captureGameState();
   console.log('🤖 Current game state:', gameState);
   
@@ -166,23 +174,41 @@ window.AIEngine.findBestMove = function() {
   }
   
   const rootNode = new MCTSNode(gameState, null, null);
-  const iterations = this.iterationsPerMove[this.difficulty];
+  const maxIterations = this.iterationsPerMove[this.difficulty];
+  const timeLimit = this.timeLimit[this.difficulty];
   
-  console.log(`🤖 Running ${iterations} MCTS iterations...`);
+  console.log(`🤖 Running up to ${maxIterations} MCTS iterations (${timeLimit}ms time limit)...`);
   
-  // Run MCTS iterations
-  for (let i = 0; i < iterations; i++) {
+  const startTime = Date.now();
+  let iterations = 0;
+  
+  // Hybrid approach: Run iterations until time limit OR max iterations reached
+  while (iterations < maxIterations && (Date.now() - startTime) < timeLimit) {
     try {
       const leaf = this.selectLeaf(rootNode);
       const child = this.expandNode(leaf);
       const result = this.simulate(child || leaf);
       this.backpropagate(child || leaf, result);
+      iterations++;
+      
+      // Yield control periodically to prevent browser freeze and update progress
+      if (iterations % 50 === 0) {
+        // Update thinking indicator with progress
+        if (hud) {
+          const progress = Math.min(100, Math.round((iterations / maxIterations) * 100));
+          const timeProgress = Math.min(100, Math.round(((Date.now() - startTime) / timeLimit) * 100));
+          hud.textContent = `🤖 AI thinking... ${Math.max(progress, timeProgress)}% (${iterations} iterations)`;
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
     } catch (error) {
-      console.warn(`🤖 Error in MCTS iteration ${i}:`, error);
+      console.warn(`🤖 Error in MCTS iteration ${iterations}:`, error);
+      break;
     }
   }
   
-  console.log(`🤖 MCTS completed. Root has ${rootNode.children.length} children.`);
+  const elapsed = Date.now() - startTime;
+  console.log(`🤖 MCTS completed ${iterations} iterations in ${elapsed}ms. Root has ${rootNode.children.length} children.`);
   
   // Select best move based on visit count and strategic value
   let bestChild = null;
@@ -1061,10 +1087,14 @@ window.AIEngine.countPotentialJumps = function(pos, allPlacedPieces) {
 window.AIEngine.getStrategicMoveBonus = function(move) {
   if (!move || !move.priority) return 0;
   
+  // MASSIVELY enhanced Queen-focused priorities
   const priorityValues = {
-    'queen-placement': 1.0,
-    'forced-queen': 0.9,
-    'threaten-queen': 0.8,
+    'queen-placement': 1.0,     // Must place Queen
+    'forced-queen': 0.95,       // Emergency Queen placement
+    'threaten-queen': 0.9,      // ATTACK opponent Queen
+    'defend-queen': 0.85,       // DEFEND our Queen
+    'surround-queen': 0.8,      // Close to winning
+    'escape-queen': 0.75,       // Save our Queen from danger
     'opening-first': 0.7,
     'opening-center': 0.6,
     'queen-safe': 0.8,
@@ -1078,7 +1108,23 @@ window.AIEngine.getStrategicMoveBonus = function(move) {
     'normal': 0.0
   };
   
-  return priorityValues[move.priority] || 0;
+  let bonus = priorityValues[move.priority] || 0;
+  
+  // EXTRA bonuses for Queen-related moves
+  if (move.piece && move.piece.meta && move.piece.meta.key === 'Q') {
+    bonus += 0.2; // Any Queen move gets extra priority
+  }
+  
+  // Bonus for moves that affect areas near Queens
+  if (move.targetingQueen) {
+    bonus += 0.3; // Moves targeting opponent Queen area
+  }
+  
+  if (move.protectingQueen) {
+    bonus += 0.25; // Moves protecting our Queen area
+  }
+  
+  return Math.min(1.0, bonus); // Cap at 1.0
 };
 
 /**
@@ -1610,20 +1656,45 @@ window.AIEngine.evaluatePosition = function(gameState) {
   const oppColor = this.color === 'white' ? 'black' : 'white';
   
   // Get difficulty for evaluation weights
+  // Enhanced evaluation weights with heavy Queen focus
   const difficulty = window.AIEngine.difficulty;
   let evaluationDepth = 1.0;
-  if (difficulty === 'medium') evaluationDepth = 1.3;
-  else if (difficulty === 'hard') evaluationDepth = 1.6;
+  if (difficulty === 'medium') evaluationDepth = 1.5;
+  else if (difficulty === 'hard') evaluationDepth = 2.0;
   
-  // 1. Queen safety evaluation (highest priority - 40% weight)
+  // 1. Queen safety evaluation (CRITICAL PRIORITY - 50% weight)
   const aiQueenThreats = this.countQueenThreats(gameState, this.color);
   const oppQueenThreats = this.countQueenThreats(gameState, oppColor);
   const queenDangerDiff = this.evaluateQueenDanger(gameState, this.color, oppColor);
-  score += (oppQueenThreats - aiQueenThreats) * 0.2 * evaluationDepth + queenDangerDiff * 0.2 * evaluationDepth;
   
-  // 2. Material value and piece positioning (25% weight)
+  // MASSIVE penalty for AI Queen in danger, HUGE bonus for threatening opponent Queen
+  let queenScore = 0;
+  
+  // Defensive Queen safety (protect our Queen)
+  if (aiQueenThreats >= 5) {
+    queenScore -= 0.8; // Emergency: Queen almost surrounded
+  } else if (aiQueenThreats >= 4) {
+    queenScore -= 0.4; // High danger: Queen needs protection
+  } else if (aiQueenThreats >= 3) {
+    queenScore -= 0.2; // Moderate danger: Be careful
+  }
+  
+  // Offensive Queen targeting (attack opponent Queen)
+  if (oppQueenThreats >= 5) {
+    queenScore += 0.9; // WIN: Opponent Queen almost surrounded
+  } else if (oppQueenThreats >= 4) {
+    queenScore += 0.5; // Excellent: Close to winning
+  } else if (oppQueenThreats >= 3) {
+    queenScore += 0.3; // Good: Building pressure
+  } else if (oppQueenThreats >= 2) {
+    queenScore += 0.1; // OK: Some pressure
+  }
+  
+  score += queenScore + queenDangerDiff * 0.3 * evaluationDepth;
+  
+  // 2. Material value and piece positioning (20% weight)
   const materialDiff = this.evaluateMaterial(gameState, this.color, oppColor);
-  score += materialDiff * 0.25;
+  score += materialDiff * 0.20;
   
   // 3. Control and mobility (20% weight)
   const controlDiff = this.evaluateControl(gameState, this.color, oppColor);
