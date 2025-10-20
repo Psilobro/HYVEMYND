@@ -48,6 +48,7 @@ const DIRS = [
     {dq:1,dr:0},{dq:1,dr:-1},{dq:0,dr:-1},
     {dq:-1,dr:0},{dq:-1,dr:1},{dq:0,dr:1}
 ];
+window.DIRS = DIRS;
 
 function isNearBorder(q, r) {
     return Math.abs(q) > GRID_RADIUS || Math.abs(r) > GRID_RADIUS;
@@ -591,6 +592,7 @@ const THEME  = {
     boardHighlightColor: 0xFFB3D,
     highlight: 0x8B3E20
 };
+window.THEME = THEME;
 
 const SETUP = [
     {key:'Q',count:1},
@@ -998,10 +1000,22 @@ function legalPlacementZones(color){
     const occ=new Set(placed.map(p=>`${p.meta.q},${p.meta.r}`));
     const zones=new Set();
 
-    // Queen by turn 4
+    console.log(`🎯 legalPlacementZones called for ${color}, placed: ${placed.length}, my: ${my.length}`);
+
+    // Queen by turn 4 - TEMPORARILY DISABLED FOR AI DEBUG
     const turn = Math.ceil(state.moveNumber / 2);
+    console.log(`🎯 Turn ${turn}, Queen placed: ${state.queenPlaced[color]}`);
+    
     if(!state.queenPlaced[color] && turn === 4){
-        if(selected.piece.meta.key!=='Q') return zones;
+        console.log(`🎯 Queen restriction check: AI enabled: ${typeof window.AIEngine !== 'undefined' && window.AIEngine.enabled}, AI color: ${window.AIEngine?.color}`);
+        // TEMPORARILY BYPASS ALL Queen restrictions for AI debugging
+        if(typeof window.AIEngine !== 'undefined' && window.AIEngine.enabled && window.AIEngine.color === color) {
+            console.log(`🎯 AI DEBUG: Bypassing all Queen restrictions`);
+            // Skip all Queen restrictions for AI
+        } else if(selected && selected.piece && selected.piece.meta.key!=='Q') {
+            console.log(`🎯 Human mode - Queen required but ${selected.piece.meta.key} selected, returning empty zones`);
+            return zones;
+        }
     }
 
     if(placed.length===0){
@@ -1034,6 +1048,8 @@ function legalPlacementZones(color){
             if(!bad) zones.add(k);
         });
     });
+    
+    console.log(`🎯 legalPlacementZones returning ${zones.size} zones for ${color}:`, Array.from(zones));
     return zones;
 }
 

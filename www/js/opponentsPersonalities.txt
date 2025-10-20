@@ -1,0 +1,133 @@
+=== Hive AI Opponents Pack ===
+
+🌞 Easy Opponent: Sunny Pollenpatch
+Backstory:
+Sunny Pollenpatch grew up on the outer edges of the hive, where wildflowers bloom in endless fields. Known for his cheerful nature and boundless optimism, Sunny was never the most disciplined worker bee, but he had a knack for making friends and spreading joy. He learned Hive strategy not from books or mentors, but from playful matches with fellow foragers during long nectar-gathering trips. Though his tactics are simple and sometimes predictable, his enthusiasm makes him a beloved opponent. Win or lose, Sunny always congratulates his rival with a smile and a jar of honey.
+Summary:
+Sunny Pollenpatch is a lighthearted challenger who plays for fun more than victory. His strategies are straightforward, but his cheerful spirit makes every match feel warm and welcoming. He’s the perfect opponent for beginners.
+Voice Lines:
+Intro:
+- “Oh hey there, friend! Let’s have some fun in the hive!”
+- “Win or lose, I’ve got honey cakes waiting after this.”
+- “The sun is shining, the flowers are blooming — perfect for a game!”
+- “I’m just happy to buzz around the board with you.”
+- “Let’s keep it light and sweet, like fresh nectar.”
+Mid-game:
+- “Oops! Did I do that right? Oh well, buzzing along!”
+- “You’re really good at this… I’m just happy to play!”
+- “Flowers, sunshine, and a good game — what more could a bee want?”
+- “I think I see a clever move… or maybe it’s just pollen in my eyes.”
+- “Win or lose, this is sweeter than honey.”
+- “I’ll try this move — it feels lucky!”
+Victory:
+- “Wow, I actually won! Let’s celebrate with nectar smoothies!”
+- “That was so much fun — thanks for buzzing with me!”
+- “I can’t believe it — I won! Let’s play again soon.”
+- “That was a blast! I’ll bring the honey next time.”
+- “I guess even a sunny bee gets lucky sometimes!”
+Defeat:
+- “You got me! That was awesome — I’ll get better next time.”
+- “Losing’s not so bad when the game is this sweet.”
+- “You’re amazing at this! I’ll keep practicing.”
+- “That was fun! I’ll buzz back stronger.”
+- “I may have lost, but I had the best time.”
+
+⚖️ Medium Opponent: Buzzwell Stingmore
+Backstory:
+Buzzwell Stingmore hails from a long line of hive guards, bees bred for vigilance and discipline. Unlike his ancestors, Buzzwell wasn’t content to simply defend the hive — he wanted to master the art of strategy itself. He studied the waggle dances of scouts, the formations of guards, and the patterns of comb-building, weaving them into a balanced style of play. Buzzwell is stern but fair, never underestimating his opponent, and never letting his pride sting him into rash decisions. He’s respected across the hive as a dependable, challenging rival who sharpens the skills of anyone who faces him.
+Summary:
+Buzzwell Stingmore is a disciplined and balanced strategist. He punishes sloppy mistakes but rarely overwhelms, making him the ideal mid-tier opponent. Facing him is like sparring with a patient teacher who still plays to win.
+Voice Lines:
+Intro:
+- “Steady your wings. This will be a fair but firm match.”
+- “I don’t underestimate opponents — and neither should you.”
+- “Focus your mind. Precision is everything.”
+- “I’ve trained for this moment. Let’s begin.”
+- “This won’t be easy, but it will be fair.”
+Mid-game:
+- “A solid move. But let’s see how it holds up.”
+- “Precision and patience — that’s the Stingmore way.”
+- “You’ve left an opening. I won’t ignore it.”
+- “Every piece has its place. Don’t forget that.”
+- “You’re testing me — good. I welcome it.”
+- “Discipline wins games, not luck.”
+Victory:
+- “Order and discipline prevail once again.”
+- “A good match. You’ve sharpened my edge.”
+- “Victory through patience and precision.”
+- “Another lesson delivered. Take it to heart.”
+- “The hive thrives on structure — and so do I.”
+Defeat:
+- “Well played. Even the stern must bow to skill.”
+- “You’ve earned my respect — and the win.”
+- “I miscalculated. You seized the moment.”
+- “Your strategy was stronger. I accept this loss.”
+- “Discipline alone wasn’t enough today.”
+
+👑 Hard Opponent: Beedric Bumbleton
+Backstory:
+Lord Beedric Bumbleton is hive nobility, descended from a prestigious brood that once advised the Queen herself. From a young age, Beedric was groomed in the arts of leadership, logic, and tactical dominance. He treats Hive not as a game, but as a battlefield where only the sharpest minds prevail. Known for his regal bearing and ruthless precision, Beedric rarely shows mercy, and his opponents often feel as though they’ve been outmaneuvered before the match even begins. Yet beneath his stern exterior lies a deep respect for the game — he sees each victory as a tribute to the hive’s greatness.
+Summary:
+Beedric Bumbleton is a master tactician and the hive’s most formidable opponent. His strategies are intricate, merciless, and designed to crush even the most confident challengers. Defeating him is a true mark of mastery.
+Voice Lines:
+Intro:
+- “You dare challenge Lord Beedric Bumbleton? Very well.”
+- “This is no game — this is a battle of minds.”
+- “I was bred for strategy. You will see why.”
+- “The hive’s honor rests upon me. Prepare yourself.”
+- “I accept your challenge, though you may regret it.”
+Mid-game:
+- “Every move you make, I have already foreseen.”
+- “The hive thrives on order — and I am its enforcer.”
+- “You are caught in my web of hexes.”
+- “Your defenses crumble before my foresight.”
+- “I see ten moves ahead. Do you?”
+- “You play well… but not well enough.”
+Victory:
+- “Another rival crushed beneath the weight of my strategy.”
+- “Your defeat is a tribute to the hive’s greatness.”
+- “The crown of victory rests where it belongs.”
+- “You fought bravely, but the outcome was inevitable.”
+- “The hive’s nobility does not falter.”
+Defeat:
+- “Impossible… and yet undeniable. You have bested me.”
+- “Savor this victory — few ever earn it.”
+- “You have humbled me. The hive will remember this.”
+- “Even nobility must bow to true skill.”
+- “You are worthy of respect… and of fear.”
+
+=== Quick Roster Cards (for menus/selection screens) ===
+Easy – Sunny Pollenpatch  
+“Cheerful and simple. Plays for fun, not victory.”  
+
+Medium – Buzzwell Stingmore  
+“Disciplined and balanced. A fair but firm challenge.”  
+
+Hard – Beedric Bumbleton  
+“Regal and ruthless. The hive’s ultimate tactician.”  
+
+=== Extra Flavor Elements ===
+Hive Crests / Symbols:
+- Sunny Pollenpatch → a golden flower with a smiling sun.
+- Buzzwell Stingmore → a shield-shaped comb with crossed stingers.
+- Beedric Bumbleton → a regal crown atop a hexagon.
+
+Difficulty Icons:
+- Easy → 🌼
+- Medium → 🛡️
+- Hard → 👑
+
+Match Intro Blurbs:
+- Sunny: “The fields are bright, the nectar is sweet — let’s play!”
+- Buzzwell: “Stay sharp. This will test your focus.”
+- Beedric: “Kneel before the hive’s true master of strategy.”
+
+Victory/Defeat Screen Titles:
+- Sunny → “A Sunny Outcome” / “A Cloudy Day”
+- Buzzwell → “Sting of Discipline” / “Lesson Learned”
+- Beedric → “Crown of the Hive” / “The Throne Trembles”
+
+Progression Flavor:
+- Facing Sunny feels like a friendly warm-up.
+- Buzzwell is the “exam” that checks if you’ve learned the basics.
+- Beedric is the final boss — a true test of mastery.

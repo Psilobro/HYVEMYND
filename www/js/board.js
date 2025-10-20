@@ -2,8 +2,8 @@
 // --- UTILS ---
 function axialToPixel(q,r){
     return {
-        x: CELL_RADIUS * 1.5 * q,
-        y: CELL_RADIUS * Math.sqrt(3) * (r + q/2)
+        x: window.CELL_RADIUS * 1.5 * q,
+        y: window.CELL_RADIUS * Math.sqrt(3) * (r + q/2)
     };
 }
 function drawHex(g, radius){
@@ -18,13 +18,13 @@ function drawHex(g, radius){
 const cells = new Map(); // "q,r" → { gfx,q,r,stack:[] }
 window.cells = cells; // Make cells globally accessible
 window.createBoard = function(boardLayer, app) {
-    for(let q=-GRID_RADIUS; q<=GRID_RADIUS; q++){
-        for(let r=-GRID_RADIUS; r<=GRID_RADIUS; r++){
-            if(Math.abs(q+r)>GRID_RADIUS) continue;
+    for(let q=-window.GRID_RADIUS; q<=window.GRID_RADIUS; q++){
+        for(let r=-window.GRID_RADIUS; r<=window.GRID_RADIUS; r++){
+            if(Math.abs(q+r)>window.GRID_RADIUS) continue;
             const c = new PIXI.Graphics()
                 .lineStyle(2, THEME.boardLine)
                 .beginFill(THEME.boardFill);
-            drawHex(c, CELL_RADIUS);
+            drawHex(c, window.CELL_RADIUS);
             c.endFill();
             const p = axialToPixel(q,r);
             c.position.set(p.x,p.y);
@@ -60,12 +60,12 @@ window.createBoardPerimeterGlow = function(boardLayer) {
     
     // Find all perimeter cells (cells at the outer edge)
     const perimeterCells = [];
-    for(let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
-        for(let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) {
-            if(Math.abs(q + r) > GRID_RADIUS) continue;
+    for(let q = -window.GRID_RADIUS; q <= window.GRID_RADIUS; q++) {
+        for(let r = -window.GRID_RADIUS; r <= window.GRID_RADIUS; r++) {
+            if(Math.abs(q + r) > window.GRID_RADIUS) continue;
             
             // Check if this cell is on the perimeter
-            if(Math.abs(q) === GRID_RADIUS || Math.abs(r) === GRID_RADIUS || Math.abs(q + r) === GRID_RADIUS) {
+            if(Math.abs(q) === window.GRID_RADIUS || Math.abs(r) === window.GRID_RADIUS || Math.abs(q + r) === window.GRID_RADIUS) {
                 perimeterCells.push({q, r});
             }
         }
@@ -96,16 +96,16 @@ window.createBoardMask = function(perimeterCells) {
     mask.beginFill(0xffffff); // Color doesn't matter for masks
     
     // Create a mask by drawing all board cells (not just perimeter) with glow padding
-    for(let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
-        for(let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) {
-            if(Math.abs(q + r) > GRID_RADIUS) continue;
+    for(let q = -window.GRID_RADIUS; q <= window.GRID_RADIUS; q++) {
+        for(let r = -window.GRID_RADIUS; r <= window.GRID_RADIUS; r++) {
+            if(Math.abs(q + r) > window.GRID_RADIUS) continue;
             
             const pos = axialToPixel(q, r);
             
             // For perimeter cells, use larger radius to include glow
             // For inner cells, use normal radius
-            const isPerimeter = Math.abs(q) === GRID_RADIUS || Math.abs(r) === GRID_RADIUS || Math.abs(q + r) === GRID_RADIUS;
-            const maskRadius = isPerimeter ? CELL_RADIUS + 24 : CELL_RADIUS + 12; // Extra padding for smooth edge
+            const isPerimeter = Math.abs(q) === window.GRID_RADIUS || Math.abs(r) === window.GRID_RADIUS || Math.abs(q + r) === window.GRID_RADIUS;
+            const maskRadius = isPerimeter ? window.CELL_RADIUS + 24 : window.CELL_RADIUS + 12; // Extra padding for smooth edge
             
             // Draw hexagon for this cell
             mask.moveTo(pos.x + maskRadius, pos.y);
