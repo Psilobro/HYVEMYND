@@ -11,20 +11,20 @@ window.AIEngine = {
   thinking: false,
   thinkingTime: 1500, // ms delay for move calculation
   
-  // MCTS Parameters - Hybrid Time/Iteration Approach
+  // MCTS Parameters - NO TIME LIMITS, DEEP THINKING ONLY
   explorationConstant: Math.sqrt(2),
   simulationDepth: 25,
   iterationsPerMove: {
-    easy: 50,        // Reasonable for quick play
-    medium: 200,     // Good strategic depth  
-    hard: 1000       // Very strong play
+    easy: 100,       // Actually think (your original goal)
+    medium: 500,     // Think deeply (your original goal)  
+    hard: 1500       // Think VERY deeply (your original goal)
   },
   
-  // Time limits (ms) - backup constraint
+  // NO TIME LIMITS - Let AI think as long as needed
   timeLimit: {
-    easy: 2000,      // 2 second max
-    medium: 5000,    // 5 second max
-    hard: 10000      // 10 second max
+    easy: Infinity,    // No time limit
+    medium: Infinity,  // No time limit
+    hard: Infinity     // No time limit
   },
   
   // Strategy depth by difficulty
@@ -177,13 +177,13 @@ window.AIEngine.findBestMove = async function() {
   const maxIterations = this.iterationsPerMove[this.difficulty];
   const timeLimit = this.timeLimit[this.difficulty];
   
-  console.log(`🤖 Running up to ${maxIterations} MCTS iterations (${timeLimit}ms time limit)...`);
+  console.log(`🤖 Running ${maxIterations} MCTS iterations (NO TIME LIMIT - thinking deeply)...`);
   
   const startTime = Date.now();
   let iterations = 0;
   
-  // Hybrid approach: Run iterations until time limit OR max iterations reached
-  while (iterations < maxIterations && (Date.now() - startTime) < timeLimit) {
+  // Deep thinking approach: Run ALL iterations, no time pressure
+  while (iterations < maxIterations) {
     try {
       const leaf = this.selectLeaf(rootNode);
       const child = this.expandNode(leaf);
@@ -191,13 +191,12 @@ window.AIEngine.findBestMove = async function() {
       this.backpropagate(child || leaf, result);
       iterations++;
       
-      // Yield control periodically to prevent browser freeze and update progress
+      // Update progress and yield control periodically
       if (iterations % 50 === 0) {
         // Update thinking indicator with progress
         if (hud) {
-          const progress = Math.min(100, Math.round((iterations / maxIterations) * 100));
-          const timeProgress = Math.min(100, Math.round(((Date.now() - startTime) / timeLimit) * 100));
-          hud.textContent = `🤖 AI thinking... ${Math.max(progress, timeProgress)}% (${iterations} iterations)`;
+          const progress = Math.round((iterations / maxIterations) * 100);
+          hud.textContent = `🤖 AI thinking deeply... ${progress}% (${iterations}/${maxIterations} iterations)`;
         }
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -208,27 +207,37 @@ window.AIEngine.findBestMove = async function() {
   }
   
   const elapsed = Date.now() - startTime;
-  console.log(`🤖 MCTS completed ${iterations} iterations in ${elapsed}ms. Root has ${rootNode.children.length} children.`);
+  console.log(`🤖 MCTS completed ALL ${iterations} iterations in ${elapsed}ms (${(elapsed/1000).toFixed(1)}s). Root has ${rootNode.children.length} children.`);
   
   // PRIORITY-FIRST MOVE SELECTION: Queen objectives override MCTS
   let bestChild = null;
   let bestScore = -1;
   
+  console.log(`🤖 🧠 ANALYZING ${rootNode.children.length} POSSIBLE MOVES:`);
+  
   // Check for WINNING moves first (surround opponent Queen)
+  console.log(`🤖 👑 Checking for WINNING moves...`);
   for (const child of rootNode.children) {
     if (this.isWinningMove(child.move)) {
-      console.log(`🤖 👑 WINNING MOVE FOUND! Surrounding opponent Queen:`, child.move);
+      console.log(`🤖 👑 ⭐ WINNING MOVE FOUND! Surrounding opponent Queen:`, child.move);
+      console.log(`🤖 👑 ⭐ GAME OVER! Taking immediate win!`);
       return child.move;
     }
   }
+  console.log(`🤖 👑 No winning moves available.`);
   
   // Check for emergency defensive moves (save our Queen)
+  console.log(`🤖 🛡️ Checking for EMERGENCY defensive moves...`);
   for (const child of rootNode.children) {
     if (this.isEmergencyDefensive(child.move)) {
-      console.log(`🤖 🛡️ EMERGENCY DEFENSE! Saving our Queen:`, child.move);
+      console.log(`🤖 🛡️ ⚠️ EMERGENCY DEFENSE! Saving our Queen:`, child.move);
+      console.log(`🤖 🛡️ ⚠️ Queen in danger - emergency response!`);
       return child.move;
     }
   }
+  console.log(`🤖 🛡️ No emergency defense needed.`);
+  
+  console.log(`🤖 📊 Evaluating moves with Queen-focused strategy...`);
   
   // Then evaluate normally with heavy Queen focus
   for (const child of rootNode.children) {
@@ -250,10 +259,13 @@ window.AIEngine.findBestMove = async function() {
   }
   
   if (bestChild) {
-    console.log('🤖 Selected best move:', bestChild.move);
+    console.log(`🤖 ⭐ FINAL DECISION after ${iterations} iterations:`);
+    console.log(`🤖 ⭐ Selected: ${bestChild.move.type} ${bestChild.move.piece?.meta?.key || '?'} to (${bestChild.move.q},${bestChild.move.r})`);
+    console.log(`🤖 ⭐ Final score: ${bestScore.toFixed(3)} | Visits: ${bestChild.visits} | Win rate: ${((bestChild.wins/bestChild.visits)*100).toFixed(1)}%`);
+    console.log(`🤖 ⭐ Strategy: ${this.analyzeQueenThreats(bestChild.move)} | Priority: ${bestChild.move.priority || 'normal'}`);
     return bestChild.move;
   } else {
-    console.log('🤖 No best move found, falling back to first available move');
+    console.log('🤖 💥 ERROR: No best move found, falling back to first available move');
     return availableMoves[0];
   }
 };
