@@ -210,19 +210,38 @@ window.AIEngine.findBestMove = async function() {
   const elapsed = Date.now() - startTime;
   console.log(`🤖 MCTS completed ${iterations} iterations in ${elapsed}ms. Root has ${rootNode.children.length} children.`);
   
-  // Select best move based on visit count and strategic value
+  // PRIORITY-FIRST MOVE SELECTION: Queen objectives override MCTS
   let bestChild = null;
   let bestScore = -1;
   
+  // Check for WINNING moves first (surround opponent Queen)
+  for (const child of rootNode.children) {
+    if (this.isWinningMove(child.move)) {
+      console.log(`🤖 👑 WINNING MOVE FOUND! Surrounding opponent Queen:`, child.move);
+      return child.move;
+    }
+  }
+  
+  // Check for emergency defensive moves (save our Queen)
+  for (const child of rootNode.children) {
+    if (this.isEmergencyDefensive(child.move)) {
+      console.log(`🤖 🛡️ EMERGENCY DEFENSE! Saving our Queen:`, child.move);
+      return child.move;
+    }
+  }
+  
+  // Then evaluate normally with heavy Queen focus
   for (const child of rootNode.children) {
     const winRate = child.visits > 0 ? child.wins/child.visits : 0;
     const visits = child.visits;
     const strategicBonus = this.getStrategicMoveBonus(child.move);
+    const queenBonus = this.getQueenFocusBonus(child.move); // NEW: Direct Queen evaluation
     
-    // Combined score: win rate (70%) + visit confidence (20%) + strategic value (10%)
-    const score = winRate * 0.7 + (visits / iterations) * 0.2 + strategicBonus * 0.1;
+    // Queen-focused scoring: Queen priority (40%) + win rate (30%) + visits (20%) + strategic (10%)
+    const score = queenBonus * 0.4 + winRate * 0.3 + (visits / iterations) * 0.2 + strategicBonus * 0.1;
     
-    console.log(`🤖 Move ${child.move.type} ${child.move.piece?.meta?.key || '?'} to ${child.move.q},${child.move.r}: ${visits} visits, ${(winRate*100).toFixed(1)}% win rate, priority: ${child.move.priority || 'normal'}, score: ${score.toFixed(3)}`);
+    const queenThreatInfo = this.analyzeQueenThreats(child.move);
+    console.log(`🤖 Move ${child.move.type} ${child.move.piece?.meta?.key || '?'} to ${child.move.q},${child.move.r}: ${visits} visits, ${(winRate*100).toFixed(1)}% win rate, priority: ${child.move.priority || 'normal'}, queenBonus: ${queenBonus.toFixed(2)}, threats: ${queenThreatInfo}, TOTAL: ${score.toFixed(3)}`);
     
     if (score > bestScore) {
       bestScore = score;
@@ -2732,6 +2751,173 @@ window.AIEngine.calculateAverageDistance = function(pieces) {
   }
   
   return pairCount > 0 ? totalDistance / pairCount : 0;
+};
+
+/**
+ * CRITICAL: Check if a move will WIN the game by surrounding opponent Queen
+ */
+window.AIEngine.isWinningMove = function(move) {
+  if (!move || move.type !== 'place') return false;
+  
+  try {
+    // Find opponent Queen
+    const oppColor = this.color === 'white' ? 'black' : 'white';
+    const oppQueen = tray.find(p => 
+      p.meta && p.meta.color === oppColor && p.meta.key === 'Q' && p.meta.placed
+    );
+    
+    if (!oppQueen) return false;
+    
+    // Count current threats around opponent Queen
+    let threatsAfterMove = 0;
+    const queenNeighbors = this.getNeighborCoords(oppQueen.meta.q, oppQueen.meta.r);
+    
+    for (const [nq, nr] of queenNeighbors) {
+      // Check if neighbor is already occupied
+      const occupied = tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
+      
+      // Check if this move will occupy this neighbor
+      if (move.q === nq && move.r === nr) {
+        threatsAfterMove++;
+      } else if (occupied) {
+        threatsAfterMove++;
+      }
+    }
+    
+    console.log(`🤖 👑 Winning check: ${threatsAfterMove}/6 neighbors would be threatened`);
+    return threatsAfterMove >= 6; // All 6 neighbors occupied = win
+    
+  } catch (error) {
+    console.error('🤖 Error in isWinningMove:', error);
+    return false;
+  }
+};
+
+/**
+ * CRITICAL: Check if AI Queen is in immediate danger and this move saves it
+ */
+window.AIEngine.isEmergencyDefensive = function(move) {
+  if (!move) return false;
+  
+  try {
+    // Find AI Queen
+    const aiQueen = tray.find(p => 
+      p.meta && p.meta.color === this.color && p.meta.key === 'Q' && p.meta.placed
+    );
+    
+    if (!aiQueen) return false;
+    
+    // Count current threats around AI Queen
+    let currentThreats = 0;
+    const queenNeighbors = this.getNeighborCoords(aiQueen.meta.q, aiQueen.meta.r);
+    
+    for (const [nq, nr] of queenNeighbors) {
+      const occupied = tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
+      if (occupied) currentThreats++;
+    }
+    
+    console.log(`🤖 🛡️ Defense check: AI Queen has ${currentThreats}/6 threats`);
+    
+    // If Queen has 4+ threats, this is emergency territory
+    if (currentThreats >= 4) {
+      // Check if this move is a Queen move that escapes danger
+      if (move.type === 'move' && move.piece && move.piece.meta.key === 'Q') {
+        console.log(`🤖 🛡️ EMERGENCY: Moving Queen to escape!`);
+        return true;
+      }
+      
+      // Check if this move blocks a threat to Queen
+      const wouldBlock = queenNeighbors.some(([nq, nr]) => {
+        const isEmpty = !tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
+        return isEmpty && (move.q === nq && move.r === nr);
+      });
+      
+      if (wouldBlock) {
+        console.log(`🤖 🛡️ EMERGENCY: Blocking threat to Queen!`);
+        return true;
+      }
+    }
+    
+    return false;
+    
+  } catch (error) {
+    console.error('🤖 Error in isEmergencyDefensive:', error);
+    return false;
+  }
+};
+
+/**
+ * CRITICAL: Calculate Queen-focused bonus for moves
+ */
+window.AIEngine.getQueenFocusBonus = function(move) {
+  if (!move) return 0;
+  
+  try {
+    let bonus = 0;
+    const oppColor = this.color === 'white' ? 'black' : 'white';
+    
+    // Find both Queens
+    const oppQueen = tray.find(p => 
+      p.meta && p.meta.color === oppColor && p.meta.key === 'Q' && p.meta.placed
+    );
+    const aiQueen = tray.find(p => 
+      p.meta && p.meta.color === this.color && p.meta.key === 'Q' && p.meta.placed
+    );
+    
+    // OFFENSIVE: Bonus for moves that threaten opponent Queen
+    if (oppQueen) {
+      const distToOppQueen = Math.abs(move.q - oppQueen.meta.q) + Math.abs(move.r - oppQueen.meta.r);
+      
+      if (distToOppQueen === 1) {
+        bonus += 0.8; // Adjacent to opponent Queen - EXCELLENT
+        console.log(`🤖 ⚔️ OFFENSIVE: Move threatens opponent Queen directly!`);
+      } else if (distToOppQueen === 2) {
+        bonus += 0.3; // Near opponent Queen - good positioning
+      }
+    }
+    
+    // DEFENSIVE: Bonus for moves that protect our Queen
+    if (aiQueen) {
+      const distToAiQueen = Math.abs(move.q - aiQueen.meta.q) + Math.abs(move.r - aiQueen.meta.r);
+      
+      if (distToAiQueen === 1) {
+        bonus += 0.4; // Protect our Queen
+        console.log(`🤖 🛡️ DEFENSIVE: Move protects AI Queen!`);
+      }
+    }
+    
+    return Math.min(1.0, bonus);
+    
+  } catch (error) {
+    console.error('🤖 Error in getQueenFocusBonus:', error);
+    return 0;
+  }
+};
+
+/**
+ * CRITICAL: Analyze Queen threats for a move
+ */
+window.AIEngine.analyzeQueenThreats = function(move) {
+  if (!move) return 'none';
+  
+  try {
+    const oppColor = this.color === 'white' ? 'black' : 'white';
+    const oppQueen = tray.find(p => 
+      p.meta && p.meta.color === oppColor && p.meta.key === 'Q' && p.meta.placed
+    );
+    
+    if (!oppQueen) return 'no-queen';
+    
+    const distToOppQueen = Math.abs(move.q - oppQueen.meta.q) + Math.abs(move.r - oppQueen.meta.r);
+    
+    if (distToOppQueen === 1) return 'threatens-queen';
+    if (distToOppQueen === 2) return 'near-queen';
+    if (distToOppQueen <= 3) return 'approaching-queen';
+    return 'distant';
+    
+  } catch (error) {
+    return 'error';
+  }
 };
 
 /**
