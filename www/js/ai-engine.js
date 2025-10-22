@@ -2834,19 +2834,22 @@ window.AIEngine.isEmergencyDefensive = function(move) {
     if (currentThreats >= 4) {
       // Check if this move is a Queen move that escapes danger
       if (move.type === 'move' && move.piece && move.piece.meta.key === 'Q') {
-        console.log(`🤖 🛡️ EMERGENCY: Moving Queen to escape!`);
+        console.log(`🤖 🛡️ EMERGENCY: Moving Queen to escape danger!`);
         return true;
       }
-      
-      // Check if this move blocks a threat to Queen
-      const wouldBlock = queenNeighbors.some(([nq, nr]) => {
-        const isEmpty = !tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
-        return isEmpty && (move.q === nq && move.r === nr);
+    }
+    
+    // NEVER place pieces next to our own Queen when it's threatened!
+    // This logic was backwards and causing the AI to surround its own Queen
+    if (currentThreats >= 3) {
+      // Check if this move would ADD a threat to our Queen (BAD!)
+      const wouldThreatenOurQueen = queenNeighbors.some(([nq, nr]) => {
+        return move.q === nq && move.r === nr;
       });
       
-      if (wouldBlock) {
-        console.log(`🤖 🛡️ EMERGENCY: Blocking threat to Queen!`);
-        return true;
+      if (wouldThreatenOurQueen) {
+        console.log(`🤖 🛡️ DANGER: Move would threaten our own Queen - AVOIDING!`);
+        return false; // This is NOT a good defensive move!
       }
     }
     
@@ -2888,13 +2891,30 @@ window.AIEngine.getQueenFocusBonus = function(move) {
       }
     }
     
-    // DEFENSIVE: Bonus for moves that protect our Queen
+    // DEFENSIVE: PENALTY for moves that threaten our own Queen!
     if (aiQueen) {
       const distToAiQueen = Math.abs(move.q - aiQueen.meta.q) + Math.abs(move.r - aiQueen.meta.r);
       
-      if (distToAiQueen === 1) {
-        bonus += 0.4; // Protect our Queen
-        console.log(`🤖 🛡️ DEFENSIVE: Move protects AI Queen!`);
+      // Count current threats to AI Queen
+      let currentThreats = 0;
+      const queenNeighbors = this.getNeighborCoords(aiQueen.meta.q, aiQueen.meta.r);
+      
+      for (const [nq, nr] of queenNeighbors) {
+        const occupied = tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
+        if (occupied) currentThreats++;
+      }
+      
+      if (distToAiQueen === 1 && currentThreats >= 3) {
+        bonus -= 0.9; // MASSIVE PENALTY for threatening our own Queen!
+        console.log(`🤖 🛡️ DEFENSIVE PENALTY: Move would threaten our own Queen! (${currentThreats}/6 threats)`);
+      } else if (distToAiQueen === 1 && currentThreats >= 2) {
+        bonus -= 0.5; // Large penalty for adding threats to Queen
+        console.log(`🤖 🛡️ DEFENSIVE WARNING: Move adds threat to our Queen (${currentThreats}/6 threats)`);
+      }
+      
+      // Only give a small bonus for protecting Queen if it's far from danger
+      if (distToAiQueen === 2 && currentThreats <= 1) {
+        bonus += 0.2; // Small bonus for nearby support (but not adjacent)
       }
     }
     
