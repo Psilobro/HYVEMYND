@@ -1105,6 +1105,20 @@ function commitPlacement(q,r){
                 console.log(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
                 alert(`GAME OVER - ${winner === 'DRAW' ? 'DRAW' : winner.toUpperCase() + ' WINS'}!`);
             }
+            
+            // Trigger personality victory/defeat response
+            if (window.Personalities && window.Personalities.currentOpponent) {
+                setTimeout(() => {
+                    if (winner === 'black') {
+                        // AI won
+                        window.Personalities.showVoiceLine('victory', 10000); // Show longer for victory
+                    } else if (winner === 'white') {
+                        // Player won, AI lost
+                        window.Personalities.showVoiceLine('defeat', 10000);
+                    }
+                    // No personality response for draws
+                }, 2000);
+            }
         }, 100);
     }
     // update move history UI (use p which is the placed piece)

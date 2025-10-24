@@ -92,48 +92,66 @@ window.AIUI.createDifficultyModal = function() {
     
     <div id="difficulty-options" style="display: flex; flex-direction: column; gap: 15px;">
       <button class="difficulty-btn" data-difficulty="easy" style="
-        background: #4CAF50; 
+        background: linear-gradient(135deg, #FFD700, #FFA500); 
         color: white; 
-        border: none; 
-        padding: 15px 25px; 
-        border-radius: 8px; 
+        border: 2px solid #FFD700;
+        padding: 18px 25px; 
+        border-radius: 12px; 
         font-size: 16px; 
         font-family: 'Milonga', serif;
         cursor: pointer;
         transition: all 0.3s ease;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
       ">
-        <strong>🟢 Easy</strong><br>
-        <small style="opacity: 0.9;">Beginner-friendly AI • Quick thinking</small>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 24px;">🌻</span>
+          <div style="text-align: left;">
+            <strong>Sunny Pollenpatch</strong><br>
+            <small style="opacity: 0.9;">🌼 Easy • The Cheerful Forager</small>
+          </div>
+        </div>
       </button>
       
       <button class="difficulty-btn" data-difficulty="medium" style="
-        background: #FF9800; 
+        background: linear-gradient(135deg, #708090, #4169E1); 
         color: white; 
-        border: none; 
-        padding: 15px 25px; 
-        border-radius: 8px; 
+        border: 2px solid #708090;
+        padding: 18px 25px; 
+        border-radius: 12px; 
         font-size: 16px; 
         font-family: 'Milonga', serif;
         cursor: pointer;
         transition: all 0.3s ease;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
       ">
-        <strong>🟡 Medium</strong><br>
-        <small style="opacity: 0.9;">Balanced challenge • Thoughtful play</small>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 24px;">⚔️</span>
+          <div style="text-align: left;">
+            <strong>Buzzwell Stingmore</strong><br>
+            <small style="opacity: 0.9;">🛡️ Medium • The Disciplined Guard</small>
+          </div>
+        </div>
       </button>
       
       <button class="difficulty-btn" data-difficulty="hard" style="
-        background: #F44336; 
+        background: linear-gradient(135deg, #4B0082, #8B0000); 
         color: white; 
-        border: none; 
-        padding: 15px 25px; 
-        border-radius: 8px; 
+        border: 2px solid #4B0082;
+        padding: 18px 25px; 
+        border-radius: 12px; 
         font-size: 16px; 
         font-family: 'Milonga', serif;
         cursor: pointer;
         transition: all 0.3s ease;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
       ">
-        <strong>🔴 Hard</strong><br>
-        <small style="opacity: 0.9;">Expert AI • Deep analysis</small>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 24px;">�</span>
+          <div style="text-align: left;">
+            <strong>Beedric Bumbleton</strong><br>
+            <small style="opacity: 0.9;">👑 Hard • Lord of the Royal Hive</small>
+          </div>
+        </div>
       </button>
     </div>
     
@@ -198,6 +216,11 @@ window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
   
+  // Set up the opponent personality
+  if (window.Personalities) {
+    window.Personalities.setOpponent(difficulty);
+  }
+  
   console.log(`🎮 Starting Single Player mode (${difficulty} difficulty)`);
   
   // Hide difficulty modal
@@ -214,8 +237,18 @@ window.AIUI.startAIMode = function(difficulty) {
   // Reset game if needed
   this.resetGameForAI();
   
+  // Get opponent name for notification
+  const opponentName = window.Personalities?.opponents[difficulty]?.name || 'AI Opponent';
+  
   // Show success notification
-  this.showNotification(`🤖 Single Player mode activated! (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} difficulty)\n\nYou play as White, AI plays as Black.`);
+  this.showNotification(`🤖 Challenge accepted!\n\nFacing: ${opponentName}\nYou play as White, AI plays as Black.`);
+  
+  // Show intro voice line after a brief delay
+  setTimeout(() => {
+    if (window.Personalities) {
+      window.Personalities.showVoiceLine('intro');
+    }
+  }, 2000);
 };
 
 /**

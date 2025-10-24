@@ -9,15 +9,33 @@ window.AIEngine = {
   difficulty: 'medium',
   color: 'black', // AI always plays black
   thinking: false,
-  thinkingTime: 1500, // ms delay for move calculation
+  thinkingTime: {
+    easy: 3000,      // 3 seconds
+    medium: 8000,    // 8 seconds  
+    hard: 25000      // 25 seconds - truly strategic thinking
+  },
   
-  // MCTS Parameters - NO TIME LIMITS, DEEP THINKING ONLY
+  // MCTS Parameters - MUCH DEEPER THINKING FOR STRATEGIC PLAY
   explorationConstant: Math.sqrt(2),
-  simulationDepth: 25,
+  simulationDepth: 35, // Increased from 25 for deeper lookahead
   iterationsPerMove: {
-    easy: 100,       // Actually think (your original goal)
-    medium: 500,     // Think deeply (your original goal)  
-    hard: 1500       // Think VERY deeply (your original goal)
+    easy: 1000,      // 10x more thinking
+    medium: 5000,    // 10x more thinking
+    hard: 15000      // 10x more thinking - truly deep analysis
+  },
+  
+  // ZERO-SPAM LOGGING SYSTEM - Only final decisions
+  logging: {
+    enabled: true,
+    level: 'minimal', // Only critical strategic decisions
+    progressInterval: 15000, // Show progress only at completion
+    maxEvaluationLogs: 0,   // ZERO evaluation logs during search
+    showFinalAnalysis: true, // Always show final move decision
+    
+    // Counters to limit spam  
+    evaluationLogCount: 0,
+    simulationLogCount: 0,
+    backpropLogCount: 0
   },
   
   // NO TIME LIMITS - Let AI think as long as needed
@@ -36,7 +54,26 @@ window.AIEngine = {
   
   // Game state cache
   gameStateCache: null,
-  lastMoveIndex: -1
+  lastMoveIndex: -1,
+  
+  // INTELLIGENT LOGGING SYSTEM
+  smartLog: function(level, message, ...args) {
+    if (!this.logging.enabled) return;
+    
+    const levels = { minimal: 0, strategic: 1, detailed: 2, verbose: 3 };
+    const currentLevel = levels[this.logging.level] || 1;
+    const messageLevel = levels[level] || 1;
+    
+    if (messageLevel <= currentLevel) {
+      console.log(message, ...args);
+    }
+  },
+  
+  resetLogCounters: function() {
+    this.logging.evaluationLogCount = 0;
+    this.logging.simulationLogCount = 0;
+    this.logging.backpropLogCount = 0;
+  }
 };
 
 /**
@@ -114,7 +151,7 @@ window.AIEngine.checkAndMakeMove = function() {
       hud.textContent = originalText;
       hud.style.background = '';
     }
-  }, this.thinkingTime);
+  }, this.thinkingTime[this.difficulty]);
 };
 
 /**
@@ -174,6 +211,13 @@ window.AIEngine.findBestMove = async function() {
   }
   
   const rootNode = new MCTSNode(gameState, null, null);
+  
+  // Ensure root node has moves initialized BEFORE starting MCTS
+  if (rootNode.untriedMoves === null) {
+    rootNode.untriedMoves = this.generateLegalMoves(gameState);
+    console.log(`🤖 🔧 Initialized root node with ${rootNode.untriedMoves.length} moves`);
+  }
+  
   const maxIterations = this.iterationsPerMove[this.difficulty];
   const timeLimit = this.timeLimit[this.difficulty];
   
@@ -185,26 +229,136 @@ window.AIEngine.findBestMove = async function() {
   // Deep thinking approach: Run ALL iterations, no time pressure
   while (iterations < maxIterations) {
     try {
+      if (iterations === 0) {
+        console.log(`🤖 🔍 MCTS Loop Debug - Starting iteration 0`);
+        // Loop iteration debug removed
+      }
+      if (iterations === 1) {
+        console.log(`🤖 🔍 MCTS Loop Debug - Starting iteration 1 (SECOND ITERATION)`);
+        console.log(`🤖   - Root node state: children=${rootNode.children.length}, untriedMoves=${rootNode.untriedMoves ? rootNode.untriedMoves.length : 'null'}`);
+      }
+      
       const leaf = this.selectLeaf(rootNode);
+      if (iterations === 0 || iterations === 1) {
+        console.log(`🤖   - selectLeaf returned leaf:`, leaf ? 'node' : 'null');
+        if (iterations === 1) {
+          console.log(`🤖   - leaf details: hasGameState=${!!leaf.gameState}, hasMove=${!!leaf.move}, isRoot=${leaf === rootNode}`);
+        }
+      }
+      
       const child = this.expandNode(leaf);
-      const result = this.simulate(child || leaf);
-      this.backpropagate(child || leaf, result);
+      if (iterations === 0 || iterations === 1) {
+        console.log(`🤖   - expandNode returned child:`, child ? 'node' : 'null');
+        console.log(`🤖   - leaf.untriedMoves.length after expand:`, leaf.untriedMoves ? leaf.untriedMoves.length : 'null');
+        if (iterations === 1 && child) {
+          console.log(`🤖   - child details: hasGameState=${!!child.gameState}, hasMove=${!!child.move}`);
+        }
+      }
+      
+      const nodeForSimulation = child || leaf;
+      if (iterations === 0 || iterations === 1) {
+        console.log(`🤖   - using node for simulation:`, nodeForSimulation === child ? 'child' : 'leaf');
+      }
+      
+      if (iterations === 0 || iterations === 1) {
+        console.log(`🤖   - about to simulate node with state:`, nodeForSimulation.gameState ? 'has-state' : 'no-state');
+      }
+      
+      let result;
+      try {
+        if (iterations === 0 || iterations === 1) {
+          console.log(`🤖   - 🔥 CALLING simulate() now... (iteration ${iterations})`);
+        }
+        result = this.simulate(nodeForSimulation);
+        if (iterations === 0 || iterations === 1) {
+          console.log(`🤖   - 🔥 simulate() RETURNED successfully:`, result, typeof result);
+          console.log(`🤖   - 🔥 result is valid number:`, !isNaN(result));
+          console.log(`🤖   - 🔥 about to call backpropagate with node and result`);
+        }
+      } catch (error) {
+        console.error(`🤖 💥 ERROR calling simulate in MCTS loop (iteration ${iterations}):`, error);
+        console.error('Node for simulation:', nodeForSimulation);
+        console.error('Stack trace:', error.stack);
+        throw error;
+      }
+      
+      try {
+        if (iterations === 0 || iterations === 1) {
+          console.log(`🤖   - 🔥 CALLING backpropagate() now... (iteration ${iterations})`);
+        }
+        this.backpropagate(nodeForSimulation, result);
+        if (iterations === 0 || iterations === 1) {
+          console.log(`🤖   - 🔥 backpropagate() COMPLETED successfully (iteration ${iterations})`);
+        }
+      } catch (error) {
+        console.error(`🤖 💥 ERROR calling backpropagate in MCTS loop (iteration ${iterations}):`, error);
+        console.error('Stack trace:', error.stack);
+        throw error;
+      }
+      
+      if (iterations === 0) {
+        console.log(`🤖   - 🔥 BACKPROPAGATE FINISHED - about to increment iterations from ${iterations}`);
+        console.log(`🤖   - 🔥 CRITICAL CHECKPOINT: Before increment, iterations=${iterations}`);
+      }
+      
       iterations++;
       
-      // Update progress and yield control periodically
-      if (iterations % 50 === 0) {
+      if (iterations === 1) {
+        console.log(`🤖   - 🔥 ITERATION INCREMENTED SUCCESSFULLY! New value: ${iterations}`);
+      }
+      
+      if (iterations === 1) {
+        console.log(`🤖 ✅ FIRST ITERATION COMPLETED! iterations=${iterations}`);
+        console.log(`🤖   - checking while condition: ${iterations} < ${maxIterations} = ${iterations < maxIterations}`);
+        console.log(`🤖   - root node children count:`, rootNode.children.length);
+        console.log(`🤖   - about to continue to iteration 2...`);
+        console.log(`🤖   - 🔥 CRITICAL: Loop should continue now!`);
+      }
+      
+      // Add debugging for second iteration
+      if (iterations === 2) {
+        console.log(`🤖 ✅ SECOND ITERATION COMPLETED! iterations=${iterations}`);
+      }
+      
+      if (iterations === 1 || iterations === 2 || iterations % 100 === 0) {
+        console.log(`🤖 MCTS Progress: ${iterations}/${maxIterations} iterations (${Math.round((iterations / maxIterations) * 100)}%)`);
         // Update thinking indicator with progress
-        if (hud) {
-          const progress = Math.round((iterations / maxIterations) * 100);
-          hud.textContent = `🤖 AI thinking deeply... ${progress}% (${iterations}/${maxIterations} iterations)`;
+        try {
+          const hudElement = document.getElementById('hud');
+          if (hudElement) {
+            const progress = Math.round((iterations / maxIterations) * 100);
+            hudElement.textContent = `🤖 AI thinking deeply... ${progress}% (${iterations}/${maxIterations} iterations)`;
+          }
+        } catch (hudError) {
+          // Ignore HUD update errors - they shouldn't break MCTS
+          console.warn('🤖 HUD update failed:', hudError.message);
         }
-        await new Promise(resolve => setTimeout(resolve, 0));
+        
+        // Only yield for every 100 iterations to avoid overhead
+        if (iterations % 100 === 0 && iterations > 0) {
+          // Use setTimeout without await to avoid blocking
+          setTimeout(() => {}, 1); // Brief yield to prevent browser freeze
+        }
       }
     } catch (error) {
-      console.warn(`🤖 Error in MCTS iteration ${iterations}:`, error);
+      console.error(`🤖 💥 CRITICAL ERROR in MCTS iteration ${iterations}:`, error);
+      console.error('🤖 💥 Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      console.error(`🤖 💥 MCTS state: iterations=${iterations}, maxIterations=${maxIterations}`);
+      console.error(`🤖 💥 Root node children: ${rootNode.children.length}`);
+      console.error(`🤖 💥 This error will cause MCTS to exit with 0 iterations!`);
+      console.error(`🤖 💥 Breaking MCTS loop due to error`);
+      console.error(`🤖 💥 FULL ERROR OBJECT:`, JSON.stringify(error, Object.getOwnPropertyNames(error)));
       break;
     }
   }
+  
+  console.log(`🤖 🔥 MCTS WHILE LOOP COMPLETED - Final iterations: ${iterations}`)
+  
+  console.log(`🤖 🏁 MCTS LOOP EXITED: iterations=${iterations}, maxIterations=${maxIterations}, reason=${iterations >= maxIterations ? 'completed' : 'error/break'}`)
   
   const elapsed = Date.now() - startTime;
   console.log(`🤖 MCTS completed ALL ${iterations} iterations in ${elapsed}ms (${(elapsed/1000).toFixed(1)}s). Root has ${rootNode.children.length} children.`);
@@ -247,7 +401,9 @@ window.AIEngine.findBestMove = async function() {
     const queenBonus = this.getQueenFocusBonus(child.move); // NEW: Direct Queen evaluation
     
     // Queen-focused scoring: Queen priority (40%) + win rate (30%) + visits (20%) + strategic (10%)
-    const score = queenBonus * 0.4 + winRate * 0.3 + (visits / iterations) * 0.2 + strategicBonus * 0.1;
+    // Fix division by zero when iterations = 0
+    const visitsRatio = iterations > 0 ? (visits / iterations) : 0;
+    const score = queenBonus * 0.4 + winRate * 0.3 + visitsRatio * 0.2 + strategicBonus * 0.1;
     
     const queenThreatInfo = this.analyzeQueenThreats(child.move);
     console.log(`🤖 Move ${child.move.type} ${child.move.piece?.meta?.key || '?'} to ${child.move.q},${child.move.r}: ${visits} visits, ${(winRate*100).toFixed(1)}% win rate, priority: ${child.move.priority || 'normal'}, queenBonus: ${queenBonus.toFixed(2)}, threats: ${queenThreatInfo}, TOTAL: ${score.toFixed(3)}`);
@@ -299,6 +455,7 @@ window.AIEngine.expandNode = function(node) {
   if (node.isTerminal()) return null;
   
   if (node.untriedMoves === null) {
+    // FIX: Use correct single-parameter call for generateLegalMoves!
     node.untriedMoves = this.generateLegalMoves(node.gameState);
   }
   
@@ -316,35 +473,141 @@ window.AIEngine.expandNode = function(node) {
  * MCTS Simulation phase - random playout with heuristics
  */
 window.AIEngine.simulate = function(node) {
-  let currentState = JSON.parse(JSON.stringify(node.gameState));
-  let depth = 0;
-  
-  while (!this.isGameOver(currentState) && depth < this.simulationDepth) {
-    const moves = this.generateLegalMoves(currentState);
-    if (moves.length === 0) break;
+  try {
+    let currentState = JSON.parse(JSON.stringify(node.gameState));
+    let depth = 0;
     
-    // Use weighted selection for better simulation quality
-    const move = this.selectSimulationMove(moves, currentState);
-    currentState = this.applyMoveToState(currentState, move);
+    // Ensure currentPlayer is properly set
+    if (!currentState.currentPlayer) {
+      console.error('🤖 ❌ SIMULATE: currentPlayer is undefined at start!');
+      currentState.currentPlayer = this.color === 'black' ? 'white' : 'black';
+    }
+    
+  while (!this.isGameOver(currentState) && depth < this.simulationDepth) {
+    let moves;
+    try {
+      // Validate currentPlayer before calling generateLegalMoves
+      if (!currentState.currentPlayer) {
+        console.error(`🤖 ❌ SIMULATE: currentPlayer undefined at depth ${depth}!`);
+        break;
+      }
+      
+      // Generate legal moves for simulation
+      moves = this.generateLegalMoves(currentState);
+    } catch (error) {
+      console.error(`🤖 💥 ERROR in generateLegalMoves during simulation at depth ${depth}:`, error);
+      console.error('Simulation state:', currentState);
+      throw error;
+    }
+    if (moves.length === 0) {
+      break; // No moves available
+    }      
+    
+    try {
+      // Use weighted selection for better simulation quality
+      const move = this.selectSimulationMove(moves, currentState);
+      currentState = this.applyMoveToState(currentState, move);
+    } catch (error) {
+      console.error(`🤖 💥 ERROR in selectSimulationMove or applyMoveToState at depth ${depth}:`, error);
+      console.error('Move that caused error:', move);
+      console.error('State before error:', currentState);
+      throw error;
+    }
+    
+    // Validate that currentPlayer was updated properly
+    if (!currentState.currentPlayer) {
+      console.error(`🤖 ❌ SIMULATE: applyMoveToState failed to set currentPlayer at depth ${depth}!`);
+      break;
+    }
+    
     depth++;
+    
+    if (depth >= this.simulationDepth) {
+      // Simulation depth limit reached
+    }
   }
-  
-  return this.evaluatePosition(currentState);
+    
+    // Evaluate final simulation position
+    try {
+      const result = this.evaluatePosition(currentState);
+      return result;
+    } catch (error) {
+      console.error(`🤖 💥 ERROR in simulation evaluation:`, error);
+      throw error;
+    }
+  } catch (error) {
+    console.error(`🤖 💥 SIMULATE ERROR:`, error);
+    console.error('Node gameState:', node.gameState);
+    console.error('Stack trace:', error.stack);
+    throw error; // Re-throw so MCTS loop catches it
+  }
 };
 
 /**
  * MCTS Backpropagation phase
  */
 window.AIEngine.backpropagate = function(node, result) {
-  while (node !== null) {
-    node.visits++;
-    // Result is from current player's perspective
-    if (node.gameState.currentPlayer === this.color) {
-      node.wins += result;
-    } else {
-      node.wins += (1 - result);
+  try {
+    // Backpropagation with minimal logging
+    
+    if (isNaN(result)) {
+      console.error(`🤖 💥 BACKPROPAGATE ERROR: result is NaN!`);
+      return;
     }
-    node = node.parent;
+    
+    let currentNode = node;
+    let depth = 0;
+    
+    while (currentNode !== null) {
+      // Update visit count
+      currentNode.visits++;
+      
+      // Safely check currentPlayer
+      const nodePlayer = currentNode.gameState && currentNode.gameState.currentPlayer;
+      // Determine node player perspective
+      
+      if (!nodePlayer) {
+        console.error(`🤖 💥 BACKPROPAGATE ERROR: No currentPlayer at depth ${depth}`);
+        // Use parent's currentPlayer if available, or default to opponent
+        const parentPlayer = currentNode.parent && currentNode.parent.gameState && currentNode.parent.gameState.currentPlayer;
+        const assumedPlayer = parentPlayer === this.color ? (this.color === 'white' ? 'black' : 'white') : this.color;
+        // Using fallback player assignment
+        
+        if (assumedPlayer === this.color) {
+          currentNode.wins += result;
+        } else {
+          currentNode.wins += (1 - result);
+        }
+      } else {
+        // Normal case - player is known
+        if (nodePlayer === this.color) {
+          // AI player node
+          currentNode.wins += result;
+        } else {
+          // Opponent player node
+          currentNode.wins += (1 - result);
+        }
+      }
+      
+      // Node updated
+      
+      currentNode = currentNode.parent;
+      depth++;
+      
+      if (depth > 50) { // Safety limit
+        console.error(`🤖 💥 BACKPROPAGATE ERROR: Infinite loop detected at depth ${depth}`);
+        break;
+      }
+    }
+    
+    // Backpropagation completed
+    
+  } catch (error) {
+    console.error(`🤖 💥 CRITICAL BACKPROPAGATE ERROR:`, error);
+    console.error('Node:', node);
+    console.error('Result:', result);
+    console.error('Stack trace:', error.stack);
+    throw error; // Re-throw so MCTS loop can handle it properly
   }
 };
 
@@ -724,8 +987,8 @@ window.AIEngine.generateOpeningMoves = function(currentColor, myTurnNumber, avai
           ) : null;
           
           if (!existingPiece) {
-            const centerDistance = Math.abs(nq) + Math.abs(nr);
-            let priority = centerDistance <= 1 ? 'opening-center' : 'opening-side';
+            // Adjacent moves are good in Hive (no center concept)
+            let priority = 'opening-adjacent';
             
             // Medium+ difficulty considers positional factors
             if (difficulty !== 'easy') {
@@ -845,6 +1108,9 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
   for (const zone of zones) {
     const [q, r] = zone.split(',').map(Number);
     
+    // Calculate distance from origin for some legacy strategic calculations (gradually removing)
+    const centerDistance = Math.abs(q) + Math.abs(r);
+    
     // CRITICAL: Validate position is actually empty
     const existingPiece = typeof tray !== 'undefined' ? tray.find(p => 
       p.meta && p.meta.placed && p.meta.q === q && p.meta.r === r
@@ -867,9 +1133,7 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
     let priority = 'normal';
     let strategicValue = 0;
     
-    // Center control bonus
-    const centerDistance = Math.abs(q) + Math.abs(r);
-    strategicValue += Math.max(0, 3 - centerDistance) * 0.2;
+    // Queen-focused Hive strategy (no center control concept in Hive)
     
     // Difficulty-specific strategic adjustments
     let strategyMultiplier = 1.0;
@@ -892,7 +1156,7 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
           strategicValue += escapeRoutes * 0.2;
         }
         
-        if (centerDistance <= 2 && protection >= 1) {
+        if (protection >= 1) {
           priority = 'queen-safe';
         }
         break;
@@ -908,7 +1172,7 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
           strategicValue += controlPotential * 0.15;
         }
         
-        if (isOpening && centerDistance <= 1) {
+        if (isOpening) {
           priority = 'ant-opening';
         }
         break;
@@ -943,10 +1207,9 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
         
       case 'S':
         // Spider - prefer flexible positions
-        if (centerDistance <= 2) {
-          strategicValue += 0.2 * strategyMultiplier;
-          priority = 'spider-flexible';
-        }
+        // Spider positioning is flexible regardless of distance from origin
+        strategicValue += 0.1 * strategyMultiplier;
+        priority = 'spider-flexible';
         
         if (difficulty !== 'easy') {
           // Medium+ considers 3-step positioning
@@ -956,12 +1219,24 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
         break;
     }
     
-    // Threat opponent queen if possible
+    // 🎯 AGGRESSIVE QUEEN HUNTING - Ants are deadly assassins!
     if (oppQueen) {
       const queenDistance = Math.abs(q - oppQueen.meta.q) + Math.abs(r - oppQueen.meta.r);
       if (queenDistance <= 2) {
-        strategicValue += 0.3;
-        priority = 'threaten-queen';
+        // MASSIVE bonuses for Queen threatening based on piece type
+        if (piece.meta.key === 'A') {
+          strategicValue += 2.0; // ANT ASSASSIN BONUS - huge threat!
+          priority = 'ant-assassin';
+        } else if (piece.meta.key === 'G') {
+          strategicValue += 1.5; // Grasshopper jump attack
+          priority = 'grasshopper-hunter';
+        } else if (piece.meta.key === 'S') {
+          strategicValue += 1.2; // Spider positioning attack
+          priority = 'spider-hunter';
+        } else {
+          strategicValue += 0.8; // Other pieces still good
+          priority = 'threaten-queen';
+        }
       }
     }
     
@@ -1070,11 +1345,23 @@ window.AIEngine.countAllAdjacentPieces = function(pos, allPlacedPieces) {
 };
 
 window.AIEngine.countEmptyNeighbors = function(pos, allPlacedPieces) {
-  const neighbors = this.getNeighborCoords(pos.q, pos.r);
+  // Handle both piece objects (with meta.q/r) and position objects (with q/r)
+  const q = pos.q || (pos.meta && pos.meta.q) || 0;
+  const r = pos.r || (pos.meta && pos.meta.r) || 0;
+  const neighbors = this.getNeighborCoords(q, r);
   let count = 0;
   
   for (const [nq, nr] of neighbors) {
-    const occupied = allPlacedPieces.some(p => p.meta.q === nq && p.meta.r === nr);
+    const occupied = allPlacedPieces.some(p => {
+      if (!p) return false;
+      if (p.meta && typeof p.meta.q === 'number' && typeof p.meta.r === 'number') {
+        return p.meta.q === nq && p.meta.r === nr;
+      }
+      if (typeof p.q === 'number' && typeof p.r === 'number') {
+        return p.q === nq && p.r === nr;
+      }
+      return false;
+    });
     if (!occupied) count++;
   }
   
@@ -1088,14 +1375,27 @@ window.AIEngine.countPotentialJumps = function(pos, allPlacedPieces) {
   
   let jumps = 0;
   
+  // Handle both piece objects (with meta.q/r) and position objects (with q/r)
+  const baseQ = pos.q || (pos.meta && pos.meta.q) || 0;
+  const baseR = pos.r || (pos.meta && pos.meta.r) || 0;
+  
   for (const [dq, dr] of directions) {
-    let checkQ = pos.q + dq;
-    let checkR = pos.r + dr;
+    let checkQ = baseQ + dq;
+    let checkR = baseR + dr;
     let foundPiece = false;
     
     // Look for a piece to jump over
     while (Math.abs(checkQ) + Math.abs(checkR) <= 4) {
-      const hasPiece = allPlacedPieces.some(p => p.meta.q === checkQ && p.meta.r === checkR);
+      const hasPiece = allPlacedPieces.some(p => {
+        if (!p) return false;
+        if (p.meta && typeof p.meta.q === 'number' && typeof p.meta.r === 'number') {
+          return p.meta.q === checkQ && p.meta.r === checkR;
+        }
+        if (typeof p.q === 'number' && typeof p.r === 'number') {
+          return p.q === checkQ && p.r === checkR;
+        }
+        return false;
+      });
       
       if (hasPiece && !foundPiece) {
         foundPiece = true;
@@ -1113,49 +1413,75 @@ window.AIEngine.countPotentialJumps = function(pos, allPlacedPieces) {
 };
 
 /**
- * Get strategic bonus for move prioritization
+ * Get strategic bonus for move prioritization - MASSIVELY ENHANCED FOR STRATEGIC PLAY
  */
 window.AIEngine.getStrategicMoveBonus = function(move) {
   if (!move || !move.priority) return 0;
   
-  // MASSIVELY enhanced Queen-focused priorities
+  const difficulty = this.difficulty;
+  let strategicMultiplier = 1.0;
+  if (difficulty === 'medium') strategicMultiplier = 1.8;
+  else if (difficulty === 'hard') strategicMultiplier = 2.5; // Much more strategic focus
+  
+  // DRAMATICALLY enhanced Queen-focused priorities
   const priorityValues = {
-    'queen-placement': 1.0,     // Must place Queen
-    'forced-queen': 0.95,       // Emergency Queen placement
-    'threaten-queen': 0.9,      // ATTACK opponent Queen
-    'defend-queen': 0.85,       // DEFEND our Queen
-    'surround-queen': 0.8,      // Close to winning
-    'escape-queen': 0.75,       // Save our Queen from danger
-    'opening-first': 0.7,
-    'opening-center': 0.6,
-    'queen-safe': 0.8,
-    'beetle-aggressive': 0.5,
-    'ant-opening': 0.4,
-    'spider-flexible': 0.3,
-    'high-value': 0.7,
-    'medium-value': 0.4,
-    'low-value': 0.1,
-    'opening-side': 0.2,
-    'normal': 0.0
+    'winning-move': 10.0,       // SURROUND opponent Queen - INSTANT WIN!
+    'queen-kill': 8.0,          // Almost surround opponent Queen
+    'threaten-queen': 5.0,      // ATTACK opponent Queen aggressively
+    'defend-queen': 4.5,        // DEFEND our Queen from danger
+    'surround-queen': 4.0,      // Building attack on opponent Queen
+    'escape-queen': 3.5,        // Save our Queen from immediate danger
+    'queen-placement': 3.0,     // Must place Queen (turn 4 rule)
+    'forced-queen': 2.8,        // Emergency Queen placement
+    'queen-safe': 2.5,          // Position Queen safely
+    'opening-excellent': 2.0,   // Excellent opening move
+    'opening-good': 1.5,        // Good opening move
+    'opening-first': 1.8,       // First move advantage
+    'opening-adjacent': 1.4,    // Adjacent to opponent pieces
+    'high-value': 1.2,          // High-value tactical move
+    'beetle-aggressive': 1.0,   // Beetle climbing tactics
+    'spider-flexible': 0.8,     // Spider positioning
+    'ant-opening': 0.7,         // Ant early placement
+    'medium-value': 0.6,        // Medium tactical value
+    'opening-side': 0.4,        // Side development
+    'low-value': 0.2,           // Low priority move
+    'normal': 0.0               // Default priority
   };
   
-  let bonus = priorityValues[move.priority] || 0;
+  let bonus = (priorityValues[move.priority] || 0) * strategicMultiplier;
   
-  // EXTRA bonuses for Queen-related moves
+  // MASSIVE extra bonuses for Queen-related moves
   if (move.piece && move.piece.meta && move.piece.meta.key === 'Q') {
-    bonus += 0.2; // Any Queen move gets extra priority
+    bonus += 1.0 * strategicMultiplier; // Any Queen move gets major priority
+    console.log(`🤖 👑 QUEEN MOVE BONUS: +${(1.0 * strategicMultiplier).toFixed(2)}`);
   }
   
-  // Bonus for moves that affect areas near Queens
+  // HUGE bonuses for moves that affect areas near Queens  
   if (move.targetingQueen) {
-    bonus += 0.3; // Moves targeting opponent Queen area
+    bonus += 2.0 * strategicMultiplier; // Moves targeting opponent Queen area
+    console.log(`🤖 ⚔️ TARGETING QUEEN BONUS: +${(2.0 * strategicMultiplier).toFixed(2)}`);
   }
   
   if (move.protectingQueen) {
-    bonus += 0.25; // Moves protecting our Queen area
+    bonus += 1.5 * strategicMultiplier; // Moves protecting our Queen area
+    console.log(`🤖 🛡️ PROTECTING QUEEN BONUS: +${(1.5 * strategicMultiplier).toFixed(2)}`);
   }
   
-  return Math.min(1.0, bonus); // Cap at 1.0
+  // Bonus for moves that improve overall position
+  if (move.centralControl) {
+    bonus += 0.5 * strategicMultiplier; // Central positioning
+  }
+  
+  if (move.connectivityBonus) {
+    bonus += 0.3 * strategicMultiplier; // Maintaining hive connectivity
+  }
+  
+  // Penalty for passive moves when aggressive play is needed
+  if (difficulty === 'hard' && bonus < 0.5) {
+    bonus *= 0.5; // Reduce bonus for non-strategic moves on hard difficulty
+  }
+  
+  return Math.max(0, Math.min(10.0, bonus)); // Cap at 10.0 for extreme moves
 };
 
 /**
@@ -1203,9 +1529,11 @@ window.AIEngine.calculateMoveScore = function(move) {
     score += move.strategicValue;
   }
   
-  // Position-based bonuses
-  const centerDistance = Math.abs(move.q) + Math.abs(move.r);
-  score += Math.max(0, 3 - centerDistance) * 0.1; // Center preference
+  // CRITICAL: Massive penalty for moves that help surround own Queen
+  const gameState = window.gameState || this.getCurrentGameState();
+  if (gameState && this.wouldHelpSurroundOwnQueen(gameState, move, this.color)) {
+    score -= 100.0; // NEVER surround own Queen!
+  }
   
   // Piece-specific bonuses
   if (move.piece && move.piece.meta) {
@@ -1672,6 +2000,9 @@ window.AIEngine.applyMoveToState = function(gameState, move) {
  * Enhanced position evaluation using advanced Hive-specific heuristics
  */
 window.AIEngine.evaluatePosition = function(gameState) {
+  // Evaluation logging completely disabled to avoid spam
+  const shouldLog = false; // DISABLED - no evaluation logs during search
+  
   // Check for immediate win/loss conditions
   const whiteQueenSurrounded = this.isQueenSurrounded(gameState, 'white');
   const blackQueenSurrounded = this.isQueenSurrounded(gameState, 'black');
@@ -1686,58 +2017,88 @@ window.AIEngine.evaluatePosition = function(gameState) {
   let score = 0.5; // Neutral baseline
   const oppColor = this.color === 'white' ? 'black' : 'white';
   
-  // Get difficulty for evaluation weights
-  // Enhanced evaluation weights with heavy Queen focus
+  // Get difficulty for evaluation weights - MUCH MORE STRATEGIC
   const difficulty = window.AIEngine.difficulty;
   let evaluationDepth = 1.0;
-  if (difficulty === 'medium') evaluationDepth = 1.5;
-  else if (difficulty === 'hard') evaluationDepth = 2.0;
+  let strategicMultiplier = 1.0;
   
-  // 1. Queen safety evaluation (CRITICAL PRIORITY - 50% weight)
+  if (difficulty === 'medium') {
+    evaluationDepth = 2.0;
+    strategicMultiplier = 1.5;
+  } else if (difficulty === 'hard') {
+    evaluationDepth = 3.0;  // Much deeper analysis
+    strategicMultiplier = 2.5; // Much more strategic focus
+  }
+  
+  // 1. Queen safety evaluation (MASSIVELY INCREASED - 70% weight for hard difficulty)
   const aiQueenThreats = this.countQueenThreats(gameState, this.color);
   const oppQueenThreats = this.countQueenThreats(gameState, oppColor);
   const queenDangerDiff = this.evaluateQueenDanger(gameState, this.color, oppColor);
   
-  // MASSIVE penalty for AI Queen in danger, HUGE bonus for threatening opponent Queen
+  if (shouldLog) {
+    console.log(`🤖 � STRATEGIC: AI Queen threats: ${aiQueenThreats}, Opponent: ${oppQueenThreats}`);
+  }
+  
+  // EXPONENTIALLY INCREASED penalties/bonuses for Queen safety
   let queenScore = 0;
   
-  // Defensive Queen safety (protect our Queen)
+  // Defensive Queen safety (protect our Queen) - MUCH MORE AGGRESSIVE
   if (aiQueenThreats >= 5) {
-    queenScore -= 0.8; // Emergency: Queen almost surrounded
+    queenScore -= 1.5 * strategicMultiplier; // CRITICAL: Queen almost surrounded
   } else if (aiQueenThreats >= 4) {
-    queenScore -= 0.4; // High danger: Queen needs protection
+    queenScore -= 0.8 * strategicMultiplier; // DANGEROUS: Queen needs immediate protection
   } else if (aiQueenThreats >= 3) {
-    queenScore -= 0.2; // Moderate danger: Be careful
+    queenScore -= 0.4 * strategicMultiplier; // ALERT: Be very careful
+  } else if (aiQueenThreats >= 2) {
+    queenScore -= 0.1 * strategicMultiplier; // CAUTION: Monitor situation
   }
   
-  // Offensive Queen targeting (attack opponent Queen)
+  // Offensive Queen targeting (attack opponent Queen) - MUCH MORE AGGRESSIVE
   if (oppQueenThreats >= 5) {
-    queenScore += 0.9; // WIN: Opponent Queen almost surrounded
+    queenScore += 2.0 * strategicMultiplier; // WINNING: Opponent Queen almost surrounded!
   } else if (oppQueenThreats >= 4) {
-    queenScore += 0.5; // Excellent: Close to winning
+    queenScore += 1.2 * strategicMultiplier; // EXCELLENT: Very close to winning
   } else if (oppQueenThreats >= 3) {
-    queenScore += 0.3; // Good: Building pressure
+    queenScore += 0.7 * strategicMultiplier; // GOOD: Strong pressure
   } else if (oppQueenThreats >= 2) {
-    queenScore += 0.1; // OK: Some pressure
+    queenScore += 0.3 * strategicMultiplier; // DECENT: Building attack
+  } else if (oppQueenThreats >= 1) {
+    queenScore += 0.1 * strategicMultiplier; // PROGRESS: Starting pressure
   }
   
-  score += queenScore + queenDangerDiff * 0.3 * evaluationDepth;
+  score += queenScore + queenDangerDiff * 0.5 * evaluationDepth;
   
-  // 2. Material value and piece positioning (20% weight)
+  // 2. Material value and piece positioning (INCREASED to 35% weight for strategic play)
   const materialDiff = this.evaluateMaterial(gameState, this.color, oppColor);
-  score += materialDiff * 0.20;
+  score += materialDiff * (0.35 * strategicMultiplier);
   
-  // 3. Control and mobility (20% weight)
-  const controlDiff = this.evaluateControl(gameState, this.color, oppColor);
-  score += controlDiff * 0.2 * evaluationDepth;
+  // 3. Control and mobility (INCREASED to 30% weight - positional understanding)
+  try {
+    const controlDiff = this.evaluateControl(gameState, this.color, oppColor);
+    score += controlDiff * (0.3 * strategicMultiplier * evaluationDepth);
+  } catch (error) {
+    console.error(`🤖 💥 CRITICAL ERROR in evaluateControl:`, error);
+    throw error;
+  }
   
-  // 4. Tactical patterns and threats (10% weight)
-  const tacticalDiff = this.evaluateTacticalPatterns(gameState, this.color, oppColor);
-  score += tacticalDiff * 0.1 * evaluationDepth;
+  // 4. Tactical patterns and threats (INCREASED to 25% weight - pattern recognition)
+  try {
+    const tacticalDiff = this.evaluateTacticalPatterns(gameState, this.color, oppColor);
+    score += tacticalDiff * (0.25 * strategicMultiplier * evaluationDepth);
+  } catch (error) {
+    console.error(`🤖 💥 CRITICAL ERROR in evaluateTacticalPatterns:`, error);
+    throw error;
+  }
   
   // 5. Endgame factors (5% weight)
-  const endgameDiff = this.evaluateEndgame(gameState, this.color, oppColor);
-  score += endgameDiff * 0.05;
+  try {
+    const endgameDiff = this.evaluateEndgame(gameState, this.color, oppColor);
+    score += endgameDiff * 0.05;
+  } catch (error) {
+    console.error(`🤖 💥 CRITICAL ERROR in evaluateEndgame:`, error);
+    console.error('Stack trace:', error.stack);
+    throw error;
+  }
   
   // Medium+ difficulty adds advanced pattern recognition
   if (difficulty !== 'easy') {
@@ -1790,6 +2151,42 @@ window.AIEngine.countQueenThreats = function(gameState, color) {
   }
   
   return threatCount;
+};
+
+/**
+ * CRITICAL: Check if a move would help surround our own Queen (NEVER DO THIS!)
+ */
+window.AIEngine.wouldHelpSurroundOwnQueen = function(gameState, move, aiColor) {
+  if (move.type !== 'place') return false;
+  
+  const aiQueen = gameState.tray.find(p => 
+    p.color === aiColor && p.key === 'Q' && p.placed
+  );
+  if (!aiQueen) return false; // No Queen placed yet
+  
+  // Check if the move position is adjacent to our Queen
+  const neighbors = this.getNeighborCoords(aiQueen.q, aiQueen.r);
+  const isAdjacentToOwnQueen = neighbors.some(([nq, nr]) => 
+    nq === move.q && nr === move.r
+  );
+  
+  if (isAdjacentToOwnQueen) {
+    // Count how many spaces around our Queen would be occupied after this move
+    let threatsAfterMove = 0;
+    for (const [nq, nr] of neighbors) {
+      const occupied = gameState.tray.some(p => 
+        p.placed && p.q === nq && p.r === nr
+      ) || (nq === move.q && nr === move.r); // Include the planned move
+      if (occupied) threatsAfterMove++;
+    }
+    
+    // If this move would put us close to losing (5+ threats), it's terrible
+    if (threatsAfterMove >= 4) {
+      return true; // DANGEROUS: helping surround own Queen!
+    }
+  }
+  
+  return false;
 };
 
 /**
@@ -2028,7 +2425,8 @@ window.AIEngine.captureGameState = function() {
     currentPlayer: window.state ? window.state.current : 'white',
     moveNumber: window.state ? (window.state.moveNumber || 0) : 0,
     tray: cleanTray,
-    gameOver: window.state ? (window.state.gameOver || false) : false
+    gameOver: window.state ? (window.state.gameOver || false) : false,
+    isSimulation: false  // Root game state is never a simulation
   };
 };
 
@@ -2049,10 +2447,32 @@ window.AIEngine.enable = function(difficulty = 'medium') {
   this.difficulty = difficulty;
   this.color = 'black'; // AI always plays black
   
-  console.log(`🤖 AI enabled as ${this.color} player (${difficulty} difficulty)`);
+  console.log(`🤖 ⭐ AI ENABLED as ${this.color} player (${difficulty} difficulty)`);
+  console.log(`🤖 ⭐ AI will make moves when it's BLACK's turn!`);
   
   // Hook into the game's turn system
   this.hookIntoGame();
+};
+
+/**
+ * TESTING: Force-enable AI for debugging (call from console)
+ */
+window.AIEngine.forceEnable = function(difficulty = 'hard') {
+  console.log(`🤖 🔧 FORCE-ENABLING AI for testing (${difficulty} difficulty)`);
+  this.enable(difficulty);
+  
+  // Reset game to white's turn so AI can play
+  if (window.state) {
+    window.state.current = 'white';
+    window.state.moveNumber = 1;
+    window.state.gameOver = false;
+  }
+  
+  console.log(`🤖 🔧 Game reset - make a WHITE move and AI will respond as BLACK`);
+  
+  if (typeof updateHUD === 'function') {
+    updateHUD();
+  }
 };
 
 /**
@@ -2180,204 +2600,411 @@ window.AIEngine.countPotentialQueenThreats = function(gameState, color, targetQu
  * Evaluate material value and piece positioning
  */
 window.AIEngine.evaluateMaterial = function(gameState, aiColor, oppColor) {
-  const aiPieces = gameState.tray.filter(p => p.color === aiColor && p.placed);
-  const oppPieces = gameState.tray.filter(p => p.color === oppColor && p.placed);
-  
-  const pieceValues = { 'Q': 0, 'A': 3, 'G': 2.5, 'S': 2, 'B': 3.5 };
-  
-  let aiValue = 0, oppValue = 0;
-  
-  // Calculate piece values with positional bonuses
-  for (const piece of aiPieces) {
-    let value = pieceValues[piece.key] || 1;
+  try {
+    // Evaluating material balance
     
-    // Positional bonuses
-    const centerDistance = Math.abs(piece.q) + Math.abs(piece.r);
-    value += Math.max(0, 3 - centerDistance) * 0.1; // Center control bonus
-    
-    // Piece-specific bonuses
-    if (piece.key === 'B') {
-      // Beetles are more valuable when stacked or near stacks
-      const isStacked = this.isPositionStacked(gameState, piece.q, piece.r);
-      if (isStacked) value += 0.5;
+    if (!gameState || !gameState.tray) {
+      console.error(`🤖 💥 MATERIAL ERROR: Invalid gameState or tray:`, gameState);
+      return 0;
     }
     
-    aiValue += value;
-  }
-  
-  for (const piece of oppPieces) {
-    let value = pieceValues[piece.key] || 1;
-    const centerDistance = Math.abs(piece.q) + Math.abs(piece.r);
-    value += Math.max(0, 3 - centerDistance) * 0.1;
+    const aiPieces = gameState.tray.filter(p => p.color === aiColor && p.placed);
+    const oppPieces = gameState.tray.filter(p => p.color === oppColor && p.placed);
     
-    if (piece.key === 'B') {
-      const isStacked = this.isPositionStacked(gameState, piece.q, piece.r);
-      if (isStacked) value += 0.5;
+    // Counting pieces for both sides
+    
+    // Hive-specific piece values based on strategic importance and versatility
+    const pieceValues = { 
+      'Q': 0,    // Queen: Target, not material value
+      'A': 4.0,  // Ant: Most valuable - can reach any position around hive
+      'B': 3.5,  // Beetle: Very valuable - can stack, pin, and reach surrounded spaces
+      'G': 2.5,  // Grasshopper: Good - can jump into surrounded spaces  
+      'S': 2.0   // Spider: Limited but precise - exactly 3 moves
+    };
+    
+    let aiValue = 0, oppValue = 0;
+    
+    // Calculate piece values with positional bonuses
+    for (const piece of aiPieces) {
+      try {
+        if (!piece || typeof piece.key !== 'string') {
+          console.error(`🤖 💥 MATERIAL ERROR: Invalid AI piece:`, piece);
+          continue;
+        }
+        
+        if (typeof piece.q !== 'number' || typeof piece.r !== 'number') {
+          console.error(`🤖 💥 MATERIAL ERROR: Invalid AI piece coordinates:`, piece);
+          continue;
+        }
+        
+        let value = pieceValues[piece.key] || 1;
+        
+        // Hive-specific positional bonuses (not chess-like center control)
+        // Focus on Queen safety and strategic positioning instead of arbitrary center
+        
+        // Piece-specific bonuses
+        if (piece.key === 'B') {
+          // Beetles are more valuable when stacked or near stacks
+          const isStacked = this.isPositionStacked(gameState, piece.q, piece.r);
+          if (isStacked) value += 0.5;
+        }
+        
+        if (isNaN(value)) {
+          console.error(`🤖 💥 MATERIAL ERROR: NaN value for AI piece:`, piece);
+          continue;
+        }
+        
+        aiValue += value;
+      } catch (error) {
+        console.error(`🤖 💥 MATERIAL ERROR: Exception processing AI piece:`, piece, error);
+        continue;
+      }
     }
     
-    oppValue += value;
+    for (const piece of oppPieces) {
+      try {
+        if (!piece || typeof piece.key !== 'string') {
+          console.error(`🤖 💥 MATERIAL ERROR: Invalid opponent piece:`, piece);
+          continue;
+        }
+        
+        if (typeof piece.q !== 'number' || typeof piece.r !== 'number') {
+          console.error(`🤖 💥 MATERIAL ERROR: Invalid opponent piece coordinates:`, piece);
+          continue;
+        }
+        
+        let value = pieceValues[piece.key] || 1;
+        const centerDistance = Math.abs(piece.q) + Math.abs(piece.r);
+        if (isNaN(centerDistance)) {
+          console.error(`🤖 💥 MATERIAL ERROR: NaN centerDistance for opponent piece:`, piece);
+          continue;
+        }
+        
+        value += Math.max(0, 3 - centerDistance) * 0.1;
+        
+        if (piece.key === 'B') {
+          const isStacked = this.isPositionStacked(gameState, piece.q, piece.r);
+          if (isStacked) value += 0.5;
+        }
+        
+        if (isNaN(value)) {
+          console.error(`🤖 💥 MATERIAL ERROR: NaN value for opponent piece:`, piece);
+          continue;
+        }
+        
+        oppValue += value;
+      } catch (error) {
+        console.error(`🤖 💥 MATERIAL ERROR: Exception processing opponent piece:`, piece, error);
+        continue;
+      }
+    }
+    
+    if (isNaN(aiValue) || isNaN(oppValue)) {
+      console.error(`🤖 💥 MATERIAL ERROR: NaN final values - aiValue:${aiValue}, oppValue:${oppValue}`);
+      return 0;
+    }
+    
+    const result = (aiValue - oppValue) / 20; // Normalize
+    
+    if (isNaN(result)) {
+      console.error(`🤖 💥 MATERIAL ERROR: NaN result - aiValue:${aiValue}, oppValue:${oppValue}`);
+      return 0;
+    }
+    
+    // Material evaluation completed
+    return result;
+    
+  } catch (error) {
+    console.error(`🤖 💥 MATERIAL ERROR: Exception in evaluateMaterial:`, error);
+    console.error(`🤖 💥 MATERIAL ERROR: Stack trace:`, error.stack);
+    return 0;
   }
-  
-  return (aiValue - oppValue) / 20; // Normalize
 };
 
 /**
  * Check if a position has stacked pieces
  */
 window.AIEngine.isPositionStacked = function(gameState, q, r) {
-  const piecesAtPosition = gameState.tray.filter(p => 
-    p.placed && p.q === q && p.r === r
-  );
-  return piecesAtPosition.length > 1;
+  try {
+    if (!gameState || !gameState.tray || typeof q !== 'number' || typeof r !== 'number') {
+      return false;
+    }
+    
+    const piecesAtPosition = gameState.tray.filter(p => 
+      p.placed && p.q === q && p.r === r
+    );
+    return piecesAtPosition.length > 1;
+  } catch (error) {
+    console.error(`🤖 💥 ERROR in isPositionStacked:`, error);
+    return false;
+  }
 };
 
 /**
  * Evaluate control and mobility
  */
 window.AIEngine.evaluateControl = function(gameState, aiColor, oppColor) {
-  // Territory control - count spaces dominated by each side
-  let aiControl = 0, oppControl = 0;
-  
-  // Check key areas around each piece
-  const aiPieces = gameState.tray.filter(p => p.color === aiColor && p.placed);
-  const oppPieces = gameState.tray.filter(p => p.color === oppColor && p.placed);
-  
-  for (const piece of aiPieces) {
-    const neighbors = this.getNeighborCoords(piece.q, piece.r);
-    for (const [nq, nr] of neighbors) {
-      const isEmpty = !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
-      if (isEmpty) aiControl += 1;
+  try {
+    if (!gameState || !gameState.tray) {
+      console.error(`🤖 💥 CONTROL ERROR: Invalid gameState`);
+      return 0;
     }
-  }
-  
-  for (const piece of oppPieces) {
-    const neighbors = this.getNeighborCoords(piece.q, piece.r);
-    for (const [nq, nr] of neighbors) {
-      const isEmpty = !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
-      if (isEmpty) oppControl += 1;
+    
+    // Territory control - count spaces dominated by each side
+    let aiControl = 0, oppControl = 0;
+    
+    // Check key areas around each piece
+    const aiPieces = gameState.tray.filter(p => p.color === aiColor && p.placed);
+    const oppPieces = gameState.tray.filter(p => p.color === oppColor && p.placed);
+    
+    for (const piece of aiPieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
+      
+      const neighbors = this.getNeighborCoords(piece.q, piece.r);
+      for (const [nq, nr] of neighbors) {
+        const isEmpty = !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
+        if (isEmpty) aiControl += 1;
+      }
     }
+    
+    for (const piece of oppPieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
+      
+      const neighbors = this.getNeighborCoords(piece.q, piece.r);
+      for (const [nq, nr] of neighbors) {
+        const isEmpty = !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
+        if (isEmpty) oppControl += 1;
+      }
+    }
+    
+    // Mobility - actual piece movement options (simplified)
+    const aiMobility = this.countAdvancedMobility(gameState, aiColor);
+    const oppMobility = this.countAdvancedMobility(gameState, oppColor);
+    
+    const controlDiff = (aiControl - oppControl) / 50;
+    const mobilityDiff = (aiMobility - oppMobility) / 20;
+    
+    const result = controlDiff + mobilityDiff;
+    
+    if (isNaN(result)) {
+      console.error(`🤖 💥 CONTROL ERROR: NaN result - controlDiff:${controlDiff}, mobilityDiff:${mobilityDiff}`);
+      return 0;
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error(`🤖 💥 CONTROL ERROR: Exception in evaluateControl:`, error);
+    return 0;
   }
-  
-  // Mobility - actual piece movement options (simplified)
-  const aiMobility = this.countAdvancedMobility(gameState, aiColor);
-  const oppMobility = this.countAdvancedMobility(gameState, oppColor);
-  
-  const controlDiff = (aiControl - oppControl) / 50;
-  const mobilityDiff = (aiMobility - oppMobility) / 20;
-  
-  return controlDiff + mobilityDiff;
 };
 
 /**
  * Count advanced mobility considering piece-specific movement patterns
  */
 window.AIEngine.countAdvancedMobility = function(gameState, color) {
-  const pieces = gameState.tray.filter(p => p.color === color && p.placed);
-  let mobility = 0;
-  
-  for (const piece of pieces) {
-    // Simplified mobility based on piece type and local environment
-    const neighbors = this.getNeighborCoords(piece.q, piece.r);
-    const emptyNeighbors = neighbors.filter(([nq, nr]) => {
-      return !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
-    });
+  try {
+    if (!gameState || !gameState.tray) return 0;
     
-    switch (piece.key) {
-      case 'A': // Ant - high mobility
-        mobility += emptyNeighbors.length * 2;
-        break;
-      case 'G': // Grasshopper - jumping mobility
-        mobility += this.countJumpOptions(gameState, piece) * 1.5;
-        break;
-      case 'S': // Spider - specific 3-step mobility
-        mobility += Math.min(emptyNeighbors.length, 3) * 1.2;
-        break;
-      case 'B': // Beetle - climbing mobility
-        mobility += (emptyNeighbors.length + neighbors.length) * 1.3;
-        break;
-      default:
-        mobility += emptyNeighbors.length;
+    const pieces = gameState.tray.filter(p => p.color === color && p.placed);
+    let mobility = 0;
+    
+    for (const piece of pieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
+      
+      // Simplified mobility based on piece type and local environment
+      const neighbors = this.getNeighborCoords(piece.q, piece.r);
+      const emptyNeighbors = neighbors.filter(([nq, nr]) => {
+        return !gameState.tray.some(p => p.placed && p.q === nq && p.r === nr);
+      });
+      
+      let pieceMobility = 0;
+      
+      switch (piece.key) {
+        case 'A': // Ant - high mobility
+          pieceMobility = emptyNeighbors.length * 2;
+          break;
+        case 'G': // Grasshopper - jumping mobility
+          pieceMobility = this.countJumpOptions(gameState, piece) * 1.5;
+          break;
+        case 'S': // Spider - specific 3-step mobility
+          pieceMobility = Math.min(emptyNeighbors.length, 3) * 1.2;
+          break;
+        case 'B': // Beetle - climbing mobility
+          pieceMobility = (emptyNeighbors.length + neighbors.length) * 1.3;
+          break;
+        default:
+          pieceMobility = emptyNeighbors.length;
+      }
+      
+      if (!isNaN(pieceMobility)) {
+        mobility += pieceMobility;
+      }
     }
+    
+    return mobility;
+  } catch (error) {
+    console.error(`🤖 💥 MOBILITY ERROR: Exception in countAdvancedMobility:`, error);
+    return 0;
   }
-  
-  return mobility;
 };
 
 /**
  * Count jump options for grasshopper
  */
 window.AIEngine.countJumpOptions = function(gameState, piece) {
-  const directions = [
-    [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]
-  ];
-  
-  let jumpOptions = 0;
-  
-  for (const [dq, dr] of directions) {
-    // Look for a piece to jump over
-    let checkQ = piece.q + dq;
-    let checkR = piece.r + dr;
-    
-    let foundPiece = false;
-    while (Math.abs(checkQ) + Math.abs(checkR) <= 5) { // Reasonable search limit
-      const hasPiece = gameState.tray.some(p => 
-        p.placed && p.q === checkQ && p.r === checkR
-      );
-      
-      if (hasPiece && !foundPiece) {
-        foundPiece = true;
-      } else if (!hasPiece && foundPiece) {
-        jumpOptions++;
-        break;
-      }
-      
-      checkQ += dq;
-      checkR += dr;
+  try {
+    if (!gameState || !gameState.tray || !piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') {
+      return 0;
     }
+    
+    const directions = [
+      [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]
+    ];
+    
+    let jumpOptions = 0;
+    
+    for (const [dq, dr] of directions) {
+      // Look for a piece to jump over
+      let checkQ = piece.q + dq;
+      let checkR = piece.r + dr;
+      
+      let foundPiece = false;
+      while (Math.abs(checkQ) + Math.abs(checkR) <= 5) { // Reasonable search limit
+        const hasPiece = gameState.tray.some(p => 
+          p.placed && p.q === checkQ && p.r === checkR
+        );
+        
+        if (hasPiece && !foundPiece) {
+          foundPiece = true;
+        } else if (!hasPiece && foundPiece) {
+          jumpOptions++;
+          break;
+        }
+        
+        checkQ += dq;
+        checkR += dr;
+      }
+    }
+    
+    return jumpOptions;
+  } catch (error) {
+    console.error(`🤖 💥 JUMP OPTIONS ERROR: Exception in countJumpOptions:`, error);
+    return 0;
   }
-  
-  return jumpOptions;
 };
 
 /**
  * Evaluate tactical patterns and threats
  */
 window.AIEngine.evaluateTacticalPatterns = function(gameState, aiColor, oppColor) {
-  let tactical = 0;
-  
-  // Check for pins (pieces that can't move without breaking hive connectivity)
-  tactical += this.countPins(gameState, oppColor) * 0.3;
-  tactical -= this.countPins(gameState, aiColor) * 0.3;
-  
-  // Check for forks (moves that threaten multiple targets)
-  tactical += this.countForkThreats(gameState, aiColor) * 0.2;
-  tactical -= this.countForkThreats(gameState, oppColor) * 0.2;
-  
-  // Check for tempo moves (forcing opponent responses)
-  tactical += this.countTempoMoves(gameState, aiColor) * 0.1;
-  
-  return tactical;
+  try {
+    if (!gameState || !gameState.tray) {
+      console.error(`🤖 💥 TACTICAL ERROR: Invalid gameState`);
+      return 0;
+    }
+    
+    let tactical = 0;
+    
+    // Smart pinning strategy - considers context
+    tactical += this.evaluateSmartPinning(gameState, aiColor, oppColor);
+    
+    // Check for forks (moves that threaten multiple targets)
+    tactical += this.countForkThreats(gameState, aiColor) * 0.2;
+    tactical -= this.countForkThreats(gameState, oppColor) * 0.2;
+    
+    // Check for tempo moves (forcing opponent responses)
+    tactical += this.countTempoMoves(gameState, aiColor) * 0.1;
+    
+    if (isNaN(tactical)) {
+      console.error(`🤖 💥 TACTICAL ERROR: NaN result`);
+      return 0;
+    }
+    
+    return tactical;
+  } catch (error) {
+    console.error(`🤖 💥 TACTICAL ERROR: Exception in evaluateTacticalPatterns:`, error);
+    return 0;
+  }
 };
 
 /**
  * Count pinned pieces (simplified)
  */
 window.AIEngine.countPins = function(gameState, color) {
-  const pieces = gameState.tray.filter(p => p.color === color && p.placed);
-  let pins = 0;
-  
-  for (const piece of pieces) {
-    // A piece is potentially pinned if removing it would split the hive
-    // Simplified check: count pieces that would be isolated
-    const connectedPieces = this.getConnectedPieces(gameState, piece.q, piece.r, piece);
-    const totalPieces = gameState.tray.filter(p => p.placed).length;
+  try {
+    if (!gameState || !gameState.tray || !color) return 0;
     
-    if (connectedPieces < totalPieces - 1) {
-      pins++;
+    const pieces = gameState.tray.filter(p => p.color === color && p.placed);
+    let pins = 0;
+    
+    for (const piece of pieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
+      
+      // A piece is potentially pinned if removing it would split the hive
+      // Simplified check: count pieces that would be isolated
+      const connectedPieces = this.getConnectedPieces(gameState, piece.q, piece.r, piece);
+      const totalPieces = gameState.tray.filter(p => p.placed).length;
+      
+      if (connectedPieces < totalPieces - 1) {
+        pins++;
+      }
     }
+    
+    return pins;
+  } catch (error) {
+    console.error(`🤖 💥 PINS ERROR: Exception in countPins:`, error);
+    return 0;
   }
-  
-  return pins;
+};
+
+/**
+ * Smart pinning evaluation - considers strategic context
+ */
+window.AIEngine.evaluateSmartPinning = function(gameState, aiColor, oppColor) {
+  try {
+    let pinValue = 0;
+    
+    // Count opponent pins (always good)
+    const oppPins = this.countPins(gameState, oppColor);
+    pinValue += oppPins * 0.4;
+    
+    // Count our pins (context-dependent)
+    const ourPins = this.countPins(gameState, aiColor);
+    
+    // Find our Queen and opponent Queen
+    const aiQueen = gameState.tray.find(p => p.color === aiColor && p.key === 'Q' && p.placed);
+    const oppQueen = gameState.tray.find(p => p.color === oppColor && p.key === 'Q' && p.placed);
+    
+    // Our pins are acceptable if:
+    // 1. We're maintaining pressure on opponent Queen
+    // 2. We're preventing opponent from threatening our Queen
+    // 3. The pinned piece is maintaining a crucial strategic advantage
+    
+    if (aiQueen && oppQueen) {
+      const oppQueenThreats = this.countQueenThreats(gameState, oppColor);
+      const aiQueenThreats = this.countQueenThreats(gameState, aiColor);
+      
+      // If opponent Queen is close to being surrounded, our pins are more acceptable
+      if (oppQueenThreats >= 4) {
+        pinValue -= ourPins * 0.1; // Minimal penalty - we're winning
+      } else if (oppQueenThreats >= 3) {
+        pinValue -= ourPins * 0.2; // Small penalty - good position
+      } else if (aiQueenThreats >= 4) {
+        pinValue -= ourPins * 0.5; // Higher penalty - we're in danger, need mobility
+      } else {
+        pinValue -= ourPins * 0.3; // Normal penalty
+      }
+    } else {
+      // Early game - pins matter less
+      pinValue -= ourPins * 0.2;
+    }
+    
+    return pinValue;
+  } catch (error) {
+    console.error(`🤖 💥 SMART PINNING ERROR:`, error);
+    return 0;
+  }
 };
 
 /**
@@ -2418,79 +3045,112 @@ window.AIEngine.getConnectedPieces = function(gameState, excludeQ, excludeR, exc
  * Count potential fork threats
  */
 window.AIEngine.countForkThreats = function(gameState, color) {
-  // Simplified: count pieces that can threaten multiple important targets
-  const pieces = gameState.tray.filter(p => p.color === color && p.placed);
-  const oppColor = color === 'white' ? 'black' : 'white';
-  const oppQueen = gameState.tray.find(p => p.color === oppColor && p.key === 'Q' && p.placed);
-  
-  let forks = 0;
-  
-  for (const piece of pieces) {
-    if (piece.key === 'A' || piece.key === 'B') { // Mobile pieces
-      const neighbors = this.getNeighborCoords(piece.q, piece.r);
-      let threats = 0;
+  try {
+    if (!gameState || !gameState.tray || !color) return 0;
+    
+    // Simplified: count pieces that can threaten multiple important targets
+    const pieces = gameState.tray.filter(p => p.color === color && p.placed);
+    const oppColor = color === 'white' ? 'black' : 'white';
+    const oppQueen = gameState.tray.find(p => p.color === oppColor && p.key === 'Q' && p.placed);
+    
+    let forks = 0;
+    
+    for (const piece of pieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
       
-      for (const [nq, nr] of neighbors) {
-        if (oppQueen && Math.abs(nq - oppQueen.q) + Math.abs(nr - oppQueen.r) <= 1) {
-          threats++;
+      if (piece.key === 'A' || piece.key === 'B') { // Mobile pieces
+        const neighbors = this.getNeighborCoords(piece.q, piece.r);
+        let threats = 0;
+        
+        for (const [nq, nr] of neighbors) {
+          if (oppQueen && Math.abs(nq - oppQueen.q) + Math.abs(nr - oppQueen.r) <= 1) {
+            threats++;
+          }
+          // Could add more threat types here
         }
-        // Could add more threat types here
+        
+        if (threats >= 2) forks++;
       }
-      
-      if (threats >= 2) forks++;
     }
+    
+    return forks;
+  } catch (error) {
+    console.error(`🤖 💥 FORK THREATS ERROR: Exception in countForkThreats:`, error);
+    return 0;
   }
-  
-  return forks;
 };
 
 /**
  * Count tempo moves (moves that force responses)
  */
 window.AIEngine.countTempoMoves = function(gameState, color) {
-  // Simplified: count threatening moves that limit opponent options
-  const oppColor = color === 'white' ? 'black' : 'white';
-  const oppQueen = gameState.tray.find(p => p.color === oppColor && p.key === 'Q' && p.placed);
-  
-  if (!oppQueen) return 0;
-  
-  const aiPieces = gameState.tray.filter(p => p.color === color && p.placed);
-  let tempoMoves = 0;
-  
-  for (const piece of aiPieces) {
-    const distance = Math.abs(piece.q - oppQueen.q) + Math.abs(piece.r - oppQueen.r);
-    if (distance <= 2 && (piece.key === 'A' || piece.key === 'B')) {
-      tempoMoves++;
+  try {
+    if (!gameState || !gameState.tray || !color) return 0;
+    
+    // Simplified: count threatening moves that limit opponent options
+    const oppColor = color === 'white' ? 'black' : 'white';
+    const oppQueen = gameState.tray.find(p => p.color === oppColor && p.key === 'Q' && p.placed);
+    
+    if (!oppQueen) return 0;
+    
+    const aiPieces = gameState.tray.filter(p => p.color === color && p.placed);
+    let tempoMoves = 0;
+    
+    for (const piece of aiPieces) {
+      if (!piece || typeof piece.q !== 'number' || typeof piece.r !== 'number') continue;
+      
+      const distance = Math.abs(piece.q - oppQueen.q) + Math.abs(piece.r - oppQueen.r);
+      if (distance <= 2 && (piece.key === 'A' || piece.key === 'B')) {
+        tempoMoves++;
+      }
     }
+    
+    return tempoMoves;
+  } catch (error) {
+    console.error(`🤖 💥 TEMPO MOVES ERROR: Exception in countTempoMoves:`, error);
+    return 0;
   }
-  
-  return tempoMoves;
 };
 
 /**
  * Evaluate endgame factors
  */
 window.AIEngine.evaluateEndgame = function(gameState, aiColor, oppColor) {
-  const totalPieces = gameState.tray.filter(p => p.placed).length;
-  
-  // Simple endgame detection - when most pieces are placed
-  if (totalPieces < 8) return 0; // Not endgame yet
-  
-  let endgame = 0;
-  
-  // In endgame, queen safety becomes even more critical
-  const aiQueenThreats = this.countQueenThreats(gameState, aiColor);
-  const oppQueenThreats = this.countQueenThreats(gameState, oppColor);
-  
-  endgame += (oppQueenThreats - aiQueenThreats) * 0.5;
-  
-  // Piece activity in endgame
-  const aiActivity = this.countAdvancedMobility(gameState, aiColor);
-  const oppActivity = this.countAdvancedMobility(gameState, oppColor);
-  
-  endgame += (aiActivity - oppActivity) * 0.1;
-  
-  return endgame;
+  try {
+    if (!gameState || !gameState.tray) {
+      console.error(`🤖 💥 ENDGAME ERROR: Invalid gameState`);
+      return 0;
+    }
+    
+    const totalPieces = gameState.tray.filter(p => p.placed).length;
+    
+    // Simple endgame detection - when most pieces are placed
+    if (totalPieces < 8) return 0; // Not endgame yet
+    
+    let endgame = 0;
+    
+    // In endgame, queen safety becomes even more critical
+    const aiQueenThreats = this.countQueenThreats(gameState, aiColor);
+    const oppQueenThreats = this.countQueenThreats(gameState, oppColor);
+    
+    endgame += (oppQueenThreats - aiQueenThreats) * 0.5;
+    
+    // Piece activity in endgame
+    const aiActivity = this.countAdvancedMobility(gameState, aiColor);
+    const oppActivity = this.countAdvancedMobility(gameState, oppColor);
+    
+    endgame += (aiActivity - oppActivity) * 0.1;
+    
+    if (isNaN(endgame)) {
+      console.error(`🤖 💥 ENDGAME ERROR: NaN result`);
+      return 0;
+    }
+    
+    return endgame;
+  } catch (error) {
+    console.error(`🤖 💥 ENDGAME ERROR: Exception in evaluateEndgame:`, error);
+    return 0;
+  }
 };
 
 /**
@@ -2797,7 +3457,10 @@ window.AIEngine.isWinningMove = function(move) {
     }
     
     console.log(`🤖 👑 Winning check: ${threatsAfterMove}/6 neighbors would be threatened`);
-    return threatsAfterMove >= 6; // All 6 neighbors occupied = win
+    // More aggressive winning recognition
+    if (threatsAfterMove >= 6) return true;  // Definite win
+    if (threatsAfterMove >= 5) return true;  // Almost certain win - force it!
+    return false;
     
   } catch (error) {
     console.error('🤖 Error in isWinningMove:', error);
@@ -2829,6 +3492,14 @@ window.AIEngine.isEmergencyDefensive = function(move) {
     }
     
     console.log(`🤖 🛡️ Defense check: AI Queen has ${currentThreats}/6 threats`);
+    
+    // Trigger personality mid-game response when AI Queen gets half-surrounded
+    if (currentThreats === 3 && window.Personalities && !window.Personalities._midGameTriggered) {
+      setTimeout(() => {
+        window.Personalities.showVoiceLine('midGame');
+        window.Personalities._midGameTriggered = true; // Prevent spam
+      }, 1000);
+    }
     
     // If Queen has 4+ threats, this is emergency territory
     if (currentThreats >= 4) {
@@ -2862,7 +3533,7 @@ window.AIEngine.isEmergencyDefensive = function(move) {
 };
 
 /**
- * CRITICAL: Calculate Queen-focused bonus for moves
+ * CRITICAL: Calculate Queen-focused bonus for moves - MASSIVELY ENHANCED
  */
 window.AIEngine.getQueenFocusBonus = function(move) {
   if (!move) return 0;
@@ -2870,6 +3541,12 @@ window.AIEngine.getQueenFocusBonus = function(move) {
   try {
     let bonus = 0;
     const oppColor = this.color === 'white' ? 'black' : 'white';
+    const difficulty = this.difficulty;
+    
+    // Difficulty multipliers for strategic thinking
+    let strategicMultiplier = 1.0;
+    if (difficulty === 'medium') strategicMultiplier = 1.8;
+    else if (difficulty === 'hard') strategicMultiplier = 3.0; // MUCH more strategic
     
     // Find both Queens
     const oppQueen = tray.find(p => 
@@ -2879,19 +3556,46 @@ window.AIEngine.getQueenFocusBonus = function(move) {
       p.meta && p.meta.color === this.color && p.meta.key === 'Q' && p.meta.placed
     );
     
-    // OFFENSIVE: Bonus for moves that threaten opponent Queen
+    // OFFENSIVE: MASSIVE bonus for moves that threaten opponent Queen
     if (oppQueen) {
       const distToOppQueen = Math.abs(move.q - oppQueen.meta.q) + Math.abs(move.r - oppQueen.meta.r);
       
+      // Count how many neighbors opponent Queen already has occupied
+      let oppQueenThreats = 0;
+      const oppQueenNeighbors = this.getNeighborCoords(oppQueen.meta.q, oppQueen.meta.r);
+      for (const [nq, nr] of oppQueenNeighbors) {
+        const occupied = tray.some(p => p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr);
+        if (occupied) oppQueenThreats++;
+      }
+      
       if (distToOppQueen === 1) {
-        bonus += 0.8; // Adjacent to opponent Queen - EXCELLENT
-        console.log(`🤖 ⚔️ OFFENSIVE: Move threatens opponent Queen directly!`);
+        // This move would add a threat to opponent Queen
+        const newThreatCount = oppQueenThreats + 1;
+        
+        if (newThreatCount >= 6) {
+          bonus += 10.0 * strategicMultiplier; // WINNING MOVE! 
+          console.log(`🤖 👑 WINNING: Move would surround opponent Queen (6/6)!`);
+        } else if (newThreatCount >= 5) {
+          bonus += 5.0 * strategicMultiplier; // ALMOST WINNING!
+          console.log(`🤖 👑 CRITICAL: Move would threaten opponent Queen (5/6)!`);
+        } else if (newThreatCount >= 4) {
+          bonus += 4.0 * strategicMultiplier; // MASSIVE pressure boost!
+          console.log(`🤖 ⚔️ EXCELLENT: Strong threat to opponent Queen (4/6)!`);
+        } else if (newThreatCount >= 3) {
+          bonus += 2.5 * strategicMultiplier; // Strong pressure bonus
+          console.log(`🤖 ⚔️ GOOD: Building pressure on opponent Queen (3/6)!`);
+        } else {
+          bonus += 0.8 * strategicMultiplier; // Starting pressure
+          console.log(`🤖 ⚔️ PROGRESS: Starting to threaten opponent Queen!`);
+        }
       } else if (distToOppQueen === 2) {
-        bonus += 0.3; // Near opponent Queen - good positioning
+        bonus += 0.4 * strategicMultiplier; // Positioning for future threat
+      } else if (distToOppQueen === 3) {
+        bonus += 0.1 * strategicMultiplier; // Distant positioning
       }
     }
     
-    // DEFENSIVE: PENALTY for moves that threaten our own Queen!
+    // DEFENSIVE: MASSIVE PENALTY for moves that expose our Queen!
     if (aiQueen) {
       const distToAiQueen = Math.abs(move.q - aiQueen.meta.q) + Math.abs(move.r - aiQueen.meta.r);
       
@@ -2904,21 +3608,36 @@ window.AIEngine.getQueenFocusBonus = function(move) {
         if (occupied) currentThreats++;
       }
       
-      if (distToAiQueen === 1 && currentThreats >= 3) {
-        bonus -= 0.9; // MASSIVE PENALTY for threatening our own Queen!
-        console.log(`🤖 🛡️ DEFENSIVE PENALTY: Move would threaten our own Queen! (${currentThreats}/6 threats)`);
-      } else if (distToAiQueen === 1 && currentThreats >= 2) {
-        bonus -= 0.5; // Large penalty for adding threats to Queen
-        console.log(`🤖 🛡️ DEFENSIVE WARNING: Move adds threat to our Queen (${currentThreats}/6 threats)`);
+      if (distToAiQueen === 1) {
+        // This move is adjacent to our Queen - CHECK IF IT'S SAFE
+        const newThreatCount = currentThreats + (move.type === 'place' ? 1 : 0);
+        
+        if (newThreatCount >= 5) {
+          bonus -= 10.0 * strategicMultiplier; // CATASTROPHIC - almost lost!
+          console.log(`🤖 💀 CATASTROPHIC: Move would almost surround our Queen (5/6)!`);
+        } else if (newThreatCount >= 4) {
+          bonus -= 5.0 * strategicMultiplier; // VERY DANGEROUS 
+          console.log(`🤖 � DANGEROUS: Move would heavily threaten our Queen (4/6)!`);
+        } else if (newThreatCount >= 3) {
+          // Check if opponent Queen is also under pressure (mutual threat situation)
+          const oppHasPressure = oppQueen ? oppQueenThreats >= 3 : false;
+          const penalty = oppHasPressure ? 0.8 : 2.5; // Much less penalty if we're winning the race
+          bonus -= penalty * strategicMultiplier;
+          console.log(`🤖 ⚠️ RISKY: Move would threaten our Queen (3/6)!`);
+        } else {
+          // Only small penalty if Queen isn't in immediate danger
+          bonus -= 0.5 * strategicMultiplier;
+        }
       }
       
-      // Only give a small bonus for protecting Queen if it's far from danger
-      if (distToAiQueen === 2 && currentThreats <= 1) {
-        bonus += 0.2; // Small bonus for nearby support (but not adjacent)
+      // Bonus for defending our Queen when it's in danger
+      if (currentThreats >= 3 && distToAiQueen === 2) {
+        bonus += 1.0 * strategicMultiplier; // Good defensive positioning
+        console.log(`🤖 🛡️ DEFENSIVE: Good position to defend our Queen!`);
       }
     }
     
-    return Math.min(1.0, bonus);
+    return Math.max(-5.0, Math.min(10.0, bonus)); // Cap the bonus range
     
   } catch (error) {
     console.error('🤖 Error in getQueenFocusBonus:', error);
