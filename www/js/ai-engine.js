@@ -673,39 +673,36 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
     
     console.log(`🤖 Queen status: hasQueen=${hasQueen}, queensPlaced=${queensPlaced}, myTurn=${myTurnNumber}`);
     
-    // **ABSOLUTE PRIORITY: FORCE Queen placement if required (MUST BE FIRST)**
-    if (!hasQueen && myTurnNumber >= 3) {
-      console.log(`🤖 🚨 CRITICAL: Must place Queen NOW on turn ${myTurnNumber}! (placing by turn 3)`);
+    // **STRATEGIC QUEEN TIMING: Smart Queen placement based on Hive theory**
+    // TOURNAMENT OPENING RULE: NO QUEEN ON FIRST TURN (turns 1-2)
+    // Queen must be placed by turn 4, but strategic timing matters
+    
+    const isQueenRequired = !hasQueen && myTurnNumber >= 3; // Must place by turn 3 (AI turn 4 absolute limit)
+    // ENFORCE TOURNAMENT RULE: No Queen placement before turn 3
+    const strategicQueenTiming = !hasQueen && myTurnNumber >= 3 && this.shouldPlaceQueenNow(allPlacedPieces, currentColor, oppColor, myTurnNumber, difficulty);
+    
+    if (isQueenRequired || strategicQueenTiming) {
+      const urgency = isQueenRequired ? 'REQUIRED' : 'STRATEGIC';
+      console.log(`🤖 � ${urgency}: Queen placement on turn ${myTurnNumber}`);
       
       const queen = availablePieces.find(p => p.meta.key === 'Q');
-      console.log(`🤖 🚨 Queen piece found:`, queen ? 'YES' : 'NO');
-      console.log(`🤖 🚨 legalPlacementZones available:`, typeof legalPlacementZones);
+      console.log(`🤖 � Queen piece found:`, queen ? 'YES' : 'NO');
       
       if (queen && typeof legalPlacementZones === 'function') {
-        console.log(`🤖 🚨 About to call legalPlacementZones...`);
         try {
           const zones = legalPlacementZones(currentColor);
-          console.log(`🤖 🚨 Emergency Queen zones:`, zones.size);
-          console.log(`🤖 🚨 Emergency zones details:`, Array.from(zones));
+          console.log(`🤖 � Queen zones available:`, zones.size);
           
           if (zones.size > 0) {
-            const firstZone = Array.from(zones)[0];
-            const [q, r] = firstZone.split(',').map(Number);
-            
-            console.log(`🤖 👑 EMERGENCY: Placing Queen at ${q},${r}`);
-            return [{
-              type: 'place',
-              piece: queen,
-              q: q,
-              r: r,
-              priority: 'emergency-queen'
-            }];
+            // Strategic Queen placement - find safest position
+            const queenMoves = this.evaluateQueenPlacementPositions(Array.from(zones), allPlacedPieces, currentColor, oppColor);
+            console.log(`🤖 👑 Generated ${queenMoves.length} strategic Queen placements`);
+            return queenMoves;
           } else {
-            console.error(`🤖 💥 EMERGENCY: NO ZONES for Queen placement!`);
+            console.error(`🤖 💥 NO ZONES for Queen placement!`);
           }
         } catch (error) {
-          console.error(`🤖 💥 Emergency Queen placement failed:`, error);
-          console.error(`🤖 💥 Stack trace:`, error.stack);
+          console.error(`🤖 💥 Queen placement failed:`, error);
         }
       } else {
         console.error(`🤖 💥 Missing Queen piece or legalPlacementZones function!`);
@@ -840,28 +837,23 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
       }
     }
     
-    // PRIORITY 2: Opening book moves (first 6 turns, if Queen not required)
-    if (totalTurnNumber <= 6) {
+    // PRIORITY 2: Opening book moves (first 3 turns only, if Queen not required)
+    // After turn 3, switch to strategic play with movement priority
+    if (totalTurnNumber <= 3 && !hasQueen) {
       console.log(`🤖 📖 Using opening book for turn ${totalTurnNumber}`);
       const openingMoves = this.generateOpeningMoves(currentColor, myTurnNumber, availablePieces, allPlacedPieces, difficulty);
       console.log(`🤖 📖 Opening book generated ${openingMoves.length} moves`);
       return openingMoves;
     }
     
-    // Strategic piece placement
-    if (availablePieces.length > 0 && typeof legalPlacementZones === 'function') {
-      const zones = legalPlacementZones(currentColor);
-      console.log(`🤖 Placement zones available:`, zones.size);
-      
-      for (const piece of availablePieces) {
-        const placements = this.generateStrategicPlacements(piece, zones, currentColor, allPlacedPieces);
-        moves.push(...placements);
-      }
-    }
+    // STRATEGIC RULE: After Queen is placed, prioritize MOVEMENT over placement
+    // This is fundamental Hive strategy - move existing pieces before adding new ones
     
-    // Piece movement (after Queen is placed)
     if (hasQueen && queensPlaced >= 1) {
-      console.log(`🤖 Generating movement moves...`);
+      console.log(`🤖 ✨ STRATEGIC PHASE: Queens placed - prioritizing piece movement over placement`);
+      
+      // FIRST: Generate all movement moves (HIGH PRIORITY)
+      console.log(`🤖 Generating movement moves (primary focus)...`);
       for (const piece of placedPieces) {
         try {
           if (typeof legalMoveZones === 'function') {
@@ -871,6 +863,7 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
             if (moveZones && moveZones.length > 0) {
               for (const zone of moveZones) {
                 const [q, r] = zone.split(',').map(Number);
+                const strategicValue = this.evaluateMovementStrategy(piece, q, r, allPlacedPieces, oppColor, hasQueen);
                 const move = {
                   type: 'move',
                   piece: piece,
@@ -878,7 +871,9 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
                   fromR: piece.meta.r,
                   q: q,
                   r: r,
-                  priority: this.evaluateMoveStrategicValue(piece, q, r, allPlacedPieces, oppColor)
+                  priority: strategicValue.priority,
+                  strategicValue: strategicValue.value,
+                  reasoning: strategicValue.reasoning
                 };
                 moves.push(move);
               }
@@ -886,6 +881,42 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
           }
         } catch (error) {
           console.warn(`🤖 Error generating moves for ${piece.meta.key}:`, error);
+        }
+      }
+      
+      // SECOND: Generate placement moves (SECONDARY - only if beneficial)
+      if (availablePieces.length > 0 && typeof legalPlacementZones === 'function') {
+        const zones = legalPlacementZones(currentColor);
+        console.log(`🤖 Placement zones available (secondary focus):`, zones.size);
+        
+        for (const piece of availablePieces) {
+          const placements = this.generateStrategicPlacements(piece, zones, currentColor, allPlacedPieces, false, difficulty);
+          // Mark placements as secondary priority
+          placements.forEach(p => {
+            p.strategicValue = (p.strategicValue || 0) * 0.8; // Reduce placement value after Queen
+            if (p.priority === 'threaten-queen') {
+              p.strategicValue *= 1.5; // Exception: Queen threats still high priority
+            }
+          });
+          moves.push(...placements);
+        }
+      }
+      
+      // Apply strategic prioritization: favor movement over placement
+      moves.forEach(move => {
+        if (move.type === 'move') {
+          move.strategicValue = (move.strategicValue || 0) + 0.3; // Movement bonus
+        }
+      });
+    } else {
+      // Early game: placement is primary focus
+      if (availablePieces.length > 0 && typeof legalPlacementZones === 'function') {
+        const zones = legalPlacementZones(currentColor);
+        console.log(`🤖 Early game: placement zones available:`, zones.size);
+        
+        for (const piece of availablePieces) {
+          const placements = this.generateStrategicPlacements(piece, zones, currentColor, allPlacedPieces, true, difficulty);
+          moves.push(...placements);
         }
       }
     }
@@ -900,37 +931,48 @@ window.AIEngine.generateSimpleGameMoves = function(currentColor) {
 };
 
 /**
- * Opening book - strategic moves for early game
+ * Opening book - strategic moves for early game using proven Hive theory
  */
 window.AIEngine.generateOpeningMoves = function(currentColor, myTurnNumber, availablePieces, allPlacedPieces, difficulty = 'easy') {
   const moves = [];
   
   console.log(`🤖 📖 Opening book for my turn ${myTurnNumber} as ${currentColor} (${difficulty} difficulty)`);
   
+  // STRATEGIC RULE 1: Never place Queen on first move (Tournament Opening Rule)
+  // STRATEGIC RULE 2: Delay Queen placement until strategic advantage
+  // STRATEGIC RULE 3: Use proven opening formations
+  
   if (myTurnNumber === 1) {
     // My first move - if no pieces on board, place at origin; otherwise place adjacent
     if (allPlacedPieces.length === 0) {
-      // Very first move of the game
+      // Very first move of the game - NEVER Queen per tournament rules
       if (availablePieces.length > 0) {
         let preferredPiece;
         
-        // Difficulty-specific piece selection
+        // Hive opening theory - proven strong openings
         if (difficulty === 'easy') {
-          // Easy: simple piece preference
+          // Easy: safe, flexible pieces
           preferredPiece = availablePieces.find(p => 
-            p.meta.key === 'A' || p.meta.key === 'B'
-          ) || availablePieces[0];
+            p.meta.key === 'A' || p.meta.key === 'S'  // Ant or Spider - solid choices
+          ) || availablePieces.find(p => p.meta.key !== 'Q'); // Any non-Queen
         } else if (difficulty === 'medium') {
-          // Medium: strategic opening pieces
+          // Medium: Spider-Bee-Ant formation start
           preferredPiece = availablePieces.find(p => 
-            p.meta.key === 'A' || p.meta.key === 'G' || p.meta.key === 'B'
-          ) || availablePieces[0];
+            p.meta.key === 'S' || p.meta.key === 'A' || p.meta.key === 'G'
+          ) || availablePieces.find(p => p.meta.key !== 'Q'); // Any non-Queen
         } else {
-          // Hard: advanced opening theory
+          // Hard: Advanced opening theory - Spider or Ant for mobility
           preferredPiece = availablePieces.find(p => 
-            p.meta.key === 'A' || p.meta.key === 'S' || p.meta.key === 'G'
-          ) || availablePieces[0];
+            p.meta.key === 'S' || p.meta.key === 'A'  // Prefer Spider/Ant for strategic flexibility
+          ) || availablePieces.find(p => p.meta.key !== 'Q'); // Any non-Queen
         }
+        
+        // ENSURE we never place Queen on first move
+        if (!preferredPiece || preferredPiece.meta.key === 'Q') {
+          preferredPiece = availablePieces.find(p => p.meta.key !== 'Q') || availablePieces[0];
+        }
+        
+        console.log(`🤖 📖 First move: placing ${preferredPiece.meta.key} (avoiding Queen per tournament rules)`);
         
         moves.push({
           type: 'place',
@@ -1256,7 +1298,7 @@ window.AIEngine.generateStrategicPlacements = function(piece, zones, currentColo
 };
 
 /**
- * Evaluate strategic value of a piece movement
+ * Evaluate strategic value of a piece movement with comprehensive Hive strategy
  */
 window.AIEngine.evaluateMoveStrategicValue = function(piece, toQ, toR, allPlacedPieces, oppColor) {
   let value = 0;
@@ -1299,6 +1341,510 @@ window.AIEngine.evaluateMoveStrategicValue = function(piece, toQ, toR, allPlaced
   }
   
   return value > 0.8 ? 'high-value' : value > 0.4 ? 'medium-value' : 'low-value';
+};
+
+/**
+ * Comprehensive strategic evaluation for piece movement with advanced Hive principles
+ */
+window.AIEngine.evaluateMovementStrategy = function(piece, toQ, toR, allPlacedPieces, oppColor, hasQueen) {
+  let value = 0;
+  let priority = 'normal';
+  let reasoning = [];
+  
+  const myColor = piece.meta.color;
+  const oppQueen = allPlacedPieces.find(p => p.meta.color === oppColor && p.meta.key === 'Q');
+  const myQueen = allPlacedPieces.find(p => p.meta.color === myColor && p.meta.key === 'Q');
+  
+  // STRATEGIC RULE: Queen safety first
+  if (myQueen) {
+    const queenThreats = this.countQueenThreats_ForPlacedPieces(allPlacedPieces, myQueen);
+    
+    // If my Queen is in danger, prioritize defensive moves
+    if (queenThreats >= 4) {
+      const distFromMyQueen = Math.abs(toQ - myQueen.meta.q) + Math.abs(toR - myQueen.meta.r);
+      if (distFromMyQueen <= 2) {
+        value += 2.0;
+        priority = 'defend-queen';
+        reasoning.push('Defending endangered Queen');
+      }
+    }
+    
+    // NEVER move in ways that help surround our own Queen
+    if (queenThreats >= 3) {
+      const wouldThreatenOurQueen = Math.abs(toQ - myQueen.meta.q) + Math.abs(toR - myQueen.meta.r) === 1;
+      if (wouldThreatenOurQueen) {
+        value -= 5.0;
+        priority = 'dangerous-self-threat';
+        reasoning.push('DANGEROUS: Would threaten own Queen');
+      }
+    }
+  }
+  
+  // STRATEGIC RULE: Aggressive Queen hunting when safe
+  if (oppQueen && (!myQueen || this.countQueenThreats_ForPlacedPieces(allPlacedPieces, myQueen) <= 2)) {
+    const distToOppQueen = Math.abs(toQ - oppQueen.meta.q) + Math.abs(toR - oppQueen.meta.r);
+    
+    if (distToOppQueen === 1) {
+      // This move directly threatens opponent Queen
+      const oppThreatsAfter = this.countQueenThreats_ForPlacedPieces(allPlacedPieces, oppQueen) + 1;
+      
+      if (oppThreatsAfter >= 6) {
+        value += 10.0;
+        priority = 'winning-move';
+        reasoning.push('WINNING: Surrounds opponent Queen!');
+      } else if (oppThreatsAfter >= 5) {
+        value += 5.0;
+        priority = 'threaten-queen';
+        reasoning.push('Critical threat to opponent Queen');
+      } else if (oppThreatsAfter >= 4) {
+        value += 3.0;
+        priority = 'threaten-queen';
+        reasoning.push('Strong pressure on opponent Queen');
+      } else {
+        value += 1.5;
+        priority = 'threaten-queen';
+        reasoning.push('Building attack on opponent Queen');
+      }
+    } else if (distToOppQueen === 2) {
+      value += 0.8;
+      reasoning.push('Positioning near opponent Queen');
+    }
+  }
+  
+  // STRATEGIC RULE: Anti-Ant pinning strategy
+  if (piece.meta.key === 'A') {
+    // Ants should avoid being pinned but can pin opponents
+    const mobilityAfterMove = this.countEmptyNeighbors({q: toQ, r: toR}, allPlacedPieces);
+    
+    if (mobilityAfterMove >= 3) {
+      value += 0.5;
+      reasoning.push('Maintains Ant mobility');
+    } else if (mobilityAfterMove <= 1) {
+      value -= 0.8;
+      reasoning.push('Risk: Ant mobility limited');
+    }
+    
+    // Check if this Ant move can pin opponent pieces
+    const canPinOpponent = this.evaluateAntPinningPotential(toQ, toR, allPlacedPieces, oppColor);
+    if (canPinOpponent) {
+      value += 1.2;
+      priority = 'ant-pin-attack';
+      reasoning.push('Ant pinning opponent pieces');
+    }
+  }
+  
+  // STRATEGIC RULE: Piece-specific strategic positioning
+  switch (piece.meta.key) {
+    case 'B': // Beetle strategic climbing
+      const stackingOpportunities = this.evaluateStackingValue(toQ, toR, allPlacedPieces, oppColor);
+      if (stackingOpportunities.canStack) {
+        value += stackingOpportunities.value;
+        reasoning.push(stackingOpportunities.reason);
+      }
+      break;
+      
+    case 'G': // Grasshopper strategic jumping
+      const jumpValue = this.evaluateGrasshopperJumpStrategy(piece, toQ, toR, allPlacedPieces, oppColor);
+      value += jumpValue.value;
+      if (jumpValue.reason) reasoning.push(jumpValue.reason);
+      break;
+      
+    case 'S': // Spider strategic positioning
+      const spiderValue = this.evaluateSpiderStrategy(piece, toQ, toR, allPlacedPieces);
+      value += spiderValue.value;
+      if (spiderValue.reason) reasoning.push(spiderValue.reason);
+      break;
+      
+    case 'Q': // Queen escape moves
+      if (myQueen && piece === myQueen) {
+        const escapeValue = this.evaluateQueenEscapeMove(toQ, toR, allPlacedPieces);
+        value += escapeValue.value;
+        if (escapeValue.reason) reasoning.push(escapeValue.reason);
+      }
+      break;
+  }
+  
+  // STRATEGIC RULE: Maintain hive connectivity and shape
+  const connectivityValue = this.evaluateHiveConnectivity(piece, toQ, toR, allPlacedPieces);
+  if (connectivityValue.breaks) {
+    value -= 10.0; // NEVER break the hive
+    priority = 'illegal-move';
+    reasoning.push('ILLEGAL: Would break hive connectivity');
+  } else {
+    value += connectivityValue.value;
+    if (connectivityValue.reason) reasoning.push(connectivityValue.reason);
+  }
+  
+  return {
+    value: value,
+    priority: priority,
+    reasoning: reasoning.join('; ')
+  };
+};
+
+/**
+ * Helper: Count Queen threats for placed pieces evaluation
+ */
+window.AIEngine.countQueenThreats_ForPlacedPieces = function(allPlacedPieces, queen) {
+  if (!queen) return 0;
+  
+  const neighbors = this.getNeighborCoords(queen.meta.q, queen.meta.r);
+  let threats = 0;
+  
+  for (const [nq, nr] of neighbors) {
+    const occupied = allPlacedPieces.some(p => p.meta.q === nq && p.meta.r === nr);
+    if (occupied) threats++;
+  }
+  
+  return threats;
+};
+
+/**
+ * Helper: Evaluate Ant pinning potential
+ */
+window.AIEngine.evaluateAntPinningPotential = function(toQ, toR, allPlacedPieces, oppColor) {
+  // Check if moving Ant to this position would limit opponent mobility
+  const neighbors = this.getNeighborCoords(toQ, toR);
+  let pinValue = 0;
+  
+  for (const [nq, nr] of neighbors) {
+    const oppPiece = allPlacedPieces.find(p => 
+      p.meta.color === oppColor && p.meta.q === nq && p.meta.r === nr
+    );
+    if (oppPiece) {
+      // Check if opponent piece would have limited mobility
+      const oppMobility = this.countEmptyNeighbors({q: nq, r: nr}, allPlacedPieces);
+      if (oppMobility <= 2) {
+        pinValue += 0.5; // Contributes to pinning
+      }
+    }
+  }
+  
+  return pinValue > 0;
+};
+
+/**
+ * Helper: Evaluate Beetle stacking strategy
+ */
+window.AIEngine.evaluateStackingValue = function(toQ, toR, allPlacedPieces, oppColor) {
+  // Check if there's a piece at the destination to climb on
+  const targetPiece = allPlacedPieces.find(p => p.meta.q === toQ && p.meta.r === toR);
+  
+  if (targetPiece && targetPiece.meta.color === oppColor) {
+    // Climbing on opponent piece
+    if (targetPiece.meta.key === 'Q') {
+      return { canStack: true, value: 8.0, reason: 'Beetle attacking opponent Queen!' };
+    } else if (targetPiece.meta.key === 'A') {
+      return { canStack: true, value: 2.0, reason: 'Beetle pinning opponent Ant' };
+    } else {
+      return { canStack: true, value: 1.0, reason: 'Beetle climbing on opponent piece' };
+    }
+  }
+  
+  return { canStack: false, value: 0 };
+};
+
+/**
+ * Helper: Evaluate Grasshopper jump strategy
+ */
+window.AIEngine.evaluateGrasshopperJumpStrategy = function(piece, toQ, toR, allPlacedPieces, oppColor) {
+  // Grasshopper jumps are powerful for reaching isolated positions
+  const oppQueen = allPlacedPieces.find(p => p.meta.color === oppColor && p.meta.key === 'Q');
+  
+  if (oppQueen) {
+    const distToOppQueen = Math.abs(toQ - oppQueen.meta.q) + Math.abs(toR - oppQueen.meta.r);
+    if (distToOppQueen === 1) {
+      return { value: 2.5, reason: 'Grasshopper jump threatening Queen' };
+    } else if (distToOppQueen === 2) {
+      return { value: 0.8, reason: 'Grasshopper positioning near Queen' };
+    }
+  }
+  
+  return { value: 0.2, reason: 'Standard Grasshopper positioning' };
+};
+
+/**
+ * Helper: Evaluate Spider strategy
+ */
+window.AIEngine.evaluateSpiderStrategy = function(piece, toQ, toR, allPlacedPieces) {
+  // Spiders move exactly 3 steps - evaluate positioning flexibility
+  const centerDistance = Math.abs(toQ) + Math.abs(toR);
+  
+  if (centerDistance <= 2) {
+    return { value: 0.6, reason: 'Spider in flexible central position' };
+  } else {
+    return { value: 0.2, reason: 'Spider positioning' };
+  }
+};
+
+/**
+ * Helper: Evaluate Queen escape moves
+ */
+window.AIEngine.evaluateQueenEscapeMove = function(toQ, toR, allPlacedPieces) {
+  // Count escape routes from new Queen position
+  const escapeRoutes = this.countEmptyNeighbors({q: toQ, r: toR}, allPlacedPieces);
+  
+  if (escapeRoutes >= 4) {
+    return { value: 2.0, reason: 'Queen moving to safe position with escape routes' };
+  } else if (escapeRoutes >= 2) {
+    return { value: 1.0, reason: 'Queen maintaining mobility' };
+  } else {
+    return { value: -1.0, reason: 'WARNING: Queen moving to limited position' };
+  }
+};
+
+/**
+ * Helper: Evaluate hive connectivity after move
+ */
+window.AIEngine.evaluateHiveConnectivity = function(piece, toQ, toR, allPlacedPieces) {
+  // This would need actual implementation of hive connectivity rules
+  // For now, assume moves are legal if generated by the game
+  return { breaks: false, value: 0.1, reason: 'Maintains hive connectivity' };
+};
+
+/**
+ * Strategic decision: Should AI place Queen now based on board position?
+ */
+window.AIEngine.shouldPlaceQueenNow = function(allPlacedPieces, myColor, oppColor, myTurnNumber, difficulty) {
+  // STRATEGIC PRINCIPLE: Delay Queen placement for tactical advantage, but not too long
+  
+  // Easy difficulty: Place Queen early for safety
+  if (difficulty === 'easy') {
+    return myTurnNumber >= 2; // Place by turn 2
+  }
+  
+  // Count opponent's pressure and pieces
+  const oppPieces = allPlacedPieces.filter(p => p.meta.color === oppColor);
+  const myPieces = allPlacedPieces.filter(p => p.meta.color === myColor);
+  const oppQueenPlaced = oppPieces.some(p => p.meta.key === 'Q');
+  
+  // Advanced timing based on opponent's strategy
+  if (difficulty === 'medium') {
+    // Place Queen by turn 3, or earlier if opponent is aggressive
+    if (myTurnNumber >= 3) return true;
+    if (oppQueenPlaced && oppPieces.length >= 3) return true; // Opponent developing fast
+    return false;
+  }
+  
+  if (difficulty === 'hard') {
+    // Sophisticated Queen timing - delay until maximum strategic advantage
+    if (myTurnNumber >= 3) return true; // Must place by turn 4 (absolute rule)
+    
+    // Place early if opponent has aggressive formation
+    if (oppQueenPlaced && this.isOpponentFormationAggressive(allPlacedPieces, oppColor)) {
+      console.log(`🤖 👑 STRATEGIC: Placing Queen early due to aggressive opponent formation`);
+      return true;
+    }
+    
+    // Place early if we have good defensive pieces ready
+    if (myPieces.length >= 2 && this.hasGoodQueenDefenders(myPieces)) {
+      console.log(`🤖 👑 STRATEGIC: Placing Queen with good defenders available`);
+      return true;
+    }
+    
+    // Delay Queen placement for flexibility
+    console.log(`🤖 👑 STRATEGIC: Delaying Queen placement for tactical flexibility`);
+    return false;
+  }
+  
+  return myTurnNumber >= 3; // Fallback
+};
+
+/**
+ * Check if opponent formation is aggressive (targeting our potential Queen positions)
+ */
+window.AIEngine.isOpponentFormationAggressive = function(allPlacedPieces, oppColor) {
+  const oppPieces = allPlacedPieces.filter(p => p.meta.color === oppColor);
+  
+  // Look for opponent pieces positioned for quick strikes
+  let aggressiveIndicators = 0;
+  
+  for (const piece of oppPieces) {
+    // Ants in forward positions are aggressive
+    if (piece.meta.key === 'A') {
+      const centerDistance = Math.abs(piece.meta.q) + Math.abs(piece.meta.r);
+      if (centerDistance <= 1) aggressiveIndicators++;
+    }
+    
+    // Beetles ready to climb
+    if (piece.meta.key === 'B') {
+      const neighboredPieces = this.countAllAdjacentPieces(piece, allPlacedPieces);
+      if (neighboredPieces >= 2) aggressiveIndicators++;
+    }
+    
+    // Multiple mobile pieces suggest aggression
+    if (['A', 'G', 'B'].includes(piece.meta.key)) {
+      aggressiveIndicators += 0.5;
+    }
+  }
+  
+  console.log(`🤖 👑 Opponent aggression score: ${aggressiveIndicators}`);
+  return aggressiveIndicators >= 2.5;
+};
+
+/**
+ * Check if we have good pieces to defend Queen
+ */
+window.AIEngine.hasGoodQueenDefenders = function(myPieces) {
+  let defenderScore = 0;
+  
+  for (const piece of myPieces) {
+    switch (piece.meta.key) {
+      case 'B': defenderScore += 2; break; // Beetles excellent defenders
+      case 'A': defenderScore += 1.5; break; // Ants good mobile defenders  
+      case 'S': defenderScore += 1; break; // Spiders decent defenders
+      case 'G': defenderScore += 0.5; break; // Grasshoppers limited defenders
+    }
+  }
+  
+  console.log(`🤖 👑 Defender score: ${defenderScore}`);
+  return defenderScore >= 2.5;
+};
+
+/**
+ * Evaluate strategic Queen placement positions
+ */
+window.AIEngine.evaluateQueenPlacementPositions = function(zones, allPlacedPieces, myColor, oppColor) {
+  const queenMoves = [];
+  const queen = typeof tray !== 'undefined' ? tray.find(p => 
+    p.meta && p.meta.color === myColor && p.meta.key === 'Q' && !p.meta.placed
+  ) : null;
+  
+  if (!queen) return [];
+  
+  console.log(`🤖 👑 Evaluating ${zones.length} Queen positions...`);
+  
+  for (const zone of zones) {
+    const [q, r] = zone.split(',').map(Number);
+    
+    // STRATEGIC EVALUATION: Queen safety factors
+    let safetyScore = this.evaluateQueenSafety(q, r, allPlacedPieces, myColor, oppColor);
+    let priority = 'queen-placement';
+    let reasoning = [];
+    
+    // Factor 1: Distance from opponent pieces (isolation = safety)
+    const oppPieces = allPlacedPieces.filter(p => p.meta.color === oppColor);
+    let minDistToOpp = Infinity;
+    
+    for (const oppPiece of oppPieces) {
+      const dist = Math.abs(q - oppPiece.meta.q) + Math.abs(r - oppPiece.meta.r);
+      minDistToOpp = Math.min(minDistToOpp, dist);
+    }
+    
+    if (minDistToOpp >= 3) {
+      safetyScore += 2.0;
+      reasoning.push('Isolated from opponents');
+      priority = 'queen-safe';
+    } else if (minDistToOpp >= 2) {
+      safetyScore += 1.0;
+      reasoning.push('Safe distance from opponents');
+    } else {
+      safetyScore -= 1.0;
+      reasoning.push('Close to opponent pieces');
+    }
+    
+    // Factor 2: Escape routes (empty neighbors)
+    const escapeRoutes = this.countEmptyNeighbors({q, r}, allPlacedPieces);
+    safetyScore += escapeRoutes * 0.3;
+    reasoning.push(`${escapeRoutes} escape routes`);
+    
+    // Factor 3: Friendly piece support
+    const friendlySupport = this.countAdjacentFriendlyPieces({q, r}, myColor);
+    safetyScore += friendlySupport * 0.5;
+    if (friendlySupport > 0) {
+      reasoning.push(`${friendlySupport} friendly neighbors`);
+    }
+    
+    // Factor 4: Avoid obvious trap positions
+    const trapRisk = this.evaluateQueenTrapRisk(q, r, allPlacedPieces, oppColor);
+    safetyScore -= trapRisk;
+    if (trapRisk > 0) {
+      reasoning.push(`Trap risk: ${trapRisk}`);
+    }
+    
+    console.log(`🤖 👑 Position ${q},${r}: safety=${safetyScore.toFixed(2)}, ${reasoning.join(', ')}`);
+    
+    queenMoves.push({
+      type: 'place',
+      piece: queen,
+      q: q,
+      r: r,
+      priority: priority,
+      strategicValue: safetyScore,
+      reasoning: reasoning.join('; ')
+    });
+  }
+  
+  // Sort by safety score (highest first)
+  queenMoves.sort((a, b) => b.strategicValue - a.strategicValue);
+  
+  // Return top 3 safest positions
+  return queenMoves.slice(0, 3);
+};
+
+/**
+ * Evaluate Queen safety at a specific position
+ */
+window.AIEngine.evaluateQueenSafety = function(q, r, allPlacedPieces, myColor, oppColor) {
+  let safety = 0;
+  
+  // Base safety from position characteristics
+  const neighbors = this.getNeighborCoords(q, r);
+  let occupiedNeighbors = 0;
+  let friendlyNeighbors = 0;
+  let hostileNeighbors = 0;
+  
+  for (const [nq, nr] of neighbors) {
+    const piece = allPlacedPieces.find(p => p.meta.q === nq && p.meta.r === nr);
+    if (piece) {
+      occupiedNeighbors++;
+      if (piece.meta.color === myColor) {
+        friendlyNeighbors++;
+      } else {
+        hostileNeighbors++;
+      }
+    }
+  }
+  
+  // Safety calculation
+  safety += (6 - occupiedNeighbors) * 0.2; // More empty = safer
+  safety += friendlyNeighbors * 0.3; // Friendly support
+  safety -= hostileNeighbors * 0.8; // Hostile neighbors very dangerous
+  
+  return safety;
+};
+
+/**
+ * Evaluate trap risk for Queen position
+ */
+window.AIEngine.evaluateQueenTrapRisk = function(q, r, allPlacedPieces, oppColor) {
+  let risk = 0;
+  
+  // Check for opponent Ants that could quickly reach this position
+  const oppAnts = allPlacedPieces.filter(p => 
+    p.meta.color === oppColor && p.meta.key === 'A'
+  );
+  
+  for (const ant of oppAnts) {
+    const dist = Math.abs(q - ant.meta.q) + Math.abs(r - ant.meta.r);
+    if (dist <= 3) {
+      risk += Math.max(0, 4 - dist) * 0.2; // Closer Ants = higher risk
+    }
+  }
+  
+  // Check for opponent Beetles that could climb/pin
+  const oppBeetles = allPlacedPieces.filter(p => 
+    p.meta.color === oppColor && p.meta.key === 'B'
+  );
+  
+  for (const beetle of oppBeetles) {
+    const dist = Math.abs(q - beetle.meta.q) + Math.abs(r - beetle.meta.r);
+    if (dist <= 2) {
+      risk += Math.max(0, 3 - dist) * 0.15; // Beetle threat
+    }
+  }
+  
+  return risk;
 };
 
 /**
@@ -3503,10 +4049,27 @@ window.AIEngine.isEmergencyDefensive = function(move) {
     
     // If Queen has 4+ threats, this is emergency territory
     if (currentThreats >= 4) {
+      // CRITICAL: Queen in extreme danger! 
+      console.log(`🤖 🛡️ CRITICAL: Queen has ${currentThreats}/6 threats - emergency action required!`);
+      
       // Check if this move is a Queen move that escapes danger
       if (move.type === 'move' && move.piece && move.piece.meta.key === 'Q') {
         console.log(`🤖 🛡️ EMERGENCY: Moving Queen to escape danger!`);
         return true;
+      }
+      
+      // Check if this move opens an escape route for our Queen
+      if (move.type === 'move') {
+        // Moving a piece that was blocking Queen's escape
+        const fromQ = move.fromQ || (move.piece && move.piece.meta.q);
+        const fromR = move.fromR || (move.piece && move.piece.meta.r);
+        if (fromQ !== undefined && fromR !== undefined) {
+          const wasBlockingEscape = queenNeighbors.some(([nq, nr]) => nq === fromQ && nr === fromR);
+          if (wasBlockingEscape) {
+            console.log(`🤖 🛡️ EMERGENCY: Moving piece to open Queen escape route!`);
+            return true;
+          }
+        }
       }
     }
     
