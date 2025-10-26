@@ -7721,7 +7721,13 @@ window.AIEngine.createStrategicPlan = function(gameState) {
 };
 
 window.AIEngine.applyStrategicFilter = function(moves) {
-  const gameState = this.getCurrentGameState();
+  // Build a simple game state for strategic analysis
+  const gameState = {
+    currentPlayer: this.color,
+    pieces: typeof tray !== 'undefined' ? tray : [],
+    queenPlaced: typeof state !== 'undefined' ? state.queenPlaced : {}
+  };
+  
   const plan = this.createStrategicPlan(gameState);
   
   debugLog(`🎯 Strategic Plan: ${plan.phase} - ${plan.objectives.join(', ')}`);
