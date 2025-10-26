@@ -184,20 +184,20 @@ window.layoutTrays = function() {
     const scaledPieceSize = pieceSize * trayPieceScale;
     let pieceSpacing, typeGap, colGap, queenOffset;
     if (isMobile) {
-        pieceSpacing = scaledPieceSize * 0.9;
-        typeGap = scaledPieceSize * 0.5;
+        pieceSpacing = scaledPieceSize * 0.9; // Slightly more space to show thin gap
+        typeGap = scaledPieceSize * 0.4; // Smaller gap between types but not too small
         colGap = scaledPieceSize * 0.2;
-        queenOffset = scaledPieceSize * 0.8;
+        queenOffset = scaledPieceSize * 0.6; // Reduce queen gap significantly
     } else if (isTablet) {
-        pieceSpacing = scaledPieceSize * 0.8;
-        typeGap = scaledPieceSize * 0.5;
+        pieceSpacing = scaledPieceSize * 0.8; // Just enough for thin gap
+        typeGap = scaledPieceSize * 0.4; // Smaller gap between types
         colGap = scaledPieceSize * 0.4;
-        queenOffset = scaledPieceSize * 1.0; // Even spacing with other pieces
+        queenOffset = scaledPieceSize * 0.8; // Reduce queen gap
     } else {
-        pieceSpacing = scaledPieceSize * 0.8;
-        typeGap = scaledPieceSize * 0.5;
+        pieceSpacing = scaledPieceSize * 0.82; // Just slightly more than 0.75 for thin gap
+        typeGap = scaledPieceSize * 0.4; // Smaller gap between piece types
         colGap = scaledPieceSize * 0.4;
-        queenOffset = scaledPieceSize * 1.4;
+        queenOffset = scaledPieceSize * 1.0; // Much smaller queen gap (was 1.4)
     }
 
     // Clear existing graphics before redrawing
@@ -223,26 +223,26 @@ window.layoutTrays = function() {
     } else if (isTablet) {
         queenCenterX = (trayWidth / 2) - 5; // Slightly adjust for tablet to look centered
     } else {
-        queenCenterX = trayWidth / 2; // Centered for desktop
+        queenCenterX = (trayWidth / 2) - 8; // Move slightly left for desktop
     }
     
     const whitePositions = {
         // Column 1: Ants and Spiders (left side)
-        'A1': { x: leftColumnX, y: startY },
-        'A2': { x: leftColumnX, y: startY + pieceSpacing },
-        'A3': { x: leftColumnX, y: startY + pieceSpacing * 2 },
-        'S1': { x: leftColumnX, y: startY + pieceSpacing * 3 + typeGap },
-        'S2': { x: leftColumnX, y: startY + pieceSpacing * 4 + typeGap },
+        'A1': { x: leftColumnX, y: startY + (scaledPieceSize * 0.1) }, // Move ants down slightly
+        'A2': { x: leftColumnX, y: startY + pieceSpacing + (scaledPieceSize * 0.1) }, // Move ants down slightly
+        'A3': { x: leftColumnX, y: startY + pieceSpacing * 2 + (scaledPieceSize * 0.1) }, // Move ants down slightly
+        'S1': { x: leftColumnX, y: startY + pieceSpacing * 3 + typeGap }, // Spiders stay exactly where they are
+        'S2': { x: leftColumnX, y: startY + pieceSpacing * 4 + typeGap }, // Spiders stay exactly where they are
         
         // Queen perfectly centered above both columns
-        'Q1': { x: queenCenterX, y: startY - queenOffset },
+        'Q1': { x: queenCenterX, y: startY - queenOffset }, // Queen stays exactly where it is
         
         // Column 2: Grasshoppers and Beetles (right side)
-        'G1': { x: rightColumnX, y: startY },
-        'G2': { x: rightColumnX, y: startY + pieceSpacing },
-        'G3': { x: rightColumnX, y: startY + pieceSpacing * 2 },
-        'B1': { x: rightColumnX, y: startY + pieceSpacing * 3 + typeGap },
-        'B2': { x: rightColumnX, y: startY + pieceSpacing * 4 + typeGap }
+        'G1': { x: rightColumnX, y: startY + (scaledPieceSize * 0.1) }, // Move grasshoppers down slightly
+        'G2': { x: rightColumnX, y: startY + pieceSpacing + (scaledPieceSize * 0.1) }, // Move grasshoppers down slightly
+        'G3': { x: rightColumnX, y: startY + pieceSpacing * 2 + (scaledPieceSize * 0.1) }, // Move grasshoppers down slightly
+        'B1': { x: rightColumnX, y: startY + pieceSpacing * 3 + typeGap }, // Beetles stay exactly where they are
+        'B2': { x: rightColumnX, y: startY + pieceSpacing * 4 + typeGap } // Beetles stay exactly where they are
     };
 
     const blackPositions = { ...whitePositions }; // Same layout for black

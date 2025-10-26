@@ -1,0 +1,313 @@
+3.1 Strategies
+Strategy theorycrafting has a large following in board games and Hive is no exception. There are many forums on the internet discussing the best strategies for
+2A. Alcorn, Pong, Atari, 1972.
+3
+J. Wexler, Artificial Intelligence in Games: A look at the smarts behind Lionhead Studios
+Black and White and where it can and will go in the future, University of Rochester, http:
+//www.cs.rochester.edu/~brown/242/assts/termprojs/games.pdf, 2002.
+4Wiki, Human-computer chess matches, Wikipedia.org, http://en.wikipedia.org/wiki/
+Human\%E2\%80\%93computer_chess_matches, retrieved April 12, 2013.
+11
+different situations and approaches to the game. Many books have also been released on the subject. Randy Ingersoll is a pioneer within the subject and has
+released a series of books to his name about various strategies within Hive.5
+Similarly to chess, Hive is a game of reaction. Every move is an immediate
+reaction to the previous move, this also means that the strategies involved are everchanging. It is next to impossible to keep to one strategy throughout an entire game
+if the goal is to win. Below, many of the concepts that are involved in the strategic
+points of a game of Hive are discussed.
+3.1.1 Pinning and blocking
+The main goal of the game is to surround the opponent’s Queen and prevent the
+opponent from doing the same to the player. For this purpose most strategies focus
+on two important points, pinning and blocking. The One Hive Rule states that
+the hive must always be connected, following this by moving a piece next to a
+single piece of the opponent, the player is able to lock the opponents piece, pinning
+it to its current position. Doing this to the opponents Queen may be one of the
+most important moves in the whole game as a moving Queen will be difficult to
+surround. Blocking is a natural follow-up to pinning, by surrounding an enemy
+piece the player blocks it from moving away. It is worth noting that most pieces
+have to slide to move, and thus it is not necessary to completely surround a piece
+to block it. Also note the fact that neither the Beetle nor the Grasshopper can be
+blocked as their movement allows them to move over other pieces. The Ant is highly
+adapted at pinning and blocking other pieces as it is able to move all around the
+Hive in just one turn. The Spider is also good but its limited movement of always
+three hinders it from being as good as the ant. The Grasshopper can quickly move
+to positions across the board to either block or pin, but can only move straight
+which in many cases might not be beneficial. The Beetle is able to pin down pieces
+by moving on top of them and by doing this it can move across the entire board into
+locations otherwise unreachable. The Beetle is slow however, and a large part of the
+game is centered around speed. Playing to pin the opponent’s pieces is important
+but the player also has to consider that every pin requires pieces and moves to
+perform, knowing when to pin and when not to is an important part of the game.
+An opponents Beetle can be dangerous next to the players pieces, but being on the
+other side of the board makes it no real threat and easily ignored.
+3.1.2 Stealing turns
+Hive is a game focusing on speed. To win the players need to be the first to surround
+their opponents Queen and to do so they need to be quick. Both the Ant and the
+Beetle can move around the board but the Ant does it a lot quicker. Now think
+about the game as a sequence of turns. Say the opponent places a piece the player
+5R. Ingersoll, Play Hive Like a Champion, Lulu, http://www.playhivelikeachampion.com/,
+2012.
+12
+wants to pin, to do so a piece needs to be moved next to it so that it is affected by
+the One Hive Rule. Moving to this certain location, the player may choose between
+six turns with a Beetle, two turns with a Spider or one turn with an Ant. Clearly
+the Spider is more effective than the Beetle, and the Ant more so than the Spider.
+Randy Ingersoll describes this as tempo in his book Play Hive like a Champion.
+The players play to gain tempo and make their opponent lose it. As an example,
+the opponent places a bug next to their Queen. By moving a piece next to it to pin
+it down the player manages to steal a turn, thus making the opponent lose tempo.
+Had the player just moved a piece next to the opponents Queen, it would have
+required a minimum of two turns, one to place the piece on the board and one to
+move it. By pinning one of the opponents pieces, the player makes sure that piece is
+unusable and by doing so wastes the opponents turn. As Ingersoll talks about this
+in his book, he also mentions that the starting player always has an advantage of
+one turn. This makes it impossible for the second player to win unless he manages
+to steal turns during the game. Similar concepts exist in many other games. Chess
+players and theorists in particular generally agree that the player with the first move
+has some advantage, and there is a lot of statistics to back this up.6
+6Wiki, First-move Advantage in Chess, Wikipedia, http://en.wikipedia.org/wiki/
+First-move_advantage_in_chess, retrieved April 4, 2013.
+13
+Chapter 4
+Method
+The algorithm chosen for the AIs decision making is Minimax7
+. It was chosen
+because it is very well suited for turn based games with two players where each player
+has perfect information of the current state of the game. It is used to maximize the
+worst result of the move that is about to be made, or in other words decide which
+possible move has the best outcome. Minimax can take an incredibly long time to
+run if not limited and optimized, so it was only allowed to look a few turns ahead.
+It was also sped up using alpha-beta pruning8
+.
+4.1 Minimax
+The Minimax search algorithm works by creating a tree where the nodes represent
+states in the game and the edges represent possible moves in that state leading to
+new states. In such a tree, the two players will alternate in taking their turns as
+the depth increases. Player A will make a move at the root state, then player B,
+and then back to A and so on. Given a heuristic function that assigns a value to a
+state depending on how good it is for player A, player B will want to minimize that
+value while player A wants to maximize it. This is where the name of the algorithm
+comes from. Leaf nodes, states where the game is over, are given values of positive
+infinity if the player running the algorithm won and negative infinity if they lost.
+When deciding which move to make, the algorithm will look several moves ahead
+and pick the move that leads to the highest minimum value. For example when
+Player A is making a move: if looking just two steps ahead it will pick a move such
+that player B:s best move yields the highest value for A. Two heuristic functions
+were implemented describing two different strategies. These are explained in the
+Analysis section below.
+7E. Mayefsky, F. Anene, M. Sirota, Algorithms - Minimax, Stanford, http://www.stanford.
+edu/~msirota/soco/minimax.html, retrieved April 12, 2013.
+8E. Mayefsky, F. Anene, M. Sirota, Algorithms - Alpha-Beta Pruning, Stanford, http://www.
+stanford.edu/~msirota/soco/alphabeta.html, retrieved April 12, 2013.
+15
+4.1.1 Alpha-Beta pruning
+Alpha-Beta pruning is used to reduce the number of nodes that are evaluated by
+the Minimax algorithm. It stops evaluating a move when it detects that the move
+is worse than the currently best one. As explained above, Minimax finds a branch
+where the leaf nodes lowest value is the highest. If one branch has been determined
+to yield at least 9 points we can stop evaluating other branches as soon as we find
+a leaf node in it with a value lower than 9.
+Figure 4.1. Branches are evaluated from left to right. When the node with
+value 8 is examined, the rest of the branch does not have to be evaluated since
+it is known that the leftmost branch will always be better.
+16
+Chapter 5
+Analysis
+For the sake of this study a fully playable version of Hive was created on the Processing platform, allowing a human to play against the AI or let the AI play against
+itself. Processing was chosen as it is an easy to use and fast environment that
+lets the user build graphical prototypes easily. It is also highly similar to Java, a
+language the writers of this report have vast experience in. Processing was chosen
+over Java because of its graphical properties as the authors wanted to focus on the
+strategy and game aspects of the project.
+5.1 Assigning values to pieces
+For the AI to be able to assign a proper value to a state it needs to know what is
+good and what is bad. This is done by assigning values to pieces and formations
+and summing up everything on the board. A high value means good and a low value
+means bad. Each piece is important for different reasons in different roles. Ants
+and Beetles are great for pinning pieces in one location, the latter do it completely
+so that the pin can not be broken, and the former do it quickly from almost any
+location on the board. It is important to know when to use which piece and for
+what reasons.
+5.1.1 Queen
+The Queen is the centerpiece of the game. If the player does not protect it, the
+game is lost. The Queen is therefore the most valuable piece. Being able to move
+the Queen might very well be the difference between winning or losing. By itself
+it is not a strong piece, but placing it allows the player to move any of their other
+pieces which gives the Queen a high value of 50 as a reference to the AI.
+5.1.2 Beetle
+The ability to move on top of the Hive is the Beetles greatest strength. It can move
+to any possible location on the board and has the ability to perfectly pin any piece
+17
+it stands upon. Many strategies involve getting a Beetle on top of the opponents
+queen to make it unable to escape, this also lets the player place pieces directly
+next to the opponents Queen which hastens the encircling process quite a bit. The
+Beetles only disadvantage is its slow movement. Beetles are given a value of 20.
+5.1.3 Grasshopper
+The Grasshopper, like the Beetle, is able to move into hexes otherwise inaccessible.
+Being able to jump over the Hive, it can ignore the rules about sliding which is
+a great strength. But the ability to only move in straight lines hinders it from
+doing many of the things needed to win. Both the Grasshopper and the Beetle are
+pieces designed to be able to fill otherwise inaccessible hexes and while they both
+fill different roles, they are considered to be of the same value. Grasshoppers were
+therefore also given a value of 20.
+5.1.4 Spider
+While being fast, the Spider is constrained by its limited moves. This makes it hard
+to coordinate in a way that is advantageous and results in the Spider possibly being
+the hardest piece to use in many cases. Its three-step movement is both its greatest
+strength and weakness. Because of this the Spider is considered the weakest piece
+and given a value of 10.
+5.1.5 Ant
+The Ant does everything the Spider does, only better. Being able to move to any
+hex around the Hive makes the Ant a very versatile piece and it has many uses. It is
+excellent for pinning down newly placed pieces by the opponent or quickly helping
+to block one of the opponents pieces. Because of this, the Ant places second highest
+on the value scale with a value of 30.
+5.2 Early game
+The first four turns of the games are considered early game. During these the player
+may place up to four pieces, or move those already placed after the Queen has been
+placed. The purpose of the early game to set up pieces for later use, every placement
+is as important as the next and it is possible to lose the game within these turns by
+making bad choices.
+18
+5.2.1 Opening move
+Queen - While a popular move and great from a strategic view, placing the Queen
+first is prohibited in many versions of the game and in official tournaments.9 The
+reason for this is the high chance of the game ending in a stalemate if both players
+place their Queen on their respective turns.
+Spider - Placing a Spider is an aggressive opening, considering that the Queen
+is almost always placed second, it will now have a spider pinned next to it for a
+long time, taking up one of the six hexes that should be protected at all costs. The
+Spider is usually placed first for one reason, saving the better pieces for later. The
+value of the Spider is much less than that of any of the other pieces and considering
+that the first piece placed will be locked in place for a long time, it will act as a
+sacrifice.
+Beetle/Grasshopper - Both of these are defensive openings. By placing a Beetle
+or a Grasshopper and then the Queen the player instantly has a piece that will be
+able to move away and leave the spot open should the need arise, which might save
+the Queen from total encirclement and the player from losing the game.
+Ant - An Ant should never be used as an opening. The Ants strongest side is
+its mobility, by using it first an effectively locking it in place for a large part of the
+game, the player sacrifices a piece that could be more useful elsewhere.
+5.2.2 Second move
+Queen - The Queen should be placed as fast as possible to prevent the opponent
+from preparing pieces to move directly next to the players Queen when it is placed.
+It is important to note that the players should never place pieces next to their
+Queen after it has been placed, doing so will give the opponent an opportunity to
+pin them in place stealing tempo.
+Spider - Placing the Spider as the second move is a very aggressive play. This
+opens up for an instant pin in the following moves, forcing the opponent to place
+his pieces next to each other. The Ant and sometimes the Grasshopper can perform
+the same move, but since Spiders are hard to use later on in the game this could
+be their only fast and easy use. It is worth noting that the player is still unable to
+move this piece until the Queen has been placed which means that the opponent
+has time to prepare for whatever move this piece will be able to perform.
+5.2.3 Third move
+Queen - If it has not been placed, it should be now. If the Queen was placed during
+the second move the player is now able to move it. Doing so is in no way at all
+beneficial to the player and should not be done.
+9Boardspace, Rules Change, Boardspace.net, http://www.boardspace.net/english/about_
+hive.html, 2008.
+19
+Spider - It is able to move across most of the board because of the lack of
+currently placed pieces. Because of this the Spider is ideal as the player is able
+to place it in a spot that will let it move to a much more ideal place that would
+otherwise not be possible later on in the game.
+Beetle - Beetles should be placed early for one reason, their lack of speed. The
+Beetle will take a long time to move across the board so placing them early will
+increase the chance that they will actually reach their goal.
+Grasshopper - Considering that the board will be small and probably spread at
+this time, the Grasshopper might not be a good piece to place. It is better to save
+it until an ideal opportunity shows itself.
+Ant - Not unlike the grasshopper, placing the Ant this early might be redundant
+considering the small size of the board this early, as a Spider is able to perform most
+of the same moves. Saving it for later when it is harder to move across the board
+might be a better choice.
+5.2.4 Fourth move
+Queen - Must be placed if it has not already been. By this time the only piece
+the opponent could have moved is the Queen, which means that the players Queen
+should either be next to one of the players own pieces or next to one of them and
+the opponents Queen. If the opponents Queen was moved next to the player, the
+player gained tempo as the opponent used one turn to move his Queen and gained
+one piece next to the players Queen. The player on the other hand, gained a piece
+next to the opponents Queen without using a turn. By moving the Queen the player
+would lose that tempo, and by this logic the Queen should never be moved during
+the fourth turn.
+Spider - Placing a Spider on the fourth turn is about as good a move as placing
+it on the third, only slightly less valuable since the board has grown a bit and the
+Spider might have a harder time moving around. Moving an already placed Spider
+is a very aggressive move by the fourth turn. The Spider should be moved next to
+one of the opponents pieces to pin it in its location, or next to the opponents Queen
+to work towards victory. Pinning one of the opponents pieces next to their Queen
+is ideal.
+Beetle - Similar to earlier turns, placing a Beetle now would be a good choice
+as it will not have to move as far to get across the board.
+Grasshopper - The Grasshopper is still an opportunistic piece and should only
+be placed or moved if the opportunity shows itself.
+Ant - Placing an Ant during the fourth turn is a good move to open up pinning
+opportunities for later. An already placed Ant can be moved to the other side of
+the board to pin the opponents pieces, or moved next to the Queen to work towards
+victory.
+20
+5.3 Mid game
+This is the build up phase where players tend to either pin their opponents pieces
+as much as possible or try to build defensive structures with their own pieces.
+Many strategies exist in this phase and we will go through a few in the following
+paragraphs.
+5.3.1 Beetle dropping
+This move has already been mentioned above. It is a rather simple but lengthy
+move, where the player places a Beetle and then moves it until it is on top of the
+opponents Queen. When on top it not only pins the Queen in place, hindering it
+from trying to escape, but also allows the player to place or drop pieces directly
+next to the opponents Queen saving a lot of tempo that would otherwise be spent
+on moving the pieces.
+5.3.2 Circling
+The goal of the game is to encircle the opponents Queen entirely while at the same
+time preventing the opponent from doing the same to the players Queen. One way
+of hindering the opponents advancement is by circling. The rules of the game state
+that no piece may enter a hex if it can not slide into it (with the exception of the
+Beetle and the Grasshopper) which means that if the player is able to encircle one
+of the hexes next to his Queen, the opponent may not move a piece to that place.
+This is to prevent pieces like the Ant or the Spider from being placed on the other
+side of the board and then moved a great distance into a certain hex. Instead, the
+opponent is forced to either spend several turns getting a slow moving Beetle to
+the location or get a Grasshopper to jump into the hole in the circle. Both of these
+solutions take a lot of time, the Beetle has to move great lengths which takes several
+turns, and the Grasshopper can only move in straight lines which might be hard to
+coordinate with already placed Grasshoppers.
+21
+Figure 5.1. Creating a circle next to a Queen makes it difficult to surround.
+22
+5.4 Late game
+It is hard to state a strict value to when the late game in Hive starts as it is almost
+interchangeable with mid game with next to no difference. One might consider that
+it starts when all the players pieces are on the board, but from a strategic view,
+there is no real difference from the mid game.
+5.5 Defensive
+As stated above a Beetle or Grasshopper early makes for a better defense than a
+Spider or an Ant. To achieve these moves, Beetles and Grasshoppers are given
+a higher value than usual during the first couple of turns. This way it makes it
+beneficial to place them early in the game, but later on Ants become the preferred
+pieces. Empty hexes next to the queen also increases the total value. After the early
+game, circling becomes a major goal in the defensive strategy. Circles and partial
+circles are created by looking at an empty hex next to the queen and counting the
+number of pieces around it. More points are given for each piece next to such an
+empty hex, this way an almost complete circle made of 5 out of 6 possible pieces
+will still give a massive defensive bonus, as only Beetles and Grasshoppers would be
+able to enter it. Only making defensive moves will not win the game, so in order to
+make offensive moves beneficial, even if playing defensively, a limit was put on how
+much defense would increase the total value. This means that at some point, the
+value given from defense is at its maximum, and a second circle will not increase the
+value any more. When defensive moves no longer are as beneficial, the best thing
+to do is to go on the offensive.
+5.6 Offensive
+The second implemented strategy was an offensive one. Opening with the sacrifice
+of a Spider and then placing the Queen. This is then followed by an early Ant for
+the possibility of pinning and then a Beetle. When mid game starts, additional
+points are given out mainly for each of the opponents pieces that are pinned and
+for having a Beetle on top of the enemy Queen. This makes the AI try to focus on
+aggressive pinning and locking down the opponent’s pieces as well as try to get a
+Beetle into a position where it can drop pieces next to the opponent Queen. Each
+state in which the opponents Queen has more pieces next to it is also worth a lot
+more which makes the AI more prone to try and surround the opponents Queen. In
+order to prevent it from focusing entirely on being offensive it also has a decreasing
+factor of value for each state in which its own Queen is threatened to make it avoid
+them as much as possible.

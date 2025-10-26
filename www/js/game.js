@@ -1306,6 +1306,19 @@ function legalMoveZones(piece){
     const type=piece.meta.key,
             q0=piece.meta.q,
             r0=piece.meta.r;
+            
+    // BEETLE BUG FIX: Check if piece has something stacked on top
+    const currentKey = `${q0},${r0}`;
+    const cell = window.cells.get(currentKey);
+    if (cell && cell.stack && cell.stack.length > 1) {
+        // Find this piece's position in the stack
+        const pieceIndex = cell.stack.findIndex(p => p === piece);
+        // If there are pieces above this one, it cannot move
+        if (pieceIndex !== -1 && pieceIndex < cell.stack.length - 1) {
+            return []; // Piece is trapped under another piece
+        }
+    }
+    
     // build occupancy from actual cell stacks so stacking is respected
     const occAll = new Set();
     window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });

@@ -148,8 +148,30 @@ window.AIUI.createDifficultyModal = function() {
         <div style="display: flex; align-items: center; gap: 12px;">
           <span style="font-size: 24px;">�</span>
           <div style="text-align: left;">
-            <strong>Beedric Bumbleton</strong><br>
-            <small style="opacity: 0.9;">👑 Hard • Lord of the Royal Hive</small>
+            <strong>Beedric Classic</strong><br>
+            <small style="opacity: 0.9;">🧠 Original MCTS</small>
+          </div>
+        </div>
+      </button>
+      
+      <button class="difficulty-btn" data-difficulty="hard-v2" style="
+        background: linear-gradient(135deg, #2F4F4F, #8B0000); 
+        color: white; 
+        border: 2px solid #2F4F4F;
+        padding: 15px 20px; 
+        border-radius: 12px; 
+        font-size: 14px; 
+        font-family: 'Milonga', serif;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        flex: 1;
+      ">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">⚡</span>
+          <div style="text-align: left;">
+            <strong>Beedric V2</strong><br>
+            <small style="opacity: 0.9;">🧠⚔️ Hybrid AI</small>
           </div>
         </div>
       </button>
@@ -216,20 +238,41 @@ window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
   
-  // Set up the opponent personality
-  if (window.Personalities) {
-    window.Personalities.setOpponent(difficulty);
+  // Handle V2 engine activation
+  if (difficulty === 'hard-v2') {
+    console.log(`🎮 Starting Single Player mode with AI Engine V2!`);
+    
+    // Activate V2 engine
+    if (window.activateAIV2) {
+      window.activateAIV2();
+    }
+    
+    // Set personality to hard for V2
+    if (window.Personalities) {
+      window.Personalities.setOpponent('hard');
+    }
+    
+    // Enable AI engine with V2
+    if (window.AIEngine) {
+      window.AIEngine.enable('hard');
+    }
+  } else {
+    // Original logic for other difficulties
+    console.log(`🎮 Starting Single Player mode (${difficulty} difficulty)`);
+    
+    // Set up the opponent personality
+    if (window.Personalities) {
+      window.Personalities.setOpponent(difficulty);
+    }
+    
+    // Enable AI engine
+    if (window.AIEngine) {
+      window.AIEngine.enable(difficulty);
+    }
   }
-  
-  console.log(`🎮 Starting Single Player mode (${difficulty} difficulty)`);
   
   // Hide difficulty modal
   this.hideDifficultyModal();
-  
-  // Enable AI engine
-  if (window.AIEngine) {
-    window.AIEngine.enable(difficulty);
-  }
   
   // Update UI
   this.updateUIForAIMode();
@@ -238,10 +281,12 @@ window.AIUI.startAIMode = function(difficulty) {
   this.resetGameForAI();
   
   // Get opponent name for notification
-  const opponentName = window.Personalities?.opponents[difficulty]?.name || 'AI Opponent';
+  const baseDifficulty = difficulty === 'hard-v2' ? 'hard' : difficulty;
+  const opponentName = window.Personalities?.opponents[baseDifficulty]?.name || 'AI Opponent';
+  const engineType = difficulty === 'hard-v2' ? ' (V2 Hybrid Engine)' : '';
   
   // Show success notification
-  this.showNotification(`🤖 Challenge accepted!\n\nFacing: ${opponentName}\nYou play as White, AI plays as Black.`);
+  this.showNotification(`🤖 Challenge accepted!\n\nFacing: ${opponentName}${engineType}\nYou play as White, AI plays as Black.`);
   
   // Show intro voice line after a brief delay
   setTimeout(() => {

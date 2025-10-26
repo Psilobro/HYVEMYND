@@ -234,8 +234,8 @@ canvas {
 
 .player-tray {
     position: absolute;
-    top: -9%; /* Move up to -9% */
-    bottom: 0;
+    top: 15%; /* Move down from top edge */
+    bottom: 0; /* Full height to bottom to give more room */
     width: 220px; /* Increased width for better 2-column layout */
     pointer-events: all; /* Enable pointer events for piece selection */
     transform: scale(0.73); /* Scale down to 73% */
@@ -476,7 +476,7 @@ canvas {
     #white-tray.player-tray {
         left: 32px !important;
         right: auto !important;
-        top: -10% !important;
+        top: 15% !important;
         transform: scale(0.7) !important;
         transform-origin: left top !important;
         width: 220px !important;
@@ -484,12 +484,10 @@ canvas {
         z-index: 5 !important;
         overflow: visible !important;
         display: block !important;
-    }
-
-    #black-tray.player-tray {
+    }    #black-tray.player-tray {
         right: 32px !important;
         left: auto !important;
-        top: -10% !important;
+        top: 15% !important;
         transform: scale(0.7) !important;
         transform-origin: right top !important;
         width: 220px !important;
@@ -664,7 +662,7 @@ canvas {
     
     #black-tray.player-tray {
         right: 50px !important; /* Closer to board */
-        top: 10px !important; /* Higher up */
+        top: 15px !important; /* Higher up */
         bottom: unset !important;
         width: 220px !important;
         height: 300px !important;
