@@ -273,8 +273,171 @@ window.AIEngineV2 = {
   },
   
   /**
-   * Check if a move threatens opponent pieces
+   * STRATEGIC GAME PLAN SYSTEM
+   * Creates multi-move plans focused on queen pinning progression
    */
+  createStrategicGamePlan: function(gameState) {
+    const queenAnalysis = this.analyzeQueenPinning();
+    const plan = {
+      phase: 'none',
+      priority: 'low',
+      objectives: [],
+      immediateGoal: null,
+      pieceDeploymentTarget: 0
+    };
+    
+    if (queenAnalysis.queens.length === 0) {
+      plan.phase = 'pre-queen';
+      plan.objectives = ['Place pieces aggressively', 'Prepare for queen hunting'];
+      return plan;
+    }
+    
+    const targetQueen = queenAnalysis.queens[0]; // Focus on first opponent queen
+    const piecesPlaced = this.getMyPlacedPieces().length;
+    const opponentPieces = this.getOpponentPlacedPieces().length;
+    
+    // CRITICAL: Must keep up with opponent piece count
+    if (piecesPlaced < opponentPieces) {
+      plan.phase = 'catch-up-deployment';
+      plan.priority = 'critical';
+      plan.immediateGoal = 'DEPLOY_MORE_PIECES';
+      plan.objectives = [
+        'Deploy pieces immediately - we are behind!',
+        'Place pieces near queen to maintain pressure',
+        'Do NOT waste moves repositioning'
+      ];
+      plan.pieceDeploymentTarget = opponentPieces + 1;
+      return plan;
+    }
+    
+    // Analyze queen pinning status
+    if (targetQueen.myPiecesAdjacent === 0) {
+      plan.phase = 'initial-pin';
+      plan.priority = 'high';
+      plan.immediateGoal = 'ESTABLISH_FIRST_PIN';
+      plan.objectives = [
+        'Get first piece adjacent to enemy queen',
+        'Establish initial pin pressure',
+        'Deploy supporting pieces nearby'
+      ];
+    } else if (targetQueen.myPiecesAdjacent < 3) {
+      plan.phase = 'build-pressure';
+      plan.priority = 'high';
+      plan.immediateGoal = 'ADD_MORE_PINNING_PIECES';
+      plan.objectives = [
+        'Add more pieces adjacent to queen',
+        'Block queen escape routes',
+        'Deploy remaining pieces for support'
+      ];
+    } else if (targetQueen.myPiecesAdjacent < 5) {
+      plan.phase = 'near-victory';
+      plan.priority = 'critical';
+      plan.immediateGoal = 'COMPLETE_SURROUND';
+      plan.objectives = [
+        'Complete queen surrounding',
+        'Block all remaining escape routes',
+        'Victory is within reach!'
+      ];
+    } else {
+      plan.phase = 'victory-execution';
+      plan.priority = 'critical';
+      plan.immediateGoal = 'WIN_GAME';
+      plan.objectives = ['Close the final gap and win!'];
+    }
+    
+    return plan;
+  },
+
+  /**
+   * Get my placed pieces count
+   */
+  getMyPlacedPieces: function() {
+    return tray.filter(p => p.meta.color === this.color && p.placed);
+  },
+
+  /**
+   * Get opponent placed pieces count  
+   */
+  getOpponentPlacedPieces: function() {
+    const opponentColor = this.color === 'white' ? 'black' : 'white';
+    return tray.filter(p => p.meta.color === opponentColor && p.placed);
+  },
+
+  /**
+   * STRATEGIC MOVE FILTERING
+   * Heavily penalize moves that don't align with current game plan
+   */
+  filterMovesByStrategy: function(moves, gameState) {
+    const plan = this.createStrategicGamePlan(gameState);
+    const filteredMoves = [];
+    
+    console.log(`🎯 STRATEGIC PLAN: ${plan.phase} (${plan.priority} priority)`);
+    console.log(`🎯 IMMEDIATE GOAL: ${plan.immediateGoal}`);
+    console.log(`🎯 OBJECTIVES: ${plan.objectives.join(', ')}`);
+    
+    for (const move of moves) {
+      let strategicScore = 0;
+      let includeMove = true;
+      
+      // CRITICAL: Deployment phase - prioritize placement over movement
+      if (plan.immediateGoal === 'DEPLOY_MORE_PIECES') {
+        if (move.type === 'place') {
+          strategicScore += 1000; // Massive bonus for placing pieces
+        } else {
+          // Only allow movements that contribute to pinning
+          const queenAnalysis = this.analyzeQueenPinning();
+          if (queenAnalysis.queens.length > 0) {
+            const targetQueen = queenAnalysis.queens[0];
+            const afterDistance = Math.abs(move.q - targetQueen.position.q) + Math.abs(move.r - targetQueen.position.r);
+            if (afterDistance <= 1) {
+              strategicScore += 200; // Allow moves that pin queen
+            } else {
+              console.log(`🚫 REJECTING NON-ESSENTIAL MOVE: ${move.type} ${move.piece?.meta.key} - deployment priority!`);
+              includeMove = false; // Reject other movements during deployment phase
+            }
+          } else {
+            includeMove = false; // No queen visible, focus on deployment
+          }
+        }
+      }
+      
+      // PIN ESTABLISHMENT: Only allow moves that establish or strengthen pins
+      else if (plan.immediateGoal === 'ESTABLISH_FIRST_PIN' || plan.immediateGoal === 'ADD_MORE_PINNING_PIECES') {
+        const aggressiveScore = this.scoreAggressiveMove(move);
+        if (aggressiveScore >= 100) {
+          strategicScore += aggressiveScore;
+        } else {
+          console.log(`🚫 REJECTING NON-PINNING MOVE: ${move.type} ${move.piece?.meta.key} - pinning priority!`);
+          includeMove = false; // Reject moves that don't contribute to pinning
+        }
+      }
+      
+      // VICTORY PHASE: Only allow winning moves
+      else if (plan.immediateGoal === 'COMPLETE_SURROUND' || plan.immediateGoal === 'WIN_GAME') {
+        const aggressiveScore = this.scoreAggressiveMove(move);
+        if (aggressiveScore >= 150) { // High threshold for near-victory
+          strategicScore += aggressiveScore * 2;
+        } else {
+          console.log(`🚫 REJECTING NON-WINNING MOVE: ${move.type} ${move.piece?.meta.key} - victory priority!`);
+          includeMove = false;
+        }
+      }
+      
+      if (includeMove) {
+        filteredMoves.push({ move, strategicScore, plan: plan.phase });
+      }
+    }
+    
+    // Sort by strategic score
+    filteredMoves.sort((a, b) => b.strategicScore - a.strategicScore);
+    
+    console.log(`🎯 STRATEGIC FILTERING: ${moves.length} → ${filteredMoves.length} moves`);
+    if (filteredMoves.length > 0) {
+      console.log(`🎯 TOP STRATEGIC MOVE: ${filteredMoves[0].move.type} ${filteredMoves[0].move.piece?.meta.key} (score: ${filteredMoves[0].strategicScore})`);
+    }
+    
+    return filteredMoves.map(fm => fm.move);
+  },
   threatensPieces: function(move) {
     // Basic threat detection - check adjacent cells for opponent pieces
     const neighbors = this.getNeighbors(move.q, move.r);
@@ -593,40 +756,44 @@ window.AIEngineV2 = {
   },
 
   analyzeStrategicPatterns: function(gameState) {
-    // Get all possible moves and score them strategically with AGGRESSIVE PRIORITY
+    // Get all possible moves
     const allMoves = this.getAllPossibleMoves();
     
-    console.log(`🧠 Analyzing ${allMoves.length} moves with aggressive queen pinning priority...`);
+    console.log(`🧠 Analyzing ${allMoves.length} moves with STRATEGIC INTELLIGENCE...`);
     
-    // Score each move with aggressive pinning as top priority
-    const scoredMoves = allMoves.map(move => {
+    // FIRST: Apply strategic filtering based on game plan
+    const strategicMoves = this.filterMovesByStrategy(allMoves, gameState);
+    
+    if (strategicMoves.length === 0) {
+      console.log(`⚠️ No strategic moves found, falling back to basic evaluation`);
+      return allMoves; // Fallback to all moves if strategic filtering too restrictive
+    }
+    
+    // SECOND: Score the strategically viable moves
+    const scoredMoves = strategicMoves.map(move => {
       let score = 0;
       
       // PRIMARY: Aggressive queen pinning (highest priority)
       const aggressiveScore = this.scoreAggressiveMove(move);
-      score += aggressiveScore * 2; // Double weight for aggression
+      score += aggressiveScore * 3; // Triple weight for strategic moves
       
-      // SECONDARY: Center preference (lower priority)
-      const distance = Math.abs(move.q) + Math.abs(move.r);
-      score += (10 - distance) * 0.5; // Reduced weight
-      
-      // TERTIARY: Piece type preference (lowest priority)
-      if (move.piece) {
-        const pieceValues = { 'Q': 25, 'B': 20, 'S': 15, 'G': 12, 'A': 10 };
-        score += (pieceValues[move.piece.meta.key] || 5) * 0.3; // Much reduced weight
+      // SECONDARY: Deployment bonus (encourage placing pieces)
+      if (move.type === 'place') {
+        score += 50; // Bonus for deployment
       }
       
-      // QUATERNARY: Movement vs placement preference
-      if (move.type === 'move') score += 3;
+      // TERTIARY: Basic positional scoring (much lower priority)
+      const distance = Math.abs(move.q) + Math.abs(move.r);
+      score += (10 - distance) * 0.2; // Minimal weight
       
       return { move, score, aggressiveScore };
     });
     
-    // Sort by score with aggressive moves at top
+    // Sort by score with strategic moves at top
     scoredMoves.sort((a, b) => b.score - a.score);
     
-    // Log top moves for debugging
-    console.log('🧠 Top 5 strategic moves:');
+    // Log top strategic moves for debugging
+    console.log('🧠 Top 5 STRATEGIC moves:');
     for (let i = 0; i < Math.min(5, scoredMoves.length); i++) {
       const item = scoredMoves[i];
       console.log(`  ${i+1}. ${item.move.type} ${item.move.piece?.meta.key || '?'} to (${item.move.q},${item.move.r}) - Score: ${item.score.toFixed(1)} (Aggressive: ${item.aggressiveScore})`);

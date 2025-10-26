@@ -405,12 +405,20 @@ window.AIEngine.findBestMove = async function() {
     this.updateThinkingUI('strategic', 15);
   }
 
+  // STRATEGIC INTELLIGENCE: Filter moves by game plan before MCTS
+  debugLog('🎯 Applying strategic intelligence to move selection...');
+  const strategicMoves = this.applyStrategicFilter(availableMoves);
+  
+  // Use strategic moves for MCTS if available, otherwise fall back to all moves
+  const movesToExplore = strategicMoves.length > 0 ? strategicMoves : availableMoves;
+  debugLog(`🎯 Strategic filtering: ${availableMoves.length} → ${movesToExplore.length} moves`);
+
   const rootNode = new MCTSNode(gameState, null, null);
   
   // Ensure root node has moves initialized BEFORE starting MCTS
   if (rootNode.untriedMoves === null) {
-    rootNode.untriedMoves = this.generateLegalMoves(gameState);
-    debugLog(`🤖 🔧 Initialized root node with ${rootNode.untriedMoves.length} moves`);
+    rootNode.untriedMoves = movesToExplore; // Use strategically filtered moves
+    debugLog(`🤖 🔧 Initialized root node with ${rootNode.untriedMoves.length} strategic moves`);
   }
   
   const maxIterations = this.iterationsPerMove[this.difficulty];
@@ -7607,4 +7615,99 @@ window.AIEngine.analyzeForcedCheckmate = function(gameState, aiColor, oppQueen) 
     console.error(`🤖 💥 ERROR in analyzeForcedCheckmate:`, error);
     return 0;
   }
+};
+
+// Strategic intelligence system for progressive queen pinning
+window.AIEngine.createStrategicPlan = function(gameState) {
+  const plan = {
+    phase: 'deployment',
+    objectives: [],
+    priorities: []
+  };
+
+  const myColor = this.color;
+  const opponentColor = myColor === 'white' ? 'black' : 'white';
+  
+  // Count deployed pieces
+  const myPieces = gameState.pieces.filter(p => p.color === myColor && p.placed);
+  const opponentPieces = gameState.pieces.filter(p => p.color === opponentColor && p.placed);
+  
+  // Phase determination
+  if (myPieces.length < 3) {
+    plan.phase = 'deployment-crisis';
+    plan.objectives.push('Deploy essential pieces first');
+    plan.priorities.push('piece-placement');
+  } else if (myPieces.length < opponentPieces.length) {
+    plan.phase = 'catch-up';
+    plan.objectives.push('Match opponent piece count');
+    plan.priorities.push('piece-placement');
+  } else {
+    // Find opponent queen
+    const opponentQueen = opponentPieces.find(p => p.meta.key === 'Q');
+    if (opponentQueen) {
+      const queenNeighbors = this.getNeighbors(opponentQueen.q, opponentQueen.r);
+      const occupiedNeighbors = queenNeighbors.filter(([q, r]) => {
+        return gameState.pieces.some(p => p.placed && p.q === q && p.r === r);
+      });
+      
+      if (occupiedNeighbors.length === 0) {
+        plan.phase = 'initial-pin';
+        plan.objectives.push('Establish first queen pin');
+        plan.priorities.push('queen-pin');
+      } else if (occupiedNeighbors.length < 4) {
+        plan.phase = 'build-pressure';
+        plan.objectives.push('Add more pinning pieces');
+        plan.priorities.push('queen-pin');
+      } else {
+        plan.phase = 'near-victory';
+        plan.objectives.push('Complete queen surrounding');
+        plan.priorities.push('queen-pin');
+      }
+    }
+  }
+  
+  return plan;
+};
+
+window.AIEngine.applyStrategicFilter = function(moves) {
+  const gameState = this.getCurrentGameState();
+  const plan = this.createStrategicPlan(gameState);
+  
+  debugLog(`🎯 Strategic Plan: ${plan.phase} - ${plan.objectives.join(', ')}`);
+  
+  // During deployment crisis, heavily penalize non-placement moves
+  if (plan.phase === 'deployment-crisis' || plan.phase === 'catch-up') {
+    const placementMoves = moves.filter(move => move.type === 'place');
+    if (placementMoves.length > 0) {
+      debugLog(`🎯 Crisis mode: Prioritizing ${placementMoves.length} placement moves`);
+      return placementMoves;
+    }
+  }
+  
+  // During pinning phases, filter for strategic moves
+  if (plan.priorities.includes('queen-pin')) {
+    const strategicMoves = moves.filter(move => {
+      if (move.type === 'place') return true; // Always allow new pieces
+      
+      // For moves, check if they contribute to queen pinning
+      const opponentColor = this.color === 'white' ? 'black' : 'white';
+      const opponentQueen = gameState.pieces.find(p => 
+        p.color === opponentColor && p.meta.key === 'Q' && p.placed
+      );
+      
+      if (opponentQueen) {
+        const distance = this.hexDistance(move.toQ, move.toR, opponentQueen.q, opponentQueen.r);
+        return distance <= 3; // Only moves near queen area
+      }
+      
+      return false; // No aimless wandering
+    });
+    
+    if (strategicMoves.length > 0) {
+      debugLog(`🎯 Queen-focused: ${strategicMoves.length}/${moves.length} strategic moves`);
+      return strategicMoves;
+    }
+  }
+  
+  return moves; // Fallback to all moves
 };
