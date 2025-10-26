@@ -35,20 +35,26 @@ window.AIEngineV2 = {
    * Enhanced thinking UI with progress tracking
    */
   updateThinkingUI: function(phase, progress, data = {}) {
+    // Get the current opponent's name, fallback to "Beedric" for V2 engine
+    let aiName = "Beedric";
+    if (window.Personalities && window.Personalities.currentOpponent) {
+      aiName = window.Personalities.currentOpponent.name.split(' ')[0]; // Use first name only
+    }
+    
     const messages = {
-      'analyzing': '🧠 Beedric: Analyzing position complexity...',
-      'tactical': '⚡ Beedric: Seeking tactical solutions...',
-      'strategic': '🎯 Beedric: Strategic pattern recognition...',
-      'searching': '🌳 Beedric: Focused tree search...',
-      'evaluating': '📊 Beedric: Deep position evaluation...',
-      'simulating': '🎲 Beedric: Monte Carlo simulations...',
-      'calculating': '🧮 Beedric: Calculating variations...',
-      'optimizing': '⚙️ Beedric: Optimizing move selection...',
-      'finalizing': '✨ Beedric: Selecting optimal move...',
-      'complete': '✅ Beedric: Analysis complete!'
+      'analyzing': `🧠 ${aiName}: Analyzing position complexity...`,
+      'tactical': `⚡ ${aiName}: Seeking tactical solutions...`,
+      'strategic': `🎯 ${aiName}: Strategic pattern recognition...`,
+      'searching': `🌳 ${aiName}: Focused tree search...`,
+      'evaluating': `📊 ${aiName}: Deep position evaluation...`,
+      'simulating': `🎲 ${aiName}: Monte Carlo simulations...`,
+      'calculating': `🧮 ${aiName}: Calculating variations...`,
+      'optimizing': `⚙️ ${aiName}: Optimizing move selection...`,
+      'finalizing': `✨ ${aiName}: Selecting optimal move...`,
+      'complete': `✅ ${aiName}: Analysis complete!`
     };
     
-    const message = messages[phase] || '🧠 Beedric: Thinking...';
+    const message = messages[phase] || `🧠 ${aiName}: Thinking...`;
     const progressBar = this.createProgressBar(progress);
     
     // Calculate time

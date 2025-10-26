@@ -122,24 +122,30 @@ window.AIEngine.updateThinkingUI = function(phase, progress, details = {}) {
   const hud = document.getElementById('hud');
   if (!hud) return;
   
+  // Get the current opponent's name, fallback to "Beedric" for original engine
+  let aiName = "Beedric";
+  if (window.Personalities && window.Personalities.currentOpponent) {
+    aiName = window.Personalities.currentOpponent.name.split(' ')[0]; // Use first name only
+  }
+  
   const phaseMessages = {
-    'initializing': '🧠 Beedric is contemplating...',
-    'tactical': '⚡ Beedric: Analyzing tactical patterns...',
-    'strategic': '📈 Beedric: Planning strategic moves...',
-    'simulation': '🎯 Beedric: Running position simulations...',
-    'evaluation': '🔍 Beedric: Evaluating candidate moves...',
-    'minimax': '🧠 Beedric: Deep tactical calculation...',
-    'mcts': '🌳 Beedric: Monte Carlo tree search...',
-    'finalizing': '✨ Beedric: Finalizing decision...',
-    'complete': '🎯 Beedric: Move decided!',
-    'error': '⚠️ Beedric: Encountered error, completing analysis...'
+    'initializing': `🧠 ${aiName} is contemplating...`,
+    'tactical': `⚡ ${aiName}: Analyzing tactical patterns...`,
+    'strategic': `📈 ${aiName}: Planning strategic moves...`,
+    'simulation': `🎯 ${aiName}: Running position simulations...`,
+    'evaluation': `🔍 ${aiName}: Evaluating candidate moves...`,
+    'minimax': `🧠 ${aiName}: Deep tactical calculation...`,
+    'mcts': `🌳 ${aiName}: Monte Carlo tree search...`,
+    'finalizing': `✨ ${aiName}: Finalizing decision...`,
+    'complete': `🎯 ${aiName}: Move decided!`,
+    'error': `⚠️ ${aiName}: Encountered error, completing analysis...`
   };
   
-  let message = phaseMessages[phase] || '🧠 Beedric is contemplating...';
+  let message = phaseMessages[phase] || `🧠 ${aiName} is contemplating...`;
   
   // Special handling for completion phase
   if (phase === 'complete') {
-    message = '🎯 Beedric: Move decided!';
+    message = `🎯 ${aiName}: Move decided!`;
     if (details.move) {
       const moveType = details.move.type === 'placement' ? 'Placing' : 'Moving';
       const piece = details.move.piece?.meta?.key || '?';
@@ -260,10 +266,16 @@ window.AIEngine.checkAndMakeMove = function() {
   debugLog(`🤖 AI (${this.color}) analyzing position...`);
   this.thinking = true;
   
+  // Get current opponent name for thinking display
+  let aiName = "Beedric";
+  if (window.Personalities && window.Personalities.currentOpponent) {
+    aiName = window.Personalities.currentOpponent.name.split(' ')[0]; // Use first name only
+  }
+  
   // Show thinking indicator in HUD
   const hud = document.getElementById('hud');
   const originalText = hud.textContent;
-  hud.textContent = `� Beedric is contemplating...`;
+  hud.textContent = `🧠 ${aiName} is contemplating...`;
   
   // Add enhanced thinking UI
   this.updateThinkingUI('initializing', 5, { phase: 'Starting Analysis' });
