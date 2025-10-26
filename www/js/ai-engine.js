@@ -7721,50 +7721,345 @@ window.AIEngine.createStrategicPlan = function(gameState) {
 };
 
 window.AIEngine.applyStrategicFilter = function(moves) {
-  // Build a simple game state for strategic analysis
-  const gameState = {
-    currentPlayer: this.color,
-    pieces: typeof tray !== 'undefined' ? tray : [],
-    queenPlaced: typeof state !== 'undefined' ? state.queenPlaced : {}
-  };
-  
-  const plan = this.createStrategicPlan(gameState);
-  
-  debugLog(`🎯 Strategic Plan: ${plan.phase} - ${plan.objectives.join(', ')}`);
-  
-  // During deployment crisis, heavily penalize non-placement moves
-  if (plan.phase === 'deployment-crisis' || plan.phase === 'catch-up') {
-    const placementMoves = moves.filter(move => move.type === 'place');
-    if (placementMoves.length > 0) {
-      debugLog(`🎯 Crisis mode: Prioritizing ${placementMoves.length} placement moves`);
-      return placementMoves;
-    }
-  }
-  
-  // During pinning phases, filter for strategic moves
-  if (plan.priorities.includes('queen-pin')) {
-    const strategicMoves = moves.filter(move => {
-      if (move.type === 'place') return true; // Always allow new pieces
+  try {
+    // Build comprehensive game state for strategic analysis
+    const gameState = {
+      currentPlayer: this.color,
+      tray: typeof tray !== 'undefined' ? tray : [],
+      queenPlaced: typeof state !== 'undefined' ? state.queenPlaced : {}
+    };
+    
+    console.log(`🎯 STRATEGIC FILTER: Analyzing ${moves.length} moves for intelligent play`);
+    
+    const oppColor = this.color === 'white' ? 'black' : 'white';
+    const strategicMoves = [];
+    
+    // Find both Queens for strategic analysis
+    const oppQueen = gameState.tray.find(p => 
+      p && p.meta && p.meta.color === oppColor && p.meta.key === 'Q' && p.meta.placed
+    );
+    const aiQueen = gameState.tray.find(p => 
+      p && p.meta && p.meta.color === this.color && p.meta.key === 'Q' && p.meta.placed
+    );
+    
+    console.log(`🎯 Queens found - AI: ${aiQueen ? 'YES' : 'NO'}, Opponent: ${oppQueen ? 'YES' : 'NO'}`);
+    
+    // ✨ INTELLIGENT QUEEN PINNING STRATEGY ✨
+    // "Pin the queen, keep the pin, add more bugs, pin the queen with those"
+    if (oppQueen && oppQueen.meta) {
+      console.log(`🎯 👑 IMPLEMENTING INTELLIGENT QUEEN PINNING STRATEGY`);
       
-      // For moves, check if they contribute to queen pinning
-      const opponentColor = this.color === 'white' ? 'black' : 'white';
-      const opponentQueen = gameState.pieces.find(p => 
-        p.color === opponentColor && p.meta.key === 'Q' && p.placed
-      );
+      // Count current threats to opponent Queen
+      let currentThreats = 0;
+      const queenNeighbors = this.getNeighborCoords(oppQueen.meta.q, oppQueen.meta.r);
       
-      if (opponentQueen) {
-        const distance = this.hexDistance(move.toQ, move.toR, opponentQueen.q, opponentQueen.r);
-        return distance <= 3; // Only moves near queen area
+      for (const [nq, nr] of queenNeighbors) {
+        const occupied = gameState.tray.some(p => 
+          p && p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr
+        );
+        if (occupied) currentThreats++;
       }
       
-      return false; // No aimless wandering
-    });
-    
-    if (strategicMoves.length > 0) {
-      debugLog(`🎯 Queen-focused: ${strategicMoves.length}/${moves.length} strategic moves`);
-      return strategicMoves;
+      console.log(`🎯 👑 Opponent Queen has ${currentThreats}/6 threats - planning progressive pinning`);
+      
+      // PRIORITY 1: WINNING MOVES - Surround the Queen completely!
+      const winningMoves = moves.filter(move => {
+        if (move.type !== 'place') return false;
+        
+        const wouldBeAdjacent = queenNeighbors.some(([nq, nr]) => 
+          nq === move.q && nr === move.r
+        );
+        
+        if (wouldBeAdjacent) {
+          const newThreats = currentThreats + 1;
+          if (newThreats >= 6) {
+            console.log(`🎯 👑 🏆 WINNING MOVE: ${move.piece.meta.key} at ${move.q},${move.r} would WIN THE GAME!`);
+            move.priority = 'winning-move';
+            move.strategicValue = 100.0;
+            return true;
+          }
+        }
+        return false;
+      });
+      
+      if (winningMoves.length > 0) {
+        console.log(`🎯 👑 🏆 FOUND ${winningMoves.length} WINNING MOVES!`);
+        return winningMoves; // Always take the win!
+      }
+      
+      // PRIORITY 2: PROGRESSIVE PINNING - Add pieces around Queen systematically
+      const pinningMoves = moves.filter(move => {
+        if (move.type !== 'place') return false;
+        
+        const wouldBeAdjacent = queenNeighbors.some(([nq, nr]) => 
+          nq === move.q && nr === move.r
+        );
+        
+        if (wouldBeAdjacent) {
+          const newThreats = currentThreats + 1;
+          
+          if (newThreats >= 5) {
+            console.log(`🎯 👑 ⚡ CRITICAL PINNING: ${move.piece.meta.key} would create ${newThreats}/6 threats!`);
+            move.priority = 'critical-pinning';
+            move.strategicValue = 50.0;
+            return true;
+          } else if (newThreats >= 4) {
+            console.log(`🎯 👑 📌 STRONG PINNING: ${move.piece.meta.key} would create ${newThreats}/6 threats`);
+            move.priority = 'strong-pinning';
+            move.strategicValue = 25.0;
+            return true;
+          } else if (newThreats >= 3) {
+            console.log(`🎯 👑 🎯 BUILDING PRESSURE: ${move.piece.meta.key} would create ${newThreats}/6 threats`);
+            move.priority = 'building-pressure';
+            move.strategicValue = 15.0;
+            return true;
+          } else if (newThreats >= 2) {
+            console.log(`🎯 👑 📍 STARTING PINNING: ${move.piece.meta.key} would create ${newThreats}/6 threats`);
+            move.priority = 'start-pinning';
+            move.strategicValue = 8.0;
+            return true;
+          }
+        }
+        return false;
+      });
+      
+      // PRIORITY 3: MAINTAIN THE PIN - Keep existing pressure while adding more
+      const maintainMoves = moves.filter(move => {
+        if (move.type !== 'move') return false;
+        
+        // Check if this piece is currently threatening the Queen
+        const currentlyThreatening = queenNeighbors.some(([nq, nr]) => 
+          nq === move.piece.meta.q && nr === move.piece.meta.r
+        );
+        
+        if (currentlyThreatening) {
+          // Check if the move would maintain the threat
+          const wouldStillThreaten = queenNeighbors.some(([nq, nr]) => 
+            nq === move.q && nr === move.r
+          );
+          
+          if (wouldStillThreaten) {
+            console.log(`🎯 👑 🔒 MAINTAIN PIN: ${move.piece.meta.key} keeps Queen pressure`);
+            move.priority = 'maintain-pressure';
+            move.strategicValue = 12.0;
+            return true;
+          } else {
+            console.log(`🎯 👑 ❌ ABANDONING PIN: ${move.piece.meta.key} would stop threatening Queen - AVOID!`);
+            move.priority = 'abandon-pressure';
+            move.strategicValue = -10.0; // Strong penalty for losing pressure
+            return false;
+          }
+        }
+        return false;
+      });
+      
+      // PRIORITY 4: SUPPORT PINS - Place pieces that support the pinning pieces
+      const supportMoves = moves.filter(move => {
+        if (move.type !== 'place') return false;
+        
+        // Find our pieces that are already threatening the Queen
+        const ourThreateningPieces = gameState.tray.filter(p => 
+          p && p.meta && p.meta.placed && p.meta.color === this.color &&
+          queenNeighbors.some(([nq, nr]) => nq === p.meta.q && nr === p.meta.r)
+        );
+        
+        // Check if this move would be adjacent to our threatening pieces (support them)
+        let supportValue = 0;
+        const moveNeighbors = this.getNeighborCoords(move.q, move.r);
+        
+        for (const threatPiece of ourThreateningPieces) {
+          const isAdjacent = moveNeighbors.some(([nq, nr]) => 
+            nq === threatPiece.meta.q && nr === threatPiece.meta.r
+          );
+          
+          if (isAdjacent) {
+            supportValue += 3.0;
+            console.log(`🎯 👑 🤝 SUPPORT PIN: ${move.piece.meta.key} supports ${threatPiece.meta.key} pinning Queen`);
+          }
+        }
+        
+        if (supportValue > 0) {
+          move.priority = 'support-pinning';
+          move.strategicValue = supportValue;
+          return true;
+        }
+        
+        return false;
+      });
+      
+      // Combine all strategic pinning moves
+      strategicMoves.push(...pinningMoves, ...maintainMoves, ...supportMoves);
+      
+      console.log(`🎯 👑 PINNING ANALYSIS: ${pinningMoves.length} pinning, ${maintainMoves.length} maintain, ${supportMoves.length} support moves`);
     }
+    
+    // ✨ PIECE DEVELOPMENT STRATEGY ✨
+    // "If it notices white placing more pieces, AI needs to keep up"
+    const allPlaced = gameState.tray.filter(p => p && p.meta && p.meta.placed);
+    const aiPlaced = allPlaced.filter(p => p.meta.color === this.color);
+    const oppPlaced = allPlaced.filter(p => p.meta.color === oppColor);
+    
+    console.log(`🎯 📊 PIECE COUNT: AI has ${aiPlaced.length}, Opponent has ${oppPlaced.length}`);
+    
+    if (oppPlaced.length > aiPlaced.length) {
+      console.log(`🎯 📈 DEVELOPMENT URGENCY: Opponent ahead by ${oppPlaced.length - aiPlaced.length} pieces - prioritizing placement!`);
+      
+      const developmentMoves = moves.filter(move => {
+        if (move.type === 'place') {
+          console.log(`🎯 📈 DEVELOPMENT: Placing ${move.piece.meta.key} to catch up`);
+          move.priority = 'catch-up-development';
+          move.strategicValue = (move.strategicValue || 0) + 5.0;
+          return true;
+        }
+        return false;
+      });
+      
+      strategicMoves.push(...developmentMoves);
+    }
+    
+    // ✨ DEFENSIVE QUEEN PROTECTION ✨
+    if (aiQueen && aiQueen.meta) {
+      let aiQueenThreats = 0;
+      const aiQueenNeighbors = this.getNeighborCoords(aiQueen.meta.q, aiQueen.meta.r);
+      
+      for (const [nq, nr] of aiQueenNeighbors) {
+        const occupied = gameState.tray.some(p => 
+          p && p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr
+        );
+        if (occupied) aiQueenThreats++;
+      }
+      
+      if (aiQueenThreats >= 3) {
+        console.log(`🎯 🛡️ QUEEN DEFENSE: Our Queen has ${aiQueenThreats}/6 threats - prioritizing defense!`);
+        
+        const defensiveMoves = moves.filter(move => {
+          if (move.type === 'move' && move.piece.meta.key === 'Q') {
+            console.log(`🎯 🛡️ QUEEN ESCAPE: Moving Queen to safety`);
+            move.priority = 'queen-escape';
+            move.strategicValue = 30.0;
+            return true;
+          }
+          
+          // Don't place pieces that would further threaten our Queen
+          if (move.type === 'place') {
+            const wouldThreatenUs = aiQueenNeighbors.some(([nq, nr]) => 
+              nq === move.q && nr === move.r
+            );
+            
+            if (wouldThreatenUs) {
+              console.log(`🎯 🛡️ AVOID SELF-THREAT: Not placing ${move.piece.meta.key} next to our Queen`);
+              move.priority = 'dangerous-self-threat';
+              move.strategicValue = -50.0; // Heavy penalty
+              return false;
+            }
+          }
+          
+          return false;
+        });
+        
+        strategicMoves.push(...defensiveMoves);
+      }
+    }
+    
+    // Apply strategic scoring to remaining moves
+    for (const move of moves) {
+      if (!strategicMoves.includes(move)) {
+        const strategicValue = this.evaluateMoveStrategically(move, gameState);
+        if (strategicValue > 1.0) { // Only include moves with decent strategic value
+          move.strategicValue = strategicValue;
+          strategicMoves.push(move);
+        }
+      }
+    }
+    
+    // Sort by strategic value (highest first)
+    strategicMoves.sort((a, b) => (b.strategicValue || 0) - (a.strategicValue || 0));
+    
+    console.log(`🎯 STRATEGIC FILTER RESULT: ${strategicMoves.length}/${moves.length} strategic moves selected`);
+    console.log(`🎯 TOP 3 MOVES:`, strategicMoves.slice(0, 3).map(m => 
+      `${m.piece?.meta?.key || '?'} ${m.type} to ${m.q},${m.r} (${m.priority || 'normal'}, value: ${(m.strategicValue || 0).toFixed(1)})`
+    ));
+    
+    // Return strategic moves or fallback to all moves if none found
+    return strategicMoves.length > 0 ? strategicMoves : moves;
+    
+  } catch (error) {
+    console.error('🎯 💥 STRATEGIC FILTER ERROR:', error);
+    return moves; // Fallback to all moves on error
   }
-  
-  return moves; // Fallback to all moves
+};
+
+/**
+ * Evaluate a move strategically for the improved filtering system
+ */
+window.AIEngine.evaluateMoveStrategically = function(move, gameState) {
+  try {
+    let value = 0;
+    
+    // Base piece value
+    const pieceValues = {
+      'Q': 3.0,  // Queen moves are critical
+      'A': 2.5,  // Ants are highly mobile and versatile
+      'B': 2.0,  // Beetles can climb and control
+      'G': 1.5,  // Grasshoppers can jump over pieces
+      'S': 1.0   // Spiders have more limited movement
+    };
+    
+    if (move.piece && move.piece.meta && move.piece.meta.key) {
+      value += pieceValues[move.piece.meta.key] || 1.0;
+    }
+    
+    // Center control bonus
+    if (move.q !== undefined && move.r !== undefined) {
+      const centerDistance = Math.abs(move.q) + Math.abs(move.r);
+      if (centerDistance <= 2) {
+        value += 1.0; // Central positions are valuable
+      } else if (centerDistance <= 3) {
+        value += 0.5; // Near-central positions have some value
+      }
+    }
+    
+    // Coordination bonus - pieces working together
+    if (move.type === 'place') {
+      const neighbors = this.getNeighborCoords(move.q, move.r);
+      let friendlyNeighbors = 0;
+      
+      for (const [nq, nr] of neighbors) {
+        const friendly = gameState.tray.find(p => 
+          p && p.meta && p.meta.placed && p.meta.color === this.color && 
+          p.meta.q === nq && p.meta.r === nr
+        );
+        if (friendly) friendlyNeighbors++;
+      }
+      
+      value += friendlyNeighbors * 0.5; // Coordination bonus
+    }
+    
+    // Mobility and flexibility bonus
+    if (move.type === 'move') {
+      const piece = move.piece;
+      if (piece && piece.meta) {
+        // Moving from a crowded position to open space is good
+        const fromNeighbors = this.getNeighborCoords(piece.meta.q, piece.meta.r);
+        const toNeighbors = this.getNeighborCoords(move.q, move.r);
+        
+        const fromCrowded = fromNeighbors.filter(([nq, nr]) => 
+          gameState.tray.some(p => p && p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr)
+        ).length;
+        
+        const toCrowded = toNeighbors.filter(([nq, nr]) => 
+          gameState.tray.some(p => p && p.meta && p.meta.placed && p.meta.q === nq && p.meta.r === nr)
+        ).length;
+        
+        if (fromCrowded > toCrowded) {
+          value += 0.5; // Moving to less crowded space
+        }
+      }
+    }
+    
+    return value;
+  } catch (error) {
+    console.error('🎯 Error evaluating move strategically:', error);
+    return 1.0; // Default value
+  }
 };
