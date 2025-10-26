@@ -230,6 +230,24 @@ window.AIEngineV2 = {
     
     // Get all possible moves
     const allMoves = this.getAllPossibleMoves();
+    
+    // CRITICAL FIRST MOVE SAFEGUARD
+    const totalPiecesPlaced = (typeof tray !== 'undefined') ? tray.filter(p => p.meta && p.meta.placed).length : 0;
+    if (totalPiecesPlaced === 0 && allMoves.length === 0) {
+      console.error(`🧠 💥 CRITICAL: No first moves generated in V2 engine! Creating emergency move...`);
+      const availablePieces = tray.filter(p => p.meta && p.meta.color === this.getAIColor() && !p.meta.placed);
+      if (availablePieces.length > 0) {
+        return {
+          type: 'place',
+          piece: availablePieces[0],
+          q: 0,
+          r: 0,
+          priority: 'emergency-first-move-v2',
+          reasoning: 'V2 Emergency fallback to prevent illegal pass on first move'
+        };
+      }
+    }
+    
     if (allMoves.length === 0) return null;
     
     // AGGRESSIVE evaluation - prioritize queen pinning over everything

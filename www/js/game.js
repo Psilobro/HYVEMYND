@@ -913,27 +913,28 @@ function updateHUD(){
 }
 
 function hasLegalMoves(color) {
-    // Check if player can place any pieces
+    // First check: Can this player place any pieces?
     const myPieces = tray.filter(p => p.meta.color === color && !p.meta.placed);
     if (myPieces.length > 0) {
-        // Check if any piece can be legally placed
-        for (const piece of myPieces) {
-            const zones = legalPlacementZones(color);
-            if (zones.size > 0) {
-                return true; // Can place at least one piece
-            }
+        // Check placement zones ONCE, not per piece
+        const zones = legalPlacementZones(color);
+        console.log(`🎯 hasLegalMoves: ${color} has ${myPieces.length} unplaced pieces, ${zones.size} legal zones`);
+        if (zones.size > 0) {
+            return true; // Can place at least one piece
         }
     }
     
-    // Check if player can move any existing pieces
+    // Second check: Can this player move any existing pieces?
     const placedPieces = tray.filter(p => p.meta.color === color && p.meta.placed);
     for (const piece of placedPieces) {
         const moves = legalMoveZones(piece);
         if (moves.length > 0) {
+            console.log(`🎯 hasLegalMoves: ${color} can move ${piece.meta.key} to ${moves.length} positions`);
             return true; // Can move at least one piece
         }
     }
     
+    console.log(`🎯 hasLegalMoves: ${color} has NO legal moves - this should only happen in true stalemate!`);
     return false; // No legal moves available
 }
 

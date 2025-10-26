@@ -890,6 +890,30 @@ window.AIEngine.generateLegalMoves = function(gameState) {
     console.log(`🤖 Generating moves for ${currentColor}, game state:`, gameState);
   }
   
+  // CRITICAL FIRST MOVE SAFEGUARD
+  const totalPiecesPlaced = (typeof tray !== 'undefined') ? tray.filter(p => p.meta && p.meta.placed).length : 0;
+  if (!gameState.isSimulation && totalPiecesPlaced === 0) {
+    console.log(`🤖 🚨 FIRST MOVE SAFEGUARD: Ensuring moves are generated for game start`);
+    const firstMoves = this.generateSimpleGameMoves(currentColor);
+    if (firstMoves.length === 0) {
+      console.error(`🤖 💥 CRITICAL: No first moves generated! This is illegal - game cannot start!`);
+      // Emergency fallback for first move
+      const availablePieces = tray.filter(p => p.meta && p.meta.color === currentColor && !p.meta.placed);
+      if (availablePieces.length > 0) {
+        console.log(`🤖 🚨 EMERGENCY: Creating emergency first move`);
+        return [{
+          type: 'place',
+          piece: availablePieces[0],
+          q: 0,
+          r: 0,
+          priority: 'emergency-first-move',
+          reasoning: 'Emergency fallback to prevent illegal pass on first move'
+        }];
+      }
+    }
+    return firstMoves;
+  }
+  
   // Use live game functions for root node, simulation for internal nodes
   if (!gameState.isSimulation) {
     console.log(`🤖 Using live game functions for root node`);
@@ -1271,9 +1295,14 @@ window.AIEngine.selectOpeningPattern = function(color, turnNumber, allPlacedPiec
 window.AIEngine.executeFirstMove = function(pattern, availablePieces, allPlacedPieces, difficulty) {
   const moves = [];
   
+  console.log(`🤖 🎯 executeFirstMove: pattern=${pattern}, availablePieces=${availablePieces.length}, allPlaced=${allPlacedPieces.length}`);
+  
   if (allPlacedPieces.length === 0) {
     // Very first move of game - based on Hive strategy book
     let preferredPiece;
+    
+    console.log(`🤖 🎯 VERY FIRST MOVE OF GAME - NO PIECES PLACED YET`);
+    console.log(`🤖 🎯 Available pieces:`, availablePieces.map(p => p.meta?.key || 'no-key'));
     
     switch (pattern) {
       case 'spider-sacrifice':
@@ -1307,14 +1336,36 @@ window.AIEngine.executeFirstMove = function(pattern, availablePieces, allPlacedP
         console.log(`🤖 📖 BOOK-DEVELOPMENT: Following book principles (no Ant opening)`);
     }
     
-    moves.push({
-      type: 'place',
-      piece: preferredPiece,
-      q: 0,
-      r: 0,
-      priority: `opening-${pattern}`,
-      reasoning: `Opening pattern: ${pattern}`
-    });
+    console.log(`🤖 🎯 Selected piece for first move:`, preferredPiece ? `${preferredPiece.meta.key}` : 'NONE FOUND!');
+    
+    if (preferredPiece) {
+      moves.push({
+        type: 'place',
+        piece: preferredPiece,
+        q: 0,
+        r: 0,
+        priority: `opening-${pattern}`,
+        reasoning: `Opening pattern: ${pattern}`
+      });
+      console.log(`🤖 🎯 FIRST MOVE GENERATED: Place ${preferredPiece.meta.key} at (0,0)`);
+    } else {
+      console.error(`🤖 💥 CRITICAL ERROR: No piece found for first move! This should never happen!`);
+      console.error(`🤖 💥 Available pieces:`, availablePieces);
+      
+      // Emergency fallback - use any available piece
+      if (availablePieces.length > 0) {
+        preferredPiece = availablePieces[0];
+        moves.push({
+          type: 'place',
+          piece: preferredPiece,
+          q: 0,
+          r: 0,
+          priority: 'emergency-first-move',
+          reasoning: 'Emergency fallback for first move'
+        });
+        console.log(`🤖 🎯 EMERGENCY FALLBACK: Using ${preferredPiece.meta?.key || 'unknown'} for first move`);
+      }
+    }
   } else {
     // Response to opponent's first move
     const oppPiece = allPlacedPieces[0];
