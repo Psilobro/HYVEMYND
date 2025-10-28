@@ -476,7 +476,7 @@ canvas {
     #white-tray.player-tray {
         left: 32px !important;
         right: auto !important;
-        top: 15% !important;
+        top: -2% !important;
         transform: scale(0.7) !important;
         transform-origin: left top !important;
         width: 220px !important;
@@ -487,7 +487,7 @@ canvas {
     }    #black-tray.player-tray {
         right: 32px !important;
         left: auto !important;
-        top: 15% !important;
+        top: -2% !important;
         transform: scale(0.7) !important;
         transform-origin: right top !important;
         width: 220px !important;
