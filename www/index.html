@@ -28,6 +28,8 @@
   <button id="play-music-button">Play Music</button>
   <button id="auto-zoom-toggle">Auto-Center: ON</button>
   <button id="move-history-toggle">History</button>
+  <button id="single-mode-button">🤖 Single Mode</button>
+  <button id="dev-ops-button">⚙️ Dev. Ops</button>
   <button id="multiplayer-button">🌐 Multiplayer</button>
   <button id="chat-toggle" style="display: none;">💬 Chat</button>
   <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
@@ -44,6 +46,105 @@
       <button id="chat-send">Send</button>
     </div>
     <div id="typing-indicator"></div>
+  </div>
+
+  <!-- Dev. Ops Modal -->
+  <div id="dev-ops-modal" style="display: none;">
+    <div id="dev-ops-header">
+      <span>⚙️ Development Operations</span>
+      <button id="dev-ops-close">×</button>
+    </div>
+    <div id="dev-ops-content">
+      <div id="dev-ops-tabs">
+        <button class="dev-ops-tab active" data-tab="ai-vs-ai">🤖 AI vs AI</button>
+        <button class="dev-ops-tab" data-tab="human-learning">🧠 Human Learning</button>
+        <button class="dev-ops-tab" data-tab="statistics">📊 Statistics</button>
+      </div>
+      
+      <!-- AI vs AI Panel -->
+      <div id="ai-vs-ai-panel" class="dev-ops-panel active">
+        <h3>AI Battle Arena</h3>
+        <div class="ai-battle-setup">
+          <div class="player-selection">
+            <label>White AI:</label>
+            <select id="white-ai-select">
+              <option value="sunny">Sunny (Depth 3)</option>
+              <option value="buzzwell">Buzzwell (Depth 4)</option>
+              <option value="beedric">Beedric (Depth 6)</option>
+            </select>
+          </div>
+          <div class="player-selection">
+            <label>Black AI:</label>
+            <select id="black-ai-select">
+              <option value="buzzwell" selected>Buzzwell (Depth 4)</option>
+              <option value="sunny">Sunny (Depth 3)</option>
+              <option value="beedric">Beedric (Depth 6)</option>
+            </select>
+          </div>
+          <div class="battle-controls">
+            <button id="start-ai-battle">🚀 Start Battle</button>
+            <button id="stop-ai-battle" style="display: none;">⏹️ Stop Battle</button>
+            <div class="battle-speed">
+              <label>Speed:</label>
+              <input type="range" id="battle-speed" min="100" max="3000" value="1000" step="100">
+              <span id="speed-display">1.0s</span>
+            </div>
+          </div>
+        </div>
+        <div id="battle-status" class="battle-status">Ready to start AI battle</div>
+      </div>
+      
+      <!-- Human Learning Panel -->
+      <div id="human-learning-panel" class="dev-ops-panel">
+        <h3>Human Learning Mode</h3>
+        <div class="learning-setup">
+          <p>Train AI by playing against it. Your moves and strategies will be analyzed to improve AI performance.</p>
+          <div class="learning-controls">
+            <button id="start-learning-game">🎓 Start Learning Game</button>
+            <div class="learning-opponent">
+              <label>Opponent:</label>
+              <select id="learning-opponent-select">
+                <option value="beedric" selected>Beedric V2 (Learning)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="learning-status" class="learning-status">Ready to start learning session</div>
+      </div>
+      
+      <!-- Statistics Panel -->
+      <div id="statistics-panel" class="dev-ops-panel">
+        <h3>Development Statistics</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h4>AI Battles</h4>
+            <div class="stat-value" id="total-battles">0</div>
+            <div class="stat-label">Total Battles</div>
+          </div>
+          <div class="stat-card">
+            <h4>Learning Games</h4>
+            <div class="stat-value" id="learning-games">0</div>
+            <div class="stat-label">Human vs AI</div>
+          </div>
+          <div class="stat-card">
+            <h4>AI Improvement</h4>
+            <div class="stat-value" id="ai-improvement">+0%</div>
+            <div class="stat-label">Win Rate Change</div>
+          </div>
+          <div class="stat-card">
+            <h4>Best Performer</h4>
+            <div class="stat-value" id="best-ai">Beedric</div>
+            <div class="stat-label">Current Champion</div>
+          </div>
+        </div>
+        <div class="detailed-stats">
+          <h4>Detailed Analysis</h4>
+          <div id="stats-details">
+            <p>No data available yet. Run some AI battles or learning games to see statistics.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="hex-orient-overlay" aria-hidden="true">
     <!-- SVG will be injected dynamically -->
@@ -75,5 +176,6 @@
   <script src="js/ai-engine-v2.js"></script>
   <script src="js/personalities.js"></script>
   <script src="js/ai-ui.js"></script>
+  <script src="js/dev-ops.js"></script>
 </body>
 </html>

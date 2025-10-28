@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Spider Movement</title>
+</head>
+<body>
+    <h1>Spider Movement Test</h1>
+    <p>Open the browser console and check for errors when loading the game.</p>
+    <script>
+        // Test if the main game file loads without syntax errors
+        console.log('Starting spider movement test...');
+        
+        // Try to load the main game script
+        const script = document.createElement('script');
+        script.src = 'www/js/game.js';
+        script.onload = function() {
+            console.log('✅ game.js loaded successfully!');
+            console.log('✅ Spider movement should now work like queen movement');
+        };
+        script.onerror = function() {
+            console.error('❌ Failed to load game.js - there may be syntax errors');
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>

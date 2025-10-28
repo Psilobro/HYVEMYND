@@ -647,7 +647,7 @@ function animatePieceMovement(piece, fromQ, fromR, toQ, toR, occBefore, onComple
             animateQueenWaggle(piece, targetPos.x, targetY, onComplete);
             break;
         case 'S':
-            animateSpiderStepByStep(piece, fromQ, fromR, toQ, toR, occBefore, onComplete);
+            animateSpiderThreeSteps(piece, fromQ, fromR, toQ, toR, occBefore, onComplete);
             break;
         case 'A':
             animateAntDarting(piece, fromQ, fromR, toQ, toR, occBefore, onComplete);
@@ -693,49 +693,32 @@ function animateQueenWaggle(piece, targetX, targetY, onComplete) {
         });
 }
 
-function animateSpiderStepByStep(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
-    console.log(`Spider animation: ${fromQ},${fromR} -> ${toQ},${toR}`);
+
+function animateSpiderThreeSteps(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
+    console.log(`Spider 3-step animation: ${fromQ},${fromR} -> ${toQ},${toR}`);
     
-    // Get all possible spider paths from the starting position using original board state
-    const allPaths = getSpiderPaths(fromQ, fromR, occBefore);
-    console.log('Spider paths found:', allPaths);
+    // Calculate the 3-step path by working backwards from destination
+    const path = calculateSpiderPath(fromQ, fromR, toQ, toR, occBefore);
     
-    // Find the path that ends at the target destination
-    let targetPath = null;
-    if (allPaths && allPaths.length > 0) {
-        console.log('Looking for target:', toQ, toR);
-        for (const path of allPaths) {
-            const lastStep = path[path.length - 1];
-            console.log('Path ends at:', lastStep[0], lastStep[1]);
-            if (lastStep[0] === toQ && lastStep[1] === toR) {
-                targetPath = path;
-                break;
-            }
-        }
-    }
-    
-    console.log('Target path found:', targetPath);
-    
-    if (!targetPath) {
-        // Fallback to direct movement if no path found
-        console.log('No spider path found, using fallback animation');
+    if (!path || path.length !== 4) { // Should be [start, step1, step2, final]
+        console.log('Could not calculate spider path, using direct animation');
         gsap.to(piece, {
             x: axialToPixel(toQ, toR).x,
             y: axialToPixel(toQ, toR).y - (window.cells.get(`${toQ},${toR}`).stack.length - 1) * 6,
-            duration: 0.5,
+            duration: 0.6,
             onComplete: onComplete
         });
         return;
     }
     
-    console.log('Using spider step-by-step animation');
+    console.log('Spider path:', path);
     const timeline = gsap.timeline({ onComplete: onComplete });
     
     // Animate through each step with pauses
-    for (let i = 1; i < targetPath.length; i++) {
-        const [q, r] = targetPath[i];
+    for (let i = 1; i < path.length; i++) {
+        const [q, r] = path[i];
         const pos = axialToPixel(q, r);
-        const isLastStep = i === targetPath.length - 1;
+        const isLastStep = i === path.length - 1;
         const cell = window.cells.get(`${q},${r}`);
         const yOffset = isLastStep ? -(cell.stack.length - 1) * 6 : 0;
         
@@ -743,11 +726,92 @@ function animateSpiderStepByStep(piece, fromQ, fromR, toQ, toR, occBefore, onCom
             .to(piece, {
                 x: pos.x,
                 y: pos.y + yOffset,
-                duration: 0.2,  // Faster step from 0.3 to 0.2
+                duration: 0.25,  // Each step takes 0.25 seconds
                 ease: "power2.inOut"
             })
-            .to({}, { duration: isLastStep ? 0 : 0.15 }); // Shorter pause from 0.25 to 0.15
+            .to({}, { duration: isLastStep ? 0 : 0.15 }); // 0.15 second pause between steps
     }
+}
+
+function calculateSpiderPath(fromQ, fromR, toQ, toR, occBefore) {
+    // Reconstruct the 3-step perimeter path the spider took to reach destination
+    const occRem = new Set(occBefore);
+    occRem.delete(`${fromQ},${fromR}`); // Remove spider from starting position
+    
+    // Find perimeter contact points from starting position
+    const perimeterStartPoints = [];
+    DIRS.forEach((d, dirIndex) => {
+        const adjQ = fromQ + d.dq;
+        const adjR = fromR + d.dr;
+        const adjKey = `${adjQ},${adjR}`;
+        if (occRem.has(adjKey)) {
+            perimeterStartPoints.push(dirIndex);
+        }
+    });
+    
+    // Try following perimeter in both directions from each contact point
+    for (const startDir of perimeterStartPoints) {
+        for (const clockwise of [true, false]) {
+            let currentQ = fromQ;
+            let currentR = fromR;
+            let lastContactDir = startDir;
+            const path = [[currentQ, currentR]];
+            let validPath = true;
+            
+            for (let step = 0; step < 3; step++) {
+                let nextPos = null;
+                
+                // Find next position along perimeter
+                for (let offset = 0; offset < 6; offset++) {
+                    const searchDir = clockwise ? 
+                        (lastContactDir + offset) % 6 : 
+                        (lastContactDir - offset + 6) % 6;
+                    
+                    const testQ = currentQ + DIRS[searchDir].dq;
+                    const testR = currentR + DIRS[searchDir].dr;
+                    const testKey = `${testQ},${testR}`;
+                    
+                    if (!canSlide(currentQ, currentR, testQ, testR, occRem)) continue;
+                    if (occRem.has(testKey)) continue;
+                    
+                    // Check if position maintains hive contact
+                    let hasHiveContact = false;
+                    let newContactDir = -1;
+                    DIRS.forEach((checkDir, checkDirIndex) => {
+                        const contactQ = testQ + checkDir.dq;
+                        const contactR = testR + checkDir.dr;
+                        const contactKey = `${contactQ},${contactR}`;
+                        if (occRem.has(contactKey)) {
+                            hasHiveContact = true;
+                            newContactDir = checkDirIndex;
+                        }
+                    });
+                    
+                    if (hasHiveContact) {
+                        nextPos = {q: testQ, r: testR};
+                        lastContactDir = newContactDir;
+                        break;
+                    }
+                }
+                
+                if (!nextPos) {
+                    validPath = false;
+                    break;
+                }
+                
+                path.push([nextPos.q, nextPos.r]);
+                currentQ = nextPos.q;
+                currentR = nextPos.r;
+            }
+            
+            // Check if this path reaches the target destination
+            if (validPath && currentQ === toQ && currentR === toR) {
+                return path;
+            }
+        }
+    }
+    
+    return null; // No valid path found
 }
 
 function animateAntDarting(piece, fromQ, fromR, toQ, toR, occBefore, onComplete) {
@@ -1331,9 +1395,17 @@ function legalMoveZones(piece){
         occRem.delete(originKey);
     }
 
-    if(!hiveIntactAfterRemoval(q0, r0)) return [];
+    console.log(`🕷️ Checking hive connectivity after removing ${type} from (${q0},${r0})`);
+    const hiveIntact = hiveIntactAfterRemoval(q0, r0);
+    console.log(`🕷️ Hive intact after removal: ${hiveIntact}`);
+    
+    if(!hiveIntact) {
+        console.log(`🕷️ Early return: hive would break if ${type} moved`);
+        return [];
+    }
 
     const zones=new Set();
+    console.log(`🕷️ Proceeding to check movement for piece type: ${type}`);
 
     if(type==='B'){ // If the piece is a Beetle
         DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
@@ -1381,280 +1453,95 @@ function legalMoveZones(piece){
             });
         }
     }
-    else if(type==='S'){ // If the piece is a Spider
-        return getSpiderMoves(q0, r0);
+    else if(type==='S'){ // Spider - 3 steps around hive perimeter (clockwise/counterclockwise)
+        // Spider follows the edge of the hive for exactly 3 steps
+        // Like following a rally car track - can have twists and turns but clear direction
+        
+        // Find perimeter directions - positions where we touch the hive
+        const perimeterStartPoints = [];
+        DIRS.forEach((d, dirIndex) => {
+            const adjQ = q0 + d.dq;
+            const adjR = r0 + d.dr;
+            const adjKey = `${adjQ},${adjR}`;
+            if (occRem.has(adjKey)) {
+                perimeterStartPoints.push(dirIndex);
+            }
+        });
+        
+        // For each perimeter contact point, try following the edge in both directions
+        perimeterStartPoints.forEach(startDir => {
+            // Try clockwise and counterclockwise around the hive
+            [true, false].forEach(clockwise => {
+                let currentQ = q0;
+                let currentR = r0;
+                let lastContactDir = startDir;
+                let validPath = true;
+                
+                for (let step = 0; step < 3; step++) {
+                    let nextPos = null;
+                    
+                    // Find next position that maintains contact with hive perimeter
+                    for (let offset = 0; offset < 6; offset++) {
+                        const searchDir = clockwise ? 
+                            (lastContactDir + offset) % 6 : 
+                            (lastContactDir - offset + 6) % 6;
+                        
+                        const testQ = currentQ + DIRS[searchDir].dq;
+                        const testR = currentR + DIRS[searchDir].dr;
+                        const testKey = `${testQ},${testR}`;
+                        
+                        // Must be able to slide to this position
+                        if (!canSlide(currentQ, currentR, testQ, testR, occRem)) continue;
+                        
+                        // Must not be occupied
+                        if (occRem.has(testKey)) continue;
+                        
+                        // Must maintain contact with hive (be adjacent to occupied cell)
+                        let hasHiveContact = false;
+                        let newContactDir = -1;
+                        DIRS.forEach((checkDir, checkDirIndex) => {
+                            const contactQ = testQ + checkDir.dq;
+                            const contactR = testR + checkDir.dr;
+                            const contactKey = `${contactQ},${contactR}`;
+                            if (occRem.has(contactKey)) {
+                                hasHiveContact = true;
+                                newContactDir = checkDirIndex;
+                            }
+                        });
+                        
+                        if (hasHiveContact) {
+                            nextPos = {q: testQ, r: testR};
+                            lastContactDir = newContactDir;
+                            break;
+                        }
+                    }
+                    
+                    if (!nextPos) {
+                        validPath = false;
+                        break;
+                    }
+                    
+                    currentQ = nextPos.q;
+                    currentR = nextPos.r;
+                }
+                
+                // Check if we successfully completed 3 steps and final position is valid
+                if (validPath && wouldHiveRemainConnectedAfterMove(q0, r0, currentQ, currentR)) {
+                    zones.add(`${currentQ},${currentR}`);
+                }
+            });
+        });
     }
 
     return Array.from(zones);
 }
 
-function getSpiderMoves(q0, r0) {
-    // Spider must move exactly 3 slides along the hive perimeter (CW or CCW).
-    // Strategy:
-    // 1) Ensure hive remains connected after removal.
-    // 2) Collect perimeter empty hexes (adjacent to any occupied hex).
-    // 3) Order perimeter hexes around the hive centroid (angle sort).
-    // 4) For each perimeter neighbor adjacent to the origin, compute the
-    //    +3 and -3 indices along the ordered ring and validate the three
-    //    slide steps with canSlide and touching-hive checks.
 
-    if (!hiveIntactAfterRemoval(q0, r0)) return []; // Early return if removing spider breaks hive connectivity - basic sanity check
 
-    const startKey = `${q0},${r0}`; // Create string key for spider's starting position
-    const cell = window.cells.get(startKey); // Get the cell object at starting position
-    // build occRem from current cells and simulate removal of the spider piece
-    const occAll = new Set(); // Initialize set for all occupied cells
-    window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); }); // Populate set with all occupied cell keys
-    const occRem = new Set(occAll); // Copy occupied set for simulation
-    if (!cell || !cell.stack || cell.stack.length <= 1) { // Check if spider is the only piece on its cell
-        occRem.delete(startKey); // Remove spider's cell from occupied set if it will be empty after removal
-    }
 
-    // collect perimeter candidates: empty cells adjacent to occRem
-    const perimeter = new Map(); // key -> {q,r,x,y} - map to store perimeter cells with coordinates
-    let cx = 0, cy = 0, count = 0; // Variables for calculating centroid
-    occRem.forEach(k => { // Iterate over occupied cells to compute centroid
-        const [oq,or] = k.split(',').map(Number); // Parse coordinates from key
-        const pt = axialToPixel(oq,or); // Convert to pixel coordinates
-        cx += pt.x; cy += pt.y; count++; // Accumulate sums for centroid calculation
-    });
-    if(count===0) return []; // Edge case: no occupied cells, return empty moves
-    cx /= count; cy /= count; // Compute average centroid position
 
-    occRem.forEach(k=>{}); // no-op to keep parity - unnecessary placeholder, likely copy-paste artifact
 
-    // build perimeter set
-    occRem.forEach(k=>{}); // Another no-op - redundant and confusing
-    occRem.forEach(o => {}); // Yet another no-op - these seem like debugging leftovers or mistakes
 
-    // iterate neighborhood around occupied cells
-    occRem.forEach(k => { // Loop through occupied cells again
-        const [oq,or] = k.split(',').map(Number); // Parse coordinates again
-        DIRS.forEach(d => { // Check all 6 directions from each occupied cell
-            const nq = oq + d.dq, nr = or + d.dr; // Calculate neighbor coordinates
-            const nk = `${nq},${nr}`; // Create neighbor key
-            if(!window.cells.has(nk)) return; // Skip if neighbor cell doesn't exist on board
-            if(occRem.has(nk)) return; // Skip if neighbor is occupied
-            // ensure it touches hive (by virtue of adjacency above)
-            if(!perimeter.has(nk)){ // If not already in perimeter map
-                const p = axialToPixel(nq,nr); // Get pixel position
-                perimeter.set(nk, {q:nq,r:nr,x:p.x,y:p.y}); // Add to perimeter with coordinates
-            }
-        });
-    });
-
-    if(perimeter.size===0) return []; // No perimeter cells found, return empty moves
-
-    // sort by angle around centroid
-    const arr = Array.from(perimeter.entries()).map(([k,v])=>{ // Convert map to array for sorting
-        const angle = Math.atan2(v.y - cy, v.x - cx); // Calculate angle from centroid
-        return {key:k, angle, ...v}; // Return object with key, angle, and coordinates
-    });
-    arr.sort((a,b)=>a.angle - b.angle); // Sort by angle - this creates the "ring" order
-    const ring = arr.map(a=>a.key); // Extract sorted keys into ring array
-
-    // helper to verify a 3-step walk along the ring starting at index and stepDir
-    function validateWalkFrom(startIdx, stepDir){ // Nested function to validate 3-step paths
-        const n = ring.length; // Length of perimeter ring
-        let curQ = q0, curR = r0; // Start from spider's position
-        for(let s=1;s<=3;s++){ // Loop for exactly 3 steps
-            // first step should be the originNeighbor (startIdx), then startIdx+stepDir, etc.
-            const idx = (startIdx + (s-1)*stepDir + n) % n; // Calculate ring index with wraparound
-            const [nx,ny] = ring[idx].split(',').map(Number); // Get coordinates of next cell in ring
-            // step must be to an adjacent hex
-            const neigh = DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny); // Check if next cell is adjacent
-            if(!neigh) return null; // Invalid if not adjacent - spider can't jump
-            if(!canSlide(curQ,curR,nx,ny,occRem)) return null; // Check sliding rules
-            // next hex must touch hive
-            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must stay touching occupied cells
-            curQ = nx; curR = ny; // Update current position
-        }
-        return `${curQ},${curR}`; // Return final position as key
-    }
-
-    // find perimeter neighbors that touch the origin
-    const originNeighbors = []; // Array to hold perimeter cells adjacent to spider
-    for(let i=0;i<DIRS.length;i++){ // Check all 6 directions
-        const nx = q0 + DIRS[i].dq, ny = r0 + DIRS[i].dr; // Calculate neighbor coordinates
-        const k = `${nx},${ny}`; // Create key
-        if(perimeter.has(k)) originNeighbors.push(k); // Add if it's on perimeter
-    }
-
-    const endpoints = new Set(); // Set to collect valid endpoint positions
-    const n = ring.length; // Ring length again
-
-    // Try each origin neighbor as a start; pick the first start that yields
-    // a valid 3-step walk in each direction. This ensures the spider 'hugs'
-    // the hive and never backtracks.
-    let found = { cw: null, ccw: null, startIdxCW: null, startIdxCCW: null }; // Track found paths
-    for(const startKey of originNeighbors){ // Loop through possible starting perimeter cells
-        const startIdx = ring.indexOf(startKey); // Find index in ring
-        if(startIdx === -1) continue; // Skip if not found (shouldn't happen)
-        if(!found.ccw){ // If no counterclockwise path found yet
-            const ep = validateWalkFrom(startIdx, +1); // Try clockwise (stepDir +1)
-            if(ep){ found.ccw = ep; found.startIdxCCW = startIdx; endpoints.add(ep); } // Add if valid
-        }
-        if(!found.cw){ // If no clockwise path found yet
-            const ep = validateWalkFrom(startIdx, -1); // Try counterclockwise (stepDir -1)
-            if(ep){ found.cw = ep; found.startIdxCW = startIdx; endpoints.add(ep); } // Add if valid
-        }
-        if(found.cw && found.ccw) break; // Stop if both directions found
-    }
-
-    function finalFromStart(startIdx, stepDir){ // Helper to compute theoretical endpoint without validation
-        let last = null; // Variable to hold final key
-        for(let s=1;s<=3;s++){ // Loop 3 steps
-            const idx = (startIdx + (s-1)*stepDir + n) % n; // Calculate index
-            last = ring[idx]; // Update last position
-        }
-        return last; // Return final key
-    }
-
-    // If only one direction had a strict path, include the theoretical
-    // opposite endpoint computed from that working start index so both
-    // directions are shown when the spider is not trapped.
-    if(found.cw && !found.ccw && found.startIdxCW !== null){ // If only clockwise found
-        endpoints.add(finalFromStart(found.startIdxCW, +1)); // Add theoretical counterclockwise endpoint
-    }
-    if(found.ccw && !found.cw && found.startIdxCCW !== null){ // If only counterclockwise found
-        endpoints.add(finalFromStart(found.startIdxCCW, -1)); // Add theoretical clockwise endpoint
-    }
-
-    // Fallback: if endpoints empty, try original neighbor-index walker as a last resort
-    if(endpoints.size===0){ // If no valid endpoints found
-        // previous simple walker: try starting at any adjacent empty cell and step by neighbor index
-        function neighborIndex(fromQ, fromR, toQ, toR){ // Helper to find direction index between two points
-            for(let i=0;i<DIRS.length;i++){ // Loop through directions
-                if(fromQ+DIRS[i].dq===toQ && fromR+DIRS[i].dr===toR) return i; // Return index if matches
-            }
-            return -1; // Not found
-        }
-        function walkDirection(dirStep){ // Function to walk in a direction for 3 steps
-            let q=q0, r=r0; // Start from spider
-            // find any neighbor index that touches the hive
-            let startIdx = -1; // Index of starting direction
-            for(let i=0;i<6;i++){ // Check all directions
-                const nx = q + DIRS[i].dq, ny = r + DIRS[i].dr; // Neighbor coordinates
-                const k = `${nx},${ny}`; // Key
-                if(!window.cells.has(k) || occRem.has(k)) continue; // Skip invalid
-                if(DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))){ startIdx = i; break; } // Find touching neighbor
-            }
-            if(startIdx === -1) return null; // No valid start found
-            let idx = startIdx; // Current direction index
-            for(let step=0; step<3; step++){ // Loop 3 steps
-                idx = (idx + dirStep + 6) % 6; // Advance direction index with wraparound
-                const nx = q + DIRS[idx].dq, ny = r + DIRS[idx].dr; // Next position
-                const k = `${nx},${ny}`; // Key
-                if(!window.cells.has(k) || occRem.has(k)) return null; // Invalid cell
-                if(!canSlide(q,r,nx,ny,occRem)) return null; // Can't slide
-                if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must touch hive
-                const common = DIRS.some(d2=>{ // Check for common neighbor (sliding gate)
-                    const a = `${q + d2.dq},${r + d2.dr}`; // Neighbor of current
-                    const b = `${nx + d2.dq},${ny + d2.dr}`; // Neighbor of next
-                    return occRem.has(a) && occRem.has(b); // Both occupied
-                });
-                if(!common) return null; // No sliding gate, invalid
-                q = nx; r = ny; // Update position
-            }
-            return `${q},${r}`; // Return final position
-        }
-        const cw = walkDirection(+1); // Try clockwise
-        const ccw = walkDirection(-1); // Try counterclockwise
-        if(cw) endpoints.add(cw); // Add if valid
-        if(ccw) endpoints.add(ccw); // Add if valid
-    }
-
-    // For compatibility, prefer validated endpoints from getSpiderPaths
-    const paths = getSpiderPaths(q0, r0); // Call the other spider path function
-    if(paths && paths.length) return paths.map(p=>`${p[p.length-1][0]},${p[p.length-1][1]}`); // Use its endpoints if available
-    return Array.from(endpoints); // Return collected endpoints as array
-}
-
-// Return exact validated 3-step spider paths (array of arrays of [q,r]).
-function getSpiderPaths(q0, r0, occAllParam){
-    // occAllParam: optional Set of occupied keys representing board state before move
-    const startKey = `${q0},${r0}`; // Starting position key
-    let occAll; // Occupied set
-    if (occAllParam) { // If provided as parameter
-        occAll = new Set(occAllParam); // Use provided set
-    } else { // Otherwise build from current board
-        // build occupancy from actual cell stacks like other functions
-        occAll = new Set(); // Initialize set
-        window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); }); // Populate from board
-    }
-    // remove the spider itself (it must move)
-    occAll.delete(startKey); // Remove spider's position
-    if(!isHiveConnected(occAll)) return []; // Hive not connected after removal, invalid
-
-    const occRem = new Set(occAll); // Copy for simulation
-
-    // collect perimeter empty hexes
-    const perimeter = new Map(); // Perimeter map
-    let cx=0, cy=0, count=0; // Centroid variables
-    occRem.forEach(k=>{ // Loop occupied cells
-        const [oq,or] = k.split(',').map(Number); // Parse coords
-        const p = axialToPixel(oq,or); cx += p.x; cy += p.y; count++; // Accumulate centroid
-    });
-    if(count===0) return []; // No occupied cells
-    cx/=count; cy/=count; // Average centroid
-    occRem.forEach(k=>{ // Loop again (redundant?)
-        const [oq,or] = k.split(',').map(Number); // Parse again
-        DIRS.forEach(d=>{ // Check neighbors
-            const nq=oq+d.dq, nr=or+d.dr, nk=`${nq},${nr}`; // Neighbor key
-            if(!window.cells.has(nk)) return; if(occRem.has(nk)) return; // Skip invalid
-            if(!perimeter.has(nk)) perimeter.set(nk, {q:nq,r:nr,x:axialToPixel(nq,nr).x,y:axialToPixel(nq,nr).y}); // Add to perimeter
-        });
-    });
-    if(perimeter.size===0) return []; // No perimeter
-    const arr = Array.from(perimeter.entries()).map(([k,v])=>{ const angle=Math.atan2(v.y-cy, v.x-cx); return {key:k,angle,...v}; }); // Create array with angles
-    arr.sort((a,b)=>a.angle-b.angle); // Sort by angle
-    const ring = arr.map(a=>a.key); // Ring of keys
-
-    const n = ring.length; // Ring length
-    function buildPathFrom(startIdx, stepDir){ // Function to build validated path
-        let curQ=q0, curR=r0; // Start position
-        const path=[[curQ,curR]]; // Path array starting with origin
-        const visited = new Set([`${curQ},${curR}`]); // Visited set
-        for(let s=1;s<=3;s++){ // 3 steps
-            const idx = (startIdx + (s-1)*stepDir + n) % n; // Ring index
-            const [nx,ny] = ring[idx].split(',').map(Number); // Next coordinates
-            const key = `${nx},${ny}`; // Key
-            // must be adjacent
-            if(!DIRS.some(d=>curQ + d.dq === nx && curR + d.dr === ny)) return null; // Not adjacent
-            // cannot revisit a previously visited hex (no backtracking)
-            if(visited.has(key)) return null; // Backtracking not allowed
-            if(!canSlide(curQ,curR,nx,ny,occRem)) return null; // Can't slide
-            if(!DIRS.some(d=>occRem.has(`${nx + d.dq},${ny + d.dr}`))) return null; // Must touch hive
-            path.push([nx,ny]); visited.add(key); curQ=nx; curR=ny; // Add to path and update
-        }
-        return path; // Return full path array
-    }
-
-    // find origin neighbors on perimeter
-    const originNeighbors=[]; // Adjacent perimeter cells
-    for(let i=0;i<DIRS.length;i++){ const nx=q0+DIRS[i].dq, ny=r0+DIRS[i].dr, k=`${nx},${ny}`; if(perimeter.has(k)) originNeighbors.push(k); } // Collect adjacent perimeter
-
-    const paths = []; // Array to collect valid paths
-    let found={cw:null,ccw:null,startIdxCW:null,startIdxCCW:null}; // Track found paths
-    for(const sk of originNeighbors){ // Loop starting cells
-        const startIdx = ring.indexOf(sk); if(startIdx===-1) continue; // Find ring index
-        if(!found.ccw){ const pth = buildPathFrom(startIdx, +1); if(pth){ paths.push(pth); found.ccw=pth; found.startIdxCCW=startIdx; }} // Try counterclockwise
-        if(!found.cw){ const pth = buildPathFrom(startIdx, -1); if(pth){ paths.push(pth); found.cw=pth; found.startIdxCW=startIdx; }} // Try clockwise
-        if(found.cw && found.ccw) break; // Stop if both found
-    }
-
-    function finalFromStartPath(startIdx, stepDir){ // Compute unvalidated path
-        const path = [[q0,r0]]; // Start with origin
-        for(let s=1;s<=3;s++){ const idx=(startIdx + (s-1)*stepDir + n)%n; const [nx,ny]=ring[idx].split(',').map(Number); path.push([nx,ny]); } // Add steps
-        return path; // Return path
-    }
-
-    if(found.cw && !found.ccw && found.startIdxCW!==null){ paths.push(finalFromStartPath(found.startIdxCW,+1)); } // Add theoretical ccw if only cw found
-    if(found.ccw && !found.cw && found.startIdxCCW!==null){ paths.push(finalFromStartPath(found.startIdxCCW,-1)); } // Add theoretical cw if only ccw found
-
-    return paths; // Return array of path arrays
-
-}
 
 function commitMove(q,r){
     animating=true;

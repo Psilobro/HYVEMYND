@@ -234,7 +234,7 @@ window.addEventListener('load', () => {
     document.getElementById('white-tray').appendChild(whiteTrayApp.view);
     whiteTrayApp.view.style.position = 'absolute';
 whiteTrayApp.view.style.left = '0px';
-whiteTrayApp.view.style.top = '30px';
+whiteTrayApp.view.style.top = '0px';
 whiteTrayApp.view.style.transform = 'scale(1.0)';
 whiteTrayApp.view.style.transformOrigin = 'left top';
 whiteTrayApp.view.style.zIndex = '5';
@@ -248,7 +248,7 @@ whiteTrayApp.view.style.zIndex = '5';
     document.getElementById('black-tray').appendChild(blackTrayApp.view);
     blackTrayApp.view.style.position = 'absolute';
 blackTrayApp.view.style.right = '0px';
-blackTrayApp.view.style.top = '30px';
+blackTrayApp.view.style.top = '0px';
 blackTrayApp.view.style.transform = 'scale(1.0)';
 blackTrayApp.view.style.transformOrigin = 'right top';
 blackTrayApp.view.style.zIndex = '6';
