@@ -809,7 +809,7 @@ canvas {
 #multiplayer-button {
     display: block !important;
     position: fixed;
-    left: 12px; /* Position in lower left corner */
+    left: 12px; /* First button - far left */
     bottom: 12px;
     z-index: 20;
     background: #E6B84D;
@@ -830,10 +830,11 @@ canvas {
 }
 
 /* AI Single Mode button - positioned to the left of multiplayer */
+/* Single Mode button - center */
 #single-mode-button {
     display: block !important;
     position: fixed;
-    left: 150px; /* To the left of multiplayer button */
+    left: 180px; /* Second button - center with good spacing */
     bottom: 12px;
     z-index: 20;
     background: #E6B84D;
@@ -854,20 +855,21 @@ canvas {
 }
 
 /* Dev. Ops button - positioned next to other buttons with matching honey styling */
+/* Dev Ops button - right */
 #dev-ops-button {
     display: block !important;
     position: fixed;
-    left: 280px; /* Next to Single Mode button */
+    left: 360px; /* Third button - far right with clear separation */
     bottom: 12px;
     z-index: 20;
-    background: #E6B84D; /* Match honey color */
-    color: #4B382A; /* Match text color */
+    background: #E6B84D;
+    color: #4B382A;
     font-family: 'Milonga', serif;
     font-size: 15px;
     border-radius: 8px;
-    border: 2px solid #E6B84D; /* Match border color */
+    border: 2px solid #E6B84D;
     padding: 6px 16px;
-    box-shadow: 0 2px 8px #e6b84d44; /* Match shadow */
+    box-shadow: 0 2px 8px #e6b84d44;
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -1555,7 +1557,7 @@ canvas {
     /* History overlay - keep it available on all screen sizes */
     
     /* Make bottom buttons smaller on very small screens */
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button {
         padding: 4px 12px !important;
         font-size: 13px !important;
         bottom: 8px !important;
@@ -1574,7 +1576,11 @@ canvas {
     }
     
     #multiplayer-button {
-        left: 140px !important; /* Adjust multiplayer button position */
+        left: 120px !important; /* Adjust multiplayer button position */
+    }
+    
+    #dev-ops-button {
+        left: 220px !important; /* Position Dev Ops button properly on mobile */
     }
 }
 
@@ -1591,17 +1597,21 @@ canvas {
         max-height: calc(100vh - 80px) !important;
     }
     
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button {
         padding: 3px 10px !important;
         font-size: 12px !important;
         bottom: 5px !important;
     }
     
     #single-mode-button, #return-to-sandbox-button {
-        left: 5px !important;
+        left: 5px !important; /* First button */
     }
     
     #multiplayer-button {
-        left: 120px !important;
+        left: 140px !important; /* Second button with good spacing */
+    }
+    
+    #dev-ops-button {
+        left: 280px !important; /* Third button with clear separation */
     }
 }
