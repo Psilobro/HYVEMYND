@@ -375,4 +375,75 @@ blackTrayApp.view.style.zIndex = '6';
             e.target.textContent = 'Play Music';
         }
     });
+
+    // Small global toast helper for transient messages
+    function showToast(message, duration = 3000) {
+        let toast = document.getElementById('global-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'global-toast';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 28px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(34,34,34,0.95);
+                color: #fff;
+                padding: 10px 16px;
+                border-radius: 10px;
+                z-index: 2000;
+                font-family: 'Milonga', serif;
+                font-size: 14px;
+                box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+                opacity: 0;
+                transition: opacity 250ms ease;
+            `;
+            document.body.appendChild(toast);
+        }
+
+        toast.textContent = message;
+        toast.style.display = 'block';
+        // Force reflow for transition
+        // eslint-disable-next-line no-unused-expressions
+        toast.offsetWidth;
+        toast.style.opacity = '1';
+
+        if (toast._hideTimeout) clearTimeout(toast._hideTimeout);
+        toast._hideTimeout = setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => { toast.style.display = 'none'; }, 300);
+        }, duration);
+    }
+
+    // Expose for other modules
+    window.showToast = showToast;
+
+    // --- Export Learning Data Button ---
+    const exportBtn = document.createElement('button');
+    exportBtn.id = 'export-learning-data';
+    exportBtn.textContent = 'Export Learning Data';
+    exportBtn.style.display = 'none';
+    exportBtn.style.margin = '12px auto';
+    exportBtn.style.padding = '8px 18px';
+    exportBtn.style.fontSize = '1.1em';
+    exportBtn.style.background = '#E6B84D';
+    exportBtn.style.color = '#222';
+    exportBtn.style.border = '2px solid #FFD700';
+    exportBtn.style.borderRadius = '8px';
+    exportBtn.style.cursor = 'pointer';
+    exportBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)';
+    exportBtn.onclick = function() {
+        const data = localStorage.getItem('devOpsStatistics');
+        if (!data) return alert('No learning data found!');
+        const blob = new Blob([data], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'devOpsStatistics.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+    document.body.appendChild(exportBtn);
 });

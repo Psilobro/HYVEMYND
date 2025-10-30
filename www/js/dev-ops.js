@@ -493,6 +493,12 @@ class DevOpsSystem {
             aiMoves: [],
             active: true
         };
+
+        // Hide export button while a learning session is active
+        try {
+            const exportBtn = document.getElementById('export-learning-data');
+            if (exportBtn) exportBtn.style.display = 'none';
+        } catch (e) { /* ignore */ }
         
         // Enable AI for learning mode
         if (window.AIEngine) {
@@ -659,6 +665,12 @@ class DevOpsSystem {
         if (window.originalUpdateHUD) {
             window.updateHUD = window.originalUpdateHUD;
         }
+
+        // Reveal export button now that learning data has been saved
+        try {
+            const exportBtn = document.getElementById('export-learning-data');
+            if (exportBtn) exportBtn.style.display = 'block';
+        } catch (e) { /* ignore */ }
     }
     
     analyzeLearningData(session) {
@@ -1188,8 +1200,16 @@ class DevOpsSystem {
             };
         }
         
-        // Calculate human win rate
-        const humanWins = learningData.filter(game => game.winner === 'white').length;
+        // Calculate human win rate (count all games where human won, regardless of color)
+        const humanWins = learningData.filter(game => {
+            // If human played white, win is 'white'; if human played black, win is 'black'
+            // Assume human always plays white unless game.humanColor is set
+            if (game.humanColor) {
+                return game.winner === game.humanColor;
+            }
+            // Fallback: if no color info, assume human is white
+            return game.winner === 'white';
+        }).length;
         const humanWinRate = ((humanWins / learningData.length) * 100).toFixed(1);
         
         // Calculate average moves
@@ -1261,6 +1281,14 @@ class DevOpsSystem {
     saveStatistics() {
         try {
             localStorage.setItem('devOpsStatistics', JSON.stringify(this.statistics));
+            // If we have learning data available, reveal export button and notify user
+            try {
+                const exportBtn = document.getElementById('export-learning-data');
+                if (exportBtn && this.statistics.humanLearningData && this.statistics.humanLearningData.length > 0) {
+                    exportBtn.style.display = 'block';
+                    if (window.showToast) window.showToast('Learning data saved — Export available', 3000);
+                }
+            } catch (e) { /* ignore DOM errors */ }
         } catch (error) {
             console.error('Failed to save statistics:', error);
         }
@@ -1272,6 +1300,13 @@ class DevOpsSystem {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 this.statistics = { ...this.statistics, ...parsed };
+                // If learned data exists, reveal export button so user can download it
+                try {
+                    const exportBtn = document.getElementById('export-learning-data');
+                    if (exportBtn && this.statistics.humanLearningData && this.statistics.humanLearningData.length > 0) {
+                        exportBtn.style.display = 'block';
+                    }
+                } catch (e) { /* ignore */ }
             }
         } catch (error) {
             console.error('Failed to load statistics:', error);

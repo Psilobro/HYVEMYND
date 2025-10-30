@@ -1159,6 +1159,16 @@ function commitPlacement(q,r){
                 }, 2000);
             }
         }, 100);
+        // Show export button at end of game
+        const exportBtn = document.getElementById('export-learning-data');
+        if (exportBtn) {
+            exportBtn.style.display = 'block';
+            exportBtn.style.position = 'fixed';
+            exportBtn.style.left = '50%';
+            exportBtn.style.top = '60%';
+            exportBtn.style.transform = 'translate(-50%, 0)';
+            exportBtn.style.zIndex = '9999';
+        }
     }
     // update move history UI (use p which is the placed piece)
     try{
