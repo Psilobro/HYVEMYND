@@ -275,7 +275,7 @@ class DevOpsSystem {
                 // Wait for AI to make its move
                 return new Promise((resolve, reject) => {
                     let attempts = 0;
-                    const maxAttempts = 100; // 10 seconds max wait
+                    const maxAttempts = 300; // 30 seconds max wait
                     
                     const checkMove = () => {
                         attempts++;

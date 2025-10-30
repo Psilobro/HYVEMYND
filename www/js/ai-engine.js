@@ -28,9 +28,9 @@ window.AIEngine = {
   explorationConstant: Math.sqrt(2),
   simulationDepth: 50, // Increased from 35 for much deeper lookahead
   iterationsPerMove: {
-    easy: 2000,      // Doubled for better play
-    medium: 10000,   // Doubled for strong play
-    hard: 30000      // Doubled for expert-level analysis
+    easy: 1000,      // Doubled for better play
+    medium: 2000,   // Doubled for strong play
+    hard: 3000       // Reduced for much faster expert-level analysis
   },
   
   // ZERO-SPAM LOGGING SYSTEM - Only final decisions
@@ -5592,6 +5592,30 @@ window.AIEngine.areAllPiecesConnected = function(pieces) {
   }
 };
 
+  /**
+   * Check if a piece can move to a given (q, r) position (basic rules, not full bug logic)
+   * Used for pin/unpin and legal move detection. Should be side-effect free.
+   */
+  window.AIEngine.canPieceMoveTo = function(piece, q, r) {
+    if (!piece || !piece.meta) return false;
+    // Basic checks: destination must be adjacent, not occupied, and not the same cell
+    if (piece.meta.q === q && piece.meta.r === r) return false;
+    // Check if destination is adjacent
+    const neighbors = this.getNeighborCoords(piece.meta.q, piece.meta.r);
+    let isNeighbor = false;
+    for (const [nq, nr] of neighbors) {
+      if (nq === q && nr === r) {
+        isNeighbor = true;
+        break;
+      }
+    }
+    if (!isNeighbor) return false;
+    // Check if destination is occupied
+    const occupied = tray.some(p => p.meta && p.meta.placed && p.meta.q === q && p.meta.r === r);
+    if (occupied) return false;
+    // For pin logic, ignore bug-specific movement rules (handled elsewhere)
+    return true;
+  };
 /**
  * CIRCLING DEFENSE - Strategic positioning to protect Queen
  * Based on book's defensive strategy: "Creating circles next to Queen makes it difficult to surround"

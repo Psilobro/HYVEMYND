@@ -1,0 +1,139 @@
+🧠 Hive Tactics AI Integration Roadmap
+Phase 1: Foundation & Rules Fidelity
+Goal: Ensure the AI knows all bug movement, placement, and game rules perfectly.
+
+1.1 Bug Movement Module
+
+Refactor/extend move generators for each bug (Queen, Beetle, Ant, Spider, Grasshopper, Mosquito, Ladybug, Pillbug).
+Add edge-case handling (e.g., Beetle climbing, Mosquito mimicking, Ladybug’s 3-step, Pillbug’s special ability).
+File: js/ai-bug-moves.js
+1.2 Placement Rules Module
+
+Enforce all placement rules (adjacency, no enemy contact, first move exceptions, Queen placement deadlines).
+File: js/ai-placement-rules.js
+1.3 Game State & Notation
+
+Add support for Hive notation and position tracking for game review and AI learning.
+File: js/ai-notation.js
+Phase 2: Strategic Evaluation & Heuristics
+Goal: Teach the AI to evaluate positions using the book’s strategic principles.
+
+2.1 Heuristic Evaluation Engine
+
+Implement scoring for Mobility, Tempo, Strength (the “three keys to victory”).
+Add phase-aware heuristics (opening, midgame, endgame).
+File: js/ai-eval.js
+2.2 Tactical Pattern Recognition
+
+Detect and score for Pins, Covers, Blocks, Fills, Double Pins, Shutouts, Squeezes, Rings, Elbows, Pockets.
+File: js/ai-tactics.js
+2.3 Formation Detection
+
+Recognize and evaluate Gates, Doors, Rings, Elbows, Pockets.
+File: js/ai-formations.js
+Phase 3: Advanced Tactics & Counterplay
+Goal: Integrate advanced tactics and counter-tactics from the book.
+
+3.1 Counterattack Logic
+
+Implement logic for switching between attack and defense, recognizing momentum shifts.
+File: js/ai-counterattack.js
+3.2 Bug Counting & Resource Management
+
+Track bug counts, reserves, and attack/defense force for both sides.
+File: js/ai-bug-count.js
+3.3 Draw Detection & Play-for-Draw
+
+Recognize and play for draws (stretched hive, compact queens, forced repetition).
+File: js/ai-draws.js
+Phase 4: Opening, Midgame, Endgame Theory
+Goal: Make the AI phase-aware and able to follow book openings and transitions.
+
+4.1 Opening Book Integration
+
+Add opening move databases and heuristics for White/Black.
+File: js/ai-opening-book.js
+4.2 Midgame Transition Logic
+
+Adjust priorities for bug placement, attack, defense, and tactical patterns.
+File: js/ai-phase.js
+4.3 Endgame Solver
+
+Implement bug counting, fill tactics, and optimal closing strategies.
+File: js/ai-endgame.js
+Phase 5: Mistake Avoidance & Human-Like Play
+Goal: Avoid beginner mistakes and exploit human errors.
+
+5.1 Mistake Database
+
+Encode common mistakes (misusing ants, poor bug placement, failing to defend queen, wasting tempo).
+File: js/ai-mistakes.js
+5.2 Adaptive Play
+
+Track opponent tendencies and adapt strategy (psychology in the Hive).
+File: js/ai-adapt.js
+Phase 6: Learning, Review, and Self-Improvement
+Goal: Enable the AI to learn from games and improve over time.
+
+6.1 Game Logging & Review
+
+Log games in Hive notation for replay and analysis.
+File: js/ai-review.js
+6.2 Self-Training Harness
+
+Allow AI to play against itself, review games, and adjust weights.
+File: js/ai-selftrain.js
+Phase 7: UI & Personality Integration
+Goal: Make it easy to adjust AI strength and personality.
+
+7.1 Personality Profiles
+
+Use the same engine for Sunny, Buzzwell, Beedric; adjust depth, iterations, and aggression/defense weights.
+File: js/ai-personality.js
+7.2 Dev Ops Controls
+
+Add UI controls for AI depth, style, and review.
+File: Extend dev-ops.js and ai-ui.js
+Phase 8: Testing & Validation
+Goal: Ensure correctness and strength.
+
+8.1 Node Harnesses
+
+Extend test_spider.js and add new tests for each bug, tactic, and formation.
+File: test_tactics.js, test_formations.js, etc.
+8.2 Game Simulation
+
+Simulate games against previous engine versions and human logs.
+📁 File Organization Suggestion
+js/ai-engine-v2.js — Main AI engine, delegates to modules
+js/ai-bug-moves.js — Bug movement logic
+js/ai-placement-rules.js — Placement rules
+js/ai-eval.js — Heuristic evaluation
+js/ai-tactics.js — Tactical pattern recognition
+js/ai-formations.js — Formation detection
+js/ai-counterattack.js — Counterattack logic
+js/ai-bug-count.js — Bug counting/resource management
+js/ai-draws.js — Draw detection/play-for-draw
+js/ai-opening-book.js — Opening theory
+js/ai-phase.js — Game phase logic
+js/ai-endgame.js — Endgame solver
+js/ai-mistakes.js — Mistake avoidance
+js/ai-adapt.js — Adaptive play
+js/ai-notation.js — Notation and review
+js/ai-review.js — Game review/logging
+js/ai-selftrain.js — Self-training harness
+js/ai-personality.js — Personality profiles
+🗂️ How to Tackle the Roadmap
+Start with bug movement and placement modules (Phase 1)
+Add strategic evaluation and tactical pattern modules (Phase 2)
+Integrate advanced tactics and counterplay (Phase 3)
+Implement phase-aware logic and opening/endgame theory (Phase 4)
+Add mistake avoidance and adaptive play (Phase 5)
+Enable game review and self-training (Phase 6)
+Integrate personality controls and UI (Phase 7)
+Test and validate with harnesses and simulations (Phase 8)
+✅ Result
+Your v2 engine will play with deep knowledge of Hive Tactics.txt.
+All personalities (Sunny, Buzzwell, Beedric) use the same engine, just with different parameters.
+The AI will recognize and use every tactic, formation, and strategic principle from the book.
+You’ll have a modular, maintainable codebase that’s easy to extend and debug.

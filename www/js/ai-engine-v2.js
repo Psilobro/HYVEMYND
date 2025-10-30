@@ -97,8 +97,8 @@ window.AIEngineV2 = {
     if (urgency.level === 'critical') baseCount *= 2;
     else if (urgency.level === 'high') baseCount *= 1.3;
     
-    // Cap at reasonable limits (500-5000 instead of 30k)
-    return Math.min(5000, Math.max(500, Math.round(baseCount)));
+  // Cap at reasonable limits (500-3000 instead of 30k)
+  return Math.min(3000, Math.max(500, Math.round(baseCount)));
   },
   
   /**
