@@ -1,0 +1,207 @@
+FORMAT: <weight(s)>\t<short description>\t<file:line or range>\t# short comment / recommended action
+
+1000\tdeployment strategicScore (massive placement bonus)\twww/js/ai-engine-v2.js:600-640\t# Dominates move choice; lower to ~150-300 to reduce placement bias
+500\tnear-win / game-winning move bonus\twww/js/ai-engine-v2.js:600-640\t# Strong incentive for near-win; keep high but ensure exact-win detection is used first
+200\tadjacent/pin-to-queen bonus\twww/js/ai-engine-v2.js:600-640\t# Encourages surrounding queen; interacts with placement bias
+150	block-escape-routes bonus	www/js/ai-engine-v2.js:600-640	# Cuts exits; may be too large when combined with other bonuses
+100	approach-to-queen bonus	www/js/ai-engine-v2.js:600-640	# Encourages closing in; reduce if AI overcommits
+150	aggressiveScore near-victory threshold	www/js/ai-engine-v2.js:620	# Current hard threshold to force aggressive acceptance; consider 80-100
+50	deployment bonus (secondary)\twww/js/ai-engine-v2.js:600-640\t# Secondary placement guidance; safe to reduce if main deployment lowered
+25	threatening-pieces bonus (sim)\twww/js/ai-engine-v2.js:610-640\t# Small sim incentive to create threats
+20	queen-placement bias (sim)\twww/js/ai-engine-v2.js:610-640\t# Bias in MC placement sims
+15	movement bonus (sim)\twww/js/ai-engine-v2.js:610-640\t# Minor per-move sim encouragement
+10	placement bonus (MC sim)\twww/js/ai-engine-v2.js:610-640\t# Small nudge for placement in MC sims
+5	random sim noise (±2.5)\twww/js/ai-engine-v2.js:610-640\t# Small exploration noise; keep low
+
+0.4	queenBonus composition weight\twww/js/ai-engine.js:660-700\t# Composition: queenBonus*0.4 + winRate*0.3 + visitsRatio*0.2 + strategicBonus*0.1
+0.3	winRate composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
+0.2	visitsRatio composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
+0.1	strategicBonus composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
+0.4	movement strategicValue bonus\twww/js/ai-engine.js:660-700\t# Small movement heuristic value
+0.3	beetle threatening-queen bonus\twww/js/ai-engine.js:660-700\t# Beetle threat emphasis; tune if beetles dominate
+0.2	queen-move importance bonus\twww/js/ai-engine.js:660-700\t# Gives extra weight to queen moves
+0.15	ant move bias\twww/js/ai-engine.js:660-700\t# Mobility preference for ants
+0.10	beetle move bias\twww/js/ai-engine.js:660-700\t# Minor beetle bias
+(-100.0)	penalty for moves that surround own queen\twww/js/ai-engine.js:680-720	# Large negative to prevent self-capture; keep large
+
+0.35	material weight in evaluation\twww/js/ai-eval.js:120-180\t# MaterialDiff * 0.35 - balance material vs positional
+0.25	coordination weight\twww/js/ai-eval.js:120-180\t# Connectivity/coordination importance
+0.20	network strength weight\twww/js/ai-eval.js:120-180\t# Hive/network strength metric
++1 per threat	queen adjacency bonus\twww/js/ai-eval.js:100-140\t# +1 per adjacent attacking piece to queen (threat count)
+
+1000	minimax ordering: high-priority scoring\twww/js/minimax-engine.js:40-140\t# Used to order moves (captures/forcing)
+500 - dist*50	close-to-opponent-queen ordering\twww/js/minimax-engine.js:40-140\t# Strongly prefers moves nearer opponent queen
+200 - dist*20	proximity-to-our-queen ordering\twww/js/minimax-engine.js:40-140\t# Protect/position around own queen
+100	generic ordering bonus\twww/js/minimax-engine.js:40-140\t# Small ordering bump
+50 - dist*5	center control ordering bonus\twww/js/minimax-engine.js:40-140\t# Encourage central moves in ordering
+
+0.3	edge/outside control bonus\twww/js/ai-formations.js:200-280\t# Bonus for blocking/controlling edges
+0.3	V-formation geometry bonus\twww/js/ai-formations.js:200-280\t# Formation/triangle reward
+0.3	triangular formation bonus\twww/js/ai-formations.js:200-280\t# Another formation reward
+0.5	pressurePieces bonus\twww/js/ai-formations.js:200-280\t# Pressure piece increment when attacking
+
+(-0.1..-0.5)	pinValue adjustments (contextual)\twww/js/ai-tactics.js:300-460\t# Penalty scale when pinned; context-dependent
+
+distance penalty multiplier\tscore -= distance * 5\twww/js/ai-engine-v2.js:660-720\t# Positional distance penalty scaling
+
+# Queen threat / defense extremes
+(-10.0)	DEFENSIVE catastrophic penalty for exposing own queen\twww/js/ai-engine.js:6400-6510\t# Very large defensive penalty; may prevent calculated sacrifices
+(-5.0)	VERY DANGEROUS penalty (defensive)\twww/js/ai-engine.js:6400-6510\t# Heavy danger penalty
+-2.0	big-penalty for moving far from queen attacks\twww/js/ai-engine.js:6400-6510\t# Penalize abandoning queen pressure
+0.4	small positioning bonuses\twww/js/ai-engine.js:6400-6510\t# Minor positioning increments
+
+exp(score * 2)	softmax / selection exponent multiplier\twww/js/ai-engine.js:700-760\t# Exponential weighting used in selection (temperature = 0.5)
+
+# Notes:
+# - All file:line ranges are approximate (from a repository scan). Open the indicated file and search the literal to find the exact line.
+# - I converted the whole file to numeric-first rows and added per-item comments and approximate file ranges as requested.
+# - Recommended quick fixes: (1) Add immediate-win short-circuit (simulate/recognize exact surround and pick it); (2) reduce deployment +1000 -> ~150-300; (3) lower aggressive threshold 150 -> 80; (4) keep sim noise small.
+# - If you want, I can now: apply the immediate-win short-circuit + lower deployment bias in code and run a static check and a small AI-vs-AI smoke test.
+
+ FORMAT: <weight(s)>\t<short description>\t<file:line or range>\t# short comment / recommended action
+ 
+ 1000\tdeployment strategicScore (massive placement bonus)\twww/js/ai-engine-v2.js:600-620\t# Dominates move choice; consider lowering to ~200 to avoid deployment bias
+ 500\tnear-win / game-winning move bonus\twww/js/ai-engine-v2.js:600-620\t# Large incentive to accept near-victory; keep high but ensure exact-win detection also used
+ 200\tadjacent/pin to queen bonus\twww/js/ai-engine-v2.js:600-620\t# Encourages surrounding the queen; OK but interacts with placement bias
+ 150\tblock escape routes bonus\twww/js/ai-engine-v2.js:600-620\t# Encourages cutting exits; may be too large in some contexts
+ 100\tapproach-to-queen bonus\twww/js/ai-engine-v2.js:600-620\t# Encourages closing in; reduce if AI overcommits to risky approaches
+ 150\taggressiveScore near-victory threshold\twww/js/ai-engine-v2.js:620\t# Threshold for forcing aggressive moves; try 80–100 to accept earlier wins
+ 50\tdeployment bonus (secondary guidance)\twww/js/ai-engine-v2.js:600-620\t# Secondary placement guidance; safe to reduce with main deployment lowered
+ 25\tthreatening pieces bonus in sim\twww/js/ai-engine-v2.js:610-640\t# Small sim incentive for creating threats
+ 20\tqueen placement in sim\twww/js/ai-engine-v2.js:610-640\t# Bias for placing queen in simulation placement heuristics
+ 15\tmovement bonus in sim\twww/js/ai-engine-v2.js:610-640\t# Minor per-move simulation encouragement
+ 10\tplacement/MonteCarlo sim placement bonus\twww/js/ai-engine-v2.js:610-640\t# Small placement nudge during MC sims
+ 5\trandom noise in sim (±2.5)\twww/js/ai-engine-v2.js:610-640\t# Adds exploration noise; leave small to diversify sims
+ 0.4\tmovement strategicValue bonus (movement heuristics)\twww/js/ai-engine.js:660-690\t# Small movement value; fine-grained tuning only
+ 0.3\tbeetle threatening queen bonus\twww/js/ai-engine.js:660-700\t# Encourages beetles to threaten queen; adjust if beetles overprioritized
+ 0.2\tqueen move importance bonus\twww/js/ai-engine.js:660-700\t# Increases weight for queen moves
+ 0.15\tant piece move bias\twww/js/ai-engine.js:660-700\t# Slight preference for ants (mobility)
+ 0.10\tbeetle piece move bias\twww/js/ai-engine.js:660-700\t# Small beetle bias
+ (-100.0)\tpenalty for moves that surround own Queen\twww/js/ai-engine.js:680-720\t# Large negative to prevent suicidal surrounding of own queen
+ 0.4\tqueenBonus composition weight\twww/js/ai-engine.js:660-680\t# part of composition: queenBonus*0.4 + winRate*0.3 + visitsRatio*0.2 + strategicBonus*0.1
+ 0.3\twinRate composition weight\twww/js/ai-engine.js:660-680\t# see composition above
+ 0.2\tvisitsRatio composition weight\twww/js/ai-engine.js:660-680\t# see composition above
+ 0.1\tstrategicBonus composition weight\twww/js/ai-engine.js:660-680\t# see composition above
+ 0.35\tmaterial weight in evaluation\twww/js/ai-eval.js:120-160\t# Material difference weighting; adjust if material dominates positional play
+ 0.25\tcoordination weight\twww/js/ai-eval.js:120-160\t# Coordination (connectivity) contribution
+ 0.20\tnetwork strength weight\twww/js/ai-eval.js:120-160\t# Strength of hive/network metric
+ +1 per threat\tqueen adjacency bonus\twww/js/ai-eval.js:100-140\t# Adds +1 per adjacent threat to a queen (counts threats)
+ 1000\tminimax ordering: high-priority scoring (move ordering)\twww/js/minimax-engine.js:40-120\t# Move-ordering boost; used to prioritize captures/forcing moves in alpha-beta
+ 500 - dist*50\tclose-to-opponent-queen ordering\twww/js/minimax-engine.js:40-120\t# Strongly prefers moves closer to opponent queen; dist scaled factor
+ 200 - dist*20\tproximity to our queen ordering\twww/js/minimax-engine.js:40-120\t# Preference to protect/position around own queen
+ 100\tgeneric ordering bonus\twww/js/minimax-engine.js:40-120\t# Small priority bump for ordering
+ 50 - dist*5\tcenter control ordering bonus\twww/js/minimax-engine.js:40-120\t# Encourages central play in ordering
+ 0.3\tedge/outside control bonus\twww/js/ai-formations.js:200-260\t# Small bonus for controlling edges or blocking edges
+ 0.3\tV-formation geometry bonus\twww/js/ai-formations.js:200-260\t# Formation reward for V/triangles
+ 0.5\tpressurePieces bonus\twww/js/ai-formations.js:200-260\t# Pressure piece increment when attacking
+ (-0.1..-0.5)\tpinValue adjustments (contextual)\twww/js/ai-tactics.js:300-420\t# Negative adjustments when pinned; scale depends on context (0.1..0.5)
+ (-10.0)\tDEFENSIVE catastrophic penalty for exposing own queen\twww/js/ai-engine.js:6400-6500\t# Large defensive penalty; keeps AI from exposing queen (may be too punitive in some lines)
+ (-5.0)\tVERY DANGEROUS penalty (defensive)\twww/js/ai-engine.js:6400-6500\t# Smaller but heavy danger penalties
+ exp(score * 2)\tsoftmax / selection exponent multiplier\twww/js/ai-engine.js:700-760\t# Exponential weighting used in selection; multiplies score by 2 in exponent
+ 
+ # Notes:
+ # - File:line pairs are approximate ranges based on a repository scan; open the listed file and search for the literal or nearby comment to find the exact line.
+ # - Lines chosen prioritize high-impact constants (deployment/placement, near-win bonuses, minimax ordering, and composition weights).
+ # - Recommended quick fixes: add an immediate-win short-circuit (detect exact surround and pick it), reduce deployment +1000 → +150..+300, lower aggressive threshold 150 → 80, keep random sim noise small.
+ # - If you want, I can now apply small code changes (immediate-win short-circuit + deployment threshold reductions) and run quick static checks.
+Description	Weight/Value
+
+--- ai-engine.js (MCTS & evaluation composition) ---
+Queen-focused composition weights (queenBonus, winRate, visitsRatio, strategicBonus)	queenBonus:0.4; winRate:0.3; visitsRatio:0.2; strategicBonus:0.1
+movement strategicValue bonus (move.strategicValue)	+0.3
+central position small bonus	+0.1
+beetle threatening queen bonus	+0.5
+strategic bonus clamp (min/max)	clamped to [0, 10]
+penalty for moves that surround own Queen	-100.0
+queen move importance bonus	+0.2
+ant piece move bias	+0.15
+beetle piece move bias	+0.10
+queen danger modifier (example multiplier applied to queenScore)	-0.8 * strategicMultiplier (reduces queenScore when dangerous)
+material weight in evaluation	materialDiff * 0.35
+coordination weight	coordinationDiff * 0.25 * evaluationDepth
+central control weight	centralControlDiff * 0.15
+network strength weight	networkStrength * 0.20
+controlDiff weight	controlDiff * 0.30 * evaluationDepth
+tacticalDiff weight	tacticalDiff * 0.25 * evaluationDepth
+tactical lookahead weight	tacticalLookahead * 0.15
+tempoDiff weight	tempoDiff * 0.20 * evaluationDepth
+circlingDiff weight	circlingDiff * 0.18 * evaluationDepth
+endgameDiff weight	endgameDiff * 0.15
+endgameSpecialist weight	endgameSpecialist * 0.10
+tempo advantage weight	tempoAdvantage * 0.15
+advancedPatterns weight	+0.08
+final evaluation clamp	clamped to [0,1]
+softmax move exponent multiplier used in selection	exp(score * 2)
+
+--- ai-engine-v2.js (aggressive/pinning policy) ---
+base: aggressiveScore added first	+aggressiveScore (varies per move)
+approach-to-queen bonus	+100
+adjacent/pin to queen bonus	+200
+block escape routes bonus	+150
+near-win / game-winning move bonus	+500
+aggressiveScore multipliers (when emphasized)	aggressiveScore * 3
+deployment strategicScore (massive placement bonus)	+1000
+deployment bonus (secondary guidance)	+50
+placement/MonteCarlo sim placement bonus	+10
+queen placement in sim	+20
+movement bonus in sim	+15
+threatening pieces bonus in sim	+25
+aggressiveScore near-victory threshold	aggressiveScore >= 150 (used to accept/avoid rejecting moves)
+distance penalty for positional scoring	score -= distance * 5
+piece default value fallback	pieceValues[key] || 5
+random noise in sim	Math.random()*5 - 2.5 (±2.5)
+"wussy" move penalties	(large negative penalty applied via logic; exact amount varies by path)
+
+--- minimax-engine.js (ordering heuristics for alpha-beta) ---
+High-priority scoring for move ordering	+1000 (certain moves)
+Close-to-opponent-queen priority	+500 - distToOppQueen * 50
+Proximity to our Queen priority	+200 - distToOurQueen * 20
+Generic bonus	+100
+Center control ordering bonus	Math.max(0, 50 - distFromCenter * 5)
+Evaluation multiplier for side	multiplier = (currentPlayer === aiColor) ? 1 : -1
+
+--- ai-eval.js (base piece values and small bonuses) ---
+Piece base values	Q:5; B:3; A:2; S:2; G:1; M:2; L:2; P:2
+Queen adjacency bonus	+1 per threat (countQueenThreats)
+
+--- Other small geometry/formation bonuses (ai-engine.js / ai-formations.js) ---
+edge/outside control bonus	+0.3 per blocked edge piece
+V-formation geometry bonus	+0.3
+triangular/formation geometry bonus (general)	+0.3
+pressurePieces bonus	+0.5 (increment for pressure pieces)
+center small bonus (again)	+0.1
+
+--- Pin / mobility / pin-value heuristics ---
+pinValue adjustments (various contexts)	-ourPins * [0.1 | 0.2 | 0.3 | 0.5] (contextual)
+danger escape penalty	danger -= Math.max(0, 3 - aiQueenEscapes) * 0.1
+
+--- Queen threat / offense/defense extremes (ai-engine.js lines ~6400–6500) ---
+offensive base threat bonus	threatBonus base values (varies; example 5.0 for strong pressure)
+stay-adjacent multiplicative bonus	threatBonus *= 1.5
+penalty for moving away from queen attacks	bonus -= 3.0 * strategicMultiplier
+small positioning bonuses	+0.4 * strategicMultiplier
+big penalty for moving very far from queen attacks	-2.0 * strategicMultiplier
+DEFENSIVE catastrophic penalty for exposing own queen	-10.0 * strategicMultiplier (catastrophic)
+VERY DANGEROUS penalty	-5.0 * strategicMultiplier
+conditional penalty scale based on opponent pressure	penalty = oppHasPressure ? 0.8 : 2.5 (then bonus -= penalty * strategicMultiplier)
+small penalty if Queen not immediate danger	-0.5 * strategicMultiplier
+defensive positioning bonus	+1.0 * strategicMultiplier
+
+--- Sampling / selection / weighting specifics ---
+Weighted selection uses exponential weighting	weight = exp(score * 2)
+Move weight base in simulation	weight base 1 (then multiplied by factors)
+QueenDistance factor in move weight	if queenDistance <=2 then weight *= 1.5
+Monte-Carlo selection temperature multiplier	*2 in exponent (see softmax exp(score*2))
+
+Notes / grouping rationale
+- Grouped by file/module then by behavior (offense/defense/orderings/eval).
+- All numeric literals were captured from scanning `www/js` source. Some are contextual multipliers applied to larger expressions (not simple scalars) — I wrote them as the expression seen in-code.
+- Some penalties are applied conditionally (based on strategicMultiplier, opponent pressure, plan phase) — the right-hand "Weight/Value" column preserves the literal used or the expression.
+
+If you'd like, I can now:
+1) Tune a short list of the worst offenders (e.g. reduce +1000 deployment to +200, reduce threshold 150→80, add immediate-win short-circuit), apply the code changes and run a quick static check; or
+2) Export this table as CSV instead of TXT for easy editing in Excel/Sheets; or
+3) Add inline comments in each source file next to the literal constants to explain rationale and recommend new values.
+
+File created at: www/ai-weight-key.txt
+
