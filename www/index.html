@@ -425,13 +425,16 @@
   <script src="js/main.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <script src="js/multiplayer.js"></script>
-  <script src="js/minimax-engine.js"></script>
+  <!-- Legacy AI systems - commented out for cleaner deployment -->
+  <!-- <script src="js/minimax-engine.js"></script> -->
   
   <!-- UHP AI Override MUST load before AI engines -->
   <script src="js/uhp/uhp-ai-override.js"></script>
   
-  <script src="js/ai-engine.js"></script>
-  <script src="js/ai-engine-v2.js"></script>
+  <!-- Legacy AI engines - kept commented for debugging if needed -->
+  <!-- <script src="js/ai-engine.js"></script> -->
+  <!-- <script src="js/ai-engine-v2.js"></script> -->
+  <!-- Only load nokamute-mzinga for UHP fallback compatibility -->
   <script src="js/ai-engine-nokamute-mzinga.js?v=1.2"></script>
   <script src="js/personalities.js"></script>
   <script src="js/ai-ui.js"></script>

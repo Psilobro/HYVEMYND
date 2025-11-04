@@ -948,10 +948,15 @@ function updateHUD(){
                        + ' to move (turn '+state.moveNumber+')';
         hud.style.fontFamily = 'Milonga, serif';
         
-        // Check if AI should move
-        if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
-          console.log(`🎯 Triggering AI check for ${state.current}`);
-          setTimeout(() => window.AIEngine.checkAndMakeMove(), 100);
+        // Check if AI should move - prioritize UHP engine, fallback to legacy
+        if (window.uhpClient && window.uhpClient.isEnabled()) {
+            // UHP engine will handle this via its own performAIAction flow
+            console.log(`🤖 UHP engine will handle AI move for ${state.current}`);
+        } else if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
+            console.log(`🎯 Triggering legacy AI check for ${state.current}`);
+            setTimeout(() => window.AIEngine.checkAndMakeMove(), 100);
+        } else {
+            console.log(`🤖 No AI system available for ${state.current}`);
         }
     } else {
         // Current player has no legal moves - pass turn
@@ -1063,11 +1068,16 @@ function legalPlacementZones(color){
     console.log(`🎯 Turn ${turn}, Queen placed: ${state.queenPlaced[color]}`);
     
     if(!state.queenPlaced[color] && turn === 4){
-        console.log(`🎯 Queen restriction check: AI enabled: ${typeof window.AIEngine !== 'undefined' && window.AIEngine.enabled}, AI color: ${window.AIEngine?.color}`);
-        // TEMPORARILY BYPASS ALL Queen restrictions for AI debugging
-        if(typeof window.AIEngine !== 'undefined' && window.AIEngine.enabled && window.AIEngine.color === color) {
-            console.log(`🎯 AI DEBUG: Bypassing all Queen restrictions`);
-            // Skip all Queen restrictions for AI
+        console.log(`🎯 Queen restriction check: Checking AI systems...`);
+        
+        // Check UHP engine first
+        const isUHPActive = window.uhpClient && window.uhpClient.isEnabled();
+        // Check legacy AI as fallback
+        const isLegacyAIActive = window.AIEngine && window.AIEngine.enabled && window.AIEngine.color === color;
+        
+        if (isUHPActive || isLegacyAIActive) {
+            console.log(`🎯 AI active - bypassing Queen restrictions for automated play`);
+            // Skip Queen restrictions for AI systems
         } else if(selected && selected.piece && selected.piece.meta.key!=='Q') {
             console.log(`🎯 Human mode - Queen required but ${selected.piece.meta.key} selected, returning empty zones`);
             return zones;

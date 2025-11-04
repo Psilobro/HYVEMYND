@@ -268,11 +268,9 @@ window.AIUI.startAIMode = function(difficulty) {
     
     console.log(`🤖 UHP engine configured for ${difficulty} difficulty`);
   } else {
-    console.warn('⚠️ UHP client not available, falling back to built-in AI');
-    // Fallback to old system if UHP not available
-    if (window.activateNokamuteMzingaAI) {
-      window.activateNokamuteMzingaAI(difficulty);
-    }
+    console.warn('⚠️ UHP client not available');
+    // Note: Legacy AI fallback systems have been simplified
+    // In clean deployment, UHP is the primary AI system
   }
   
   // Set personality for voice lines and theming
@@ -333,9 +331,10 @@ window.AIUI.returnToSandbox = function() {
     console.log('🤖 UHP engine disabled for sandbox mode');
   }
   
-  // Also disable any legacy AI engines
-  if (window.AIEngine) {
+  // Also disable any legacy AI engines that might be loaded
+  if (window.AIEngine && window.AIEngine.disable) {
     window.AIEngine.disable();
+    console.log('🤖 Legacy AI engine disabled');
   }
   
   // Hide personality chat bubble
