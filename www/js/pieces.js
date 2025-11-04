@@ -43,6 +43,8 @@ const PIECE_MAP = {
 };
 
 const tray = [];
+// Make tray available globally
+window.tray = tray;
 // Global mobile/tablet detection function
 function isMobileDevice() {
     return window.innerWidth <= 900 && window.innerHeight <= 350;
@@ -212,7 +214,9 @@ window.layoutTrays = function() {
     const trayWidth = 220; // Updated to match CSS and main.js
     
     // Start position (adjusted for mobile - move pieces down by one piece length, then up by half)
-    const startY = isMobile ? 60 + scaledPieceSize - (scaledPieceSize * 0.5) : (trayHeight - (pieceSpacing * 4 + typeGap)) / 2;
+    // For desktop, add extra top padding to prevent Queen clipping
+    const topPadding = isMobile ? 0 : 80; // Extra padding at top for Queen pieces
+    const startY = isMobile ? 60 + scaledPieceSize - (scaledPieceSize * 0.5) : topPadding + (trayHeight - (pieceSpacing * 4 + typeGap)) / 2;
 
     // Column positions for each tray - balanced spacing for larger pieces
     const leftColumnX = 50; // Increased margin to prevent clipping of scaled pieces

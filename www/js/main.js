@@ -218,11 +218,11 @@ window.addEventListener('load', () => {
     window.glowLayer = glowLayer;
 
     // --- TRAY PIXI APPS ---
-    // Calculate tray height - account for tablet scaling
-    let trayHeight = window.innerHeight;
+    // Calculate tray height - account for tablet scaling and extra space for Queen pieces
+    let trayHeight = window.innerHeight + 160; // Add extra height for top and bottom padding
     if (window.innerWidth >= 769 && window.innerWidth <= 1200) {
         // For tablets, increase canvas height to account for 0.6 CSS scaling
-        trayHeight = window.innerHeight / 0.6;
+        trayHeight = (window.innerHeight + 160) / 0.6;
     }
     
     whiteTrayApp = new PIXI.Application({
@@ -235,7 +235,7 @@ window.addEventListener('load', () => {
     whiteTrayApp.view.style.position = 'absolute';
 whiteTrayApp.view.style.left = '0px';
 whiteTrayApp.view.style.top = '0px';
-whiteTrayApp.view.style.transform = 'scale(1.0)';
+// Let CSS handle scaling - don't override with JavaScript
 whiteTrayApp.view.style.transformOrigin = 'left top';
 whiteTrayApp.view.style.zIndex = '5';
 
@@ -249,7 +249,7 @@ whiteTrayApp.view.style.zIndex = '5';
     blackTrayApp.view.style.position = 'absolute';
 blackTrayApp.view.style.right = '0px';
 blackTrayApp.view.style.top = '0px';
-blackTrayApp.view.style.transform = 'scale(1.0)';
+// Let CSS handle scaling - don't override with JavaScript
 blackTrayApp.view.style.transformOrigin = 'right top';
 blackTrayApp.view.style.zIndex = '6';
 

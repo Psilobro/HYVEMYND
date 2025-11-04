@@ -1,0 +1,20 @@
+{
+  "name": "hyvemynd-uhp-bridge",
+  "version": "1.0.0",
+  "description": "WebSocket bridge for HYVEMYND to connect with UHP engines",
+  "main": "uhp-bridge.js",
+  "scripts": {
+    "start": "node uhp-bridge.js",
+    "dev": "nodemon uhp-bridge.js",
+    "setup": "setup.bat"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["hive", "uhp", "engine", "websocket"],
+  "author": "HYVEMYND",
+  "license": "MIT"
+}

@@ -238,38 +238,23 @@ window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
   
-  // Handle V2 engine activation
-  if (difficulty === 'hard-v2') {
-    console.log(`🎮 Starting Single Player mode with AI Engine V2!`);
-    
-    // Activate V2 engine
-    if (window.activateAIV2) {
-      window.activateAIV2();
-    }
-    
-    // Set personality to hard for V2
-    if (window.Personalities) {
-      window.Personalities.setOpponent('hard');
-    }
-    
-    // Enable AI engine with V2
-    if (window.AIEngine) {
-      window.AIEngine.enable('hard');
-    }
-  } else {
-    // Original logic for other difficulties
-    console.log(`🎮 Starting Single Player mode (${difficulty} difficulty)`);
-    
-    // Set up the opponent personality
-    if (window.Personalities) {
-      window.Personalities.setOpponent(difficulty);
-    }
-    
-    // Enable AI engine
-    if (window.AIEngine) {
-      window.AIEngine.enable(difficulty);
-    }
+  // Use Nokamute/Mzinga AI for ALL difficulty levels (including V2)
+  console.log(`🎮 Starting Single Player mode with Nokamute/Mzinga AI (${difficulty})!`);
+  
+  // Activate Nokamute/Mzinga engine with proper difficulty
+  if (window.activateNokamuteMzingaAI) {
+    // Map hard-v2 to hard for personality but keep the full difficulty for the AI
+    const aiDifficulty = difficulty;
+    window.activateNokamuteMzingaAI(aiDifficulty);
   }
+  
+  // Set personality based on difficulty (map hard-v2 to hard for personality)
+  const personalityDifficulty = difficulty === 'hard-v2' ? 'hard' : difficulty;
+  if (window.Personalities) {
+    window.Personalities.setOpponent(personalityDifficulty);
+  }
+  
+  // DON'T call window.AIEngine.enable() - our engine handles this
   
   // Hide difficulty modal
   this.hideDifficultyModal();

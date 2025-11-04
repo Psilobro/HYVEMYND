@@ -155,6 +155,24 @@ window.Personalities = {
     this.currentOpponent = this.opponents[difficulty];
     this._midGameTriggered = false; // Reset mid-game trigger
     console.log(`🎭 Active opponent: ${this.currentOpponent.name} (${difficulty})`);
+    
+    // Integrate with Nokamute/Mzinga AI engine
+    if (typeof window.AIEngineNokamuteMzinga !== 'undefined') {
+      const difficultyMap = {
+        'easy': 'easy',
+        'medium': 'medium',
+        'hard': 'hard'
+      };
+      
+      const aiDifficulty = difficultyMap[difficulty] || 'medium';
+      window.AIEngineNokamuteMzinga.difficulty = aiDifficulty;
+      console.log(`🤖 AI difficulty set to ${aiDifficulty} for ${this.currentOpponent.name}`);
+      
+      // Show personality intro
+      setTimeout(() => {
+        this.showVoiceLine('intro');
+      }, 1000);
+    }
   },
   
   /**

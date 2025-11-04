@@ -1,0 +1,18 @@
+[submodule "reference-ai"]
+	path = reference-ai
+	url = https://github.com/shaw3257/hive.git
+[submodule "reference-ai-2"]
+	path = reference-ai-2
+	url = https://github.com/makatony/hiveAI.git
+[submodule "reference-ai-3"]
+	path = reference-ai-3
+	url = https://github.com/vidstige/hive.git
+[submodule "reference-ai-4"]
+	path = reference-ai-4
+	url = https://github.com/jonthysell/Mzinga.git
+[submodule "reference-ai-5"]
+	path = reference-ai-5
+	url = https://github.com/edre/nokamute.git
+[submodule "reference-ai-6"]
+	path = reference-ai-6
+	url = https://github.com/hiveboardgame/hive.git

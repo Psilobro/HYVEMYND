@@ -1,62 +1,322 @@
-FORMAT: <weight(s)>\t<short description>\t<file:line or range>\t# short comment / recommended action
+# HIVE AI WEIGHT SYSTEM ANALYSIS
+# =================================
+# 
+# SCALE UNDERSTANDING:
+# - Large bonuses (100-1000+): Raw score additions/subtractions that dominate decisions
+# - Small decimals (0.1-1.0): Probability multipliers, composition weights, or fine-tuning factors  
+# - Negative values: Penalties to discourage bad moves
+# - NO UNIVERSAL SCALE: Each weight type has its own context and magnitude
+#
+# THREAT TERMINOLOGY CLARIFICATION:
+# - "threatening queen" = AI's pieces attacking the OPPONENT'S queen (offensive)
+# - "exposing own queen" = AI moves that put the AI'S OWN queen in danger (defensive)
+# - "queen adjacency bonus" = bonus for AI pieces next to OPPONENT'S queen
+#
+# ==================================================================================
 
-1000\tdeployment strategicScore (massive placement bonus)\twww/js/ai-engine-v2.js:600-640\t# Dominates move choice; lower to ~150-300 to reduce placement bias
-500\tnear-win / game-winning move bonus\twww/js/ai-engine-v2.js:600-640\t# Strong incentive for near-win; keep high but ensure exact-win detection is used first
-200\tadjacent/pin-to-queen bonus\twww/js/ai-engine-v2.js:600-640\t# Encourages surrounding queen; interacts with placement bias
-150	block-escape-routes bonus	www/js/ai-engine-v2.js:600-640	# Cuts exits; may be too large when combined with other bonuses
-100	approach-to-queen bonus	www/js/ai-engine-v2.js:600-640	# Encourages closing in; reduce if AI overcommits
-150	aggressiveScore near-victory threshold	www/js/ai-engine-v2.js:620	# Current hard threshold to force aggressive acceptance; consider 80-100
-50	deployment bonus (secondary)\twww/js/ai-engine-v2.js:600-640\t# Secondary placement guidance; safe to reduce if main deployment lowered
-25	threatening-pieces bonus (sim)\twww/js/ai-engine-v2.js:610-640\t# Small sim incentive to create threats
-20	queen-placement bias (sim)\twww/js/ai-engine-v2.js:610-640\t# Bias in MC placement sims
-15	movement bonus (sim)\twww/js/ai-engine-v2.js:610-640\t# Minor per-move sim encouragement
-10	placement bonus (MC sim)\twww/js/ai-engine-v2.js:610-640\t# Small nudge for placement in MC sims
-5	random sim noise (±2.5)\twww/js/ai-engine-v2.js:610-640\t# Small exploration noise; keep low
+SECTION 1: PLACEMENT/DEPLOYMENT BONUSES (AI-ENGINE-V2.JS)
+# These dominate initial move selection by adding raw score points
+# Scale: 0-1000+ (no upper limit, but 1000 is extremely high)
 
-0.4	queenBonus composition weight\twww/js/ai-engine.js:660-700\t# Composition: queenBonus*0.4 + winRate*0.3 + visitsRatio*0.2 + strategicBonus*0.1
-0.3	winRate composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
-0.2	visitsRatio composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
-0.1	strategicBonus composition weight\twww/js/ai-engine.js:660-700\t# Part of MCTS move scoring
-0.4	movement strategicValue bonus\twww/js/ai-engine.js:660-700\t# Small movement heuristic value
-0.3	beetle threatening-queen bonus\twww/js/ai-engine.js:660-700\t# Beetle threat emphasis; tune if beetles dominate
-0.2	queen-move importance bonus\twww/js/ai-engine.js:660-700\t# Gives extra weight to queen moves
-0.15	ant move bias\twww/js/ai-engine.js:660-700\t# Mobility preference for ants
-0.10	beetle move bias\twww/js/ai-engine.js:660-700\t# Minor beetle bias
-(-100.0)	penalty for moves that surround own queen\twww/js/ai-engine.js:680-720	# Large negative to prevent self-capture; keep large
+1000	DEPLOYMENT PLACEMENT MEGA-BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Massive bonus added when AI places any piece on the board
+	# EFFECT: Makes AI heavily favor placing new pieces over moving existing ones
+	# PROBLEM: At 1000, this completely overwhelms other considerations
+	# SCALE: Raw score addition (0-1000+, no theoretical max)
+	# RECOMMENDATION: Lower to 150-300 to balance placement vs movement decisions
 
-0.35	material weight in evaluation\twww/js/ai-eval.js:120-180\t# MaterialDiff * 0.35 - balance material vs positional
-0.25	coordination weight\twww/js/ai-eval.js:120-180\t# Connectivity/coordination importance
-0.20	network strength weight\twww/js/ai-eval.js:120-180\t# Hive/network strength metric
-+1 per threat	queen adjacency bonus\twww/js/ai-eval.js:100-140\t# +1 per adjacent attacking piece to queen (threat count)
+500	NEAR-WIN DETECTION BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Bonus when AI detects it's close to surrounding opponent's queen
+	# EFFECT: Encourages finishing moves when victory is near
+	# PERSPECTIVE: This detects AI's advantage over opponent (good to keep high)
+	# SCALE: Raw score addition (typically 100-1000 for game-changing moves)
+	# RECOMMENDATION: Keep high (400-600) but ensure exact-win detection exists
 
-1000	minimax ordering: high-priority scoring\twww/js/minimax-engine.js:40-140\t# Used to order moves (captures/forcing)
-500 - dist*50	close-to-opponent-queen ordering\twww/js/minimax-engine.js:40-140\t# Strongly prefers moves nearer opponent queen
-200 - dist*20	proximity-to-our-queen ordering\twww/js/minimax-engine.js:40-140\t# Protect/position around own queen
-100	generic ordering bonus\twww/js/minimax-engine.js:40-140\t# Small ordering bump
-50 - dist*5	center control ordering bonus\twww/js/minimax-engine.js:40-140\t# Encourage central moves in ordering
+200	ADJACENT-TO-OPPONENT-QUEEN BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Bonus for placing/moving AI pieces next to the opponent's queen
+	# EFFECT: Encourages aggressive play around opponent's queen
+	# PERSPECTIVE: AI attacking opponent's queen (offensive strategy)
+	# SCALE: Raw score addition (50-300 typical for positional bonuses)
+	# RECOMMENDATION: Reasonable at 150-250, but interacts with placement bias
 
-0.3	edge/outside control bonus\twww/js/ai-formations.js:200-280\t# Bonus for blocking/controlling edges
-0.3	V-formation geometry bonus\twww/js/ai-formations.js:200-280\t# Formation/triangle reward
-0.3	triangular formation bonus\twww/js/ai-formations.js:200-280\t# Another formation reward
-0.5	pressurePieces bonus\twww/js/ai-formations.js:200-280\t# Pressure piece increment when attacking
+150	BLOCK-ESCAPE-ROUTES BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Bonus for moves that cut off opponent queen's escape paths
+	# EFFECT: Encourages controlling space around opponent's queen
+	# PERSPECTIVE: AI restricting opponent's options (tactical advantage)
+	# SCALE: Raw score addition (50-200 for tactical bonuses)
+	# RECOMMENDATION: May be too high when combined with other queen-attack bonuses
 
-(-0.1..-0.5)	pinValue adjustments (contextual)\twww/js/ai-tactics.js:300-460\t# Penalty scale when pinned; context-dependent
+100	APPROACH-OPPONENT-QUEEN BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Bonus for moving AI pieces closer to opponent's queen
+	# EFFECT: Encourages general aggressive positioning
+	# PERSPECTIVE: AI seeking attack opportunities on opponent
+	# SCALE: Raw score addition (25-150 for directional bonuses)
+	# RECOMMENDATION: Fine at 75-125, ensures steady pressure
 
-distance penalty multiplier\tscore -= distance * 5\twww/js/ai-engine-v2.js:660-720\t# Positional distance penalty scaling
+150	AGGRESSIVE-ACCEPTANCE THRESHOLD	www/js/ai-engine-v2.js:620
+	# WHAT: Minimum "aggressiveness score" required to accept a move
+	# EFFECT: AI rejects moves below this threshold as "too passive"
+	# PROBLEM: At 150, AI may reject winning moves that don't seem "aggressive enough"
+	# SCALE: Threshold value (0-200+, where higher = more picky about aggression)
+	# RECOMMENDATION: Lower to 80-100 to accept more diverse winning strategies
 
-# Queen threat / defense extremes
-(-10.0)	DEFENSIVE catastrophic penalty for exposing own queen\twww/js/ai-engine.js:6400-6510\t# Very large defensive penalty; may prevent calculated sacrifices
-(-5.0)	VERY DANGEROUS penalty (defensive)\twww/js/ai-engine.js:6400-6510\t# Heavy danger penalty
--2.0	big-penalty for moving far from queen attacks\twww/js/ai-engine.js:6400-6510\t# Penalize abandoning queen pressure
-0.4	small positioning bonuses\twww/js/ai-engine.js:6400-6510\t# Minor positioning increments
+# ==================================================================================
 
-exp(score * 2)	softmax / selection exponent multiplier\twww/js/ai-engine.js:700-760\t# Exponential weighting used in selection (temperature = 0.5)
+SECTION 2: SIMULATION BONUSES (AI-ENGINE-V2.JS)
+# These affect AI's internal simulations during move evaluation
+# Scale: 5-50 (small influences on simulation outcomes)
 
-# Notes:
-# - All file:line ranges are approximate (from a repository scan). Open the indicated file and search the literal to find the exact line.
-# - I converted the whole file to numeric-first rows and added per-item comments and approximate file ranges as requested.
-# - Recommended quick fixes: (1) Add immediate-win short-circuit (simulate/recognize exact surround and pick it); (2) reduce deployment +1000 -> ~150-300; (3) lower aggressive threshold 150 -> 80; (4) keep sim noise small.
-# - If you want, I can now: apply the immediate-win short-circuit + lower deployment bias in code and run a static check and a small AI-vs-AI smoke test.
+50	SECONDARY DEPLOYMENT BONUS	www/js/ai-engine-v2.js:600-640
+	# WHAT: Additional smaller bonus for placement moves (backup to main 1000 bonus)
+	# EFFECT: Further reinforces placement preference
+	# RECOMMENDATION: Reduce proportionally if main deployment bonus is lowered
+
+25	THREATENING-PIECES SIMULATION BONUS	www/js/ai-engine-v2.js:610-640
+	# WHAT: Small bonus in simulations for moves that create threats on opponent
+	# EFFECT: Encourages AI to maintain pressure in its mental planning
+	# SCALE: Simulation modifier (5-50, affects internal planning accuracy)
+
+20	QUEEN-PLACEMENT SIMULATION BIAS	www/js/ai-engine-v2.js:610-640
+	# WHAT: Extra weight when AI simulates placing its own queen
+	# EFFECT: Makes AI more likely to place queen earlier in simulated games
+	# RECOMMENDATION: Keep moderate (15-30) to avoid queen-rushing
+
+15	MOVEMENT SIMULATION BONUS	www/js/ai-engine-v2.js:610-640
+	# WHAT: Small bonus for movement moves during simulation planning
+	# EFFECT: Balances against placement bias in AI's internal thinking
+
+10	MONTE-CARLO PLACEMENT NUDGE	www/js/ai-engine-v2.js:610-640
+	# WHAT: Tiny bonus during random simulation rollouts for placements
+	# EFFECT: Slightly biases random play toward placement
+	# SCALE: Very small (5-25, just influences randomness)
+
+5	RANDOM SIMULATION NOISE (±2.5)	www/js/ai-engine-v2.js:610-640
+	# WHAT: Random number added/subtracted to simulation scores for variety
+	# EFFECT: Prevents AI from being too deterministic in identical positions
+	# SCALE: Noise range (typically ±1 to ±10)
+	# RECOMMENDATION: Keep small (±1 to ±5) to maintain strategic consistency
+
+# ==================================================================================
+
+SECTION 3: MCTS COMPOSITION WEIGHTS (AI-ENGINE.JS)
+# These combine different evaluation factors into final move scores
+# Scale: 0.0-1.0 (percentages that must sum to reasonable total)
+
+0.4	QUEEN-BONUS COMPOSITION WEIGHT	www/js/ai-engine.js:660-700
+	# WHAT: 40% weight given to "queen safety/attack" factor in final move score
+	# CALCULATION: finalScore = queenBonus*0.4 + winRate*0.3 + visitsRatio*0.2 + strategicBonus*0.1
+	# EFFECT: Queen-related considerations dominate 40% of AI's decision-making
+	# SCALE: Composition percentage (0.0-1.0, where 0.4 = 40% influence)
+
+0.3	WIN-RATE COMPOSITION WEIGHT	www/js/ai-engine.js:660-700
+	# WHAT: 30% weight given to historical win-rate of similar moves
+	# EFFECT: AI learns from past successes (Monte Carlo Tree Search data)
+	# SCALE: Composition percentage (30% of final decision)
+
+0.2	VISITS-RATIO COMPOSITION WEIGHT	www/js/ai-engine.js:660-700
+	# WHAT: 20% weight for how much this move has been explored in search tree
+	# EFFECT: Balances between exploitation (good moves) and exploration (untested moves)
+	# SCALE: Composition percentage (20% of final decision)
+
+0.1	STRATEGIC-BONUS COMPOSITION WEIGHT	www/js/ai-engine.js:660-700
+	# WHAT: 10% weight for miscellaneous strategic factors
+	# EFFECT: Small influence for tactical/positional considerations
+	# SCALE: Composition percentage (10% of final decision)
+
+# ==================================================================================
+
+SECTION 4: PIECE-SPECIFIC MOVEMENT BONUSES (AI-ENGINE.JS)
+# These encourage AI to move certain piece types
+# Scale: 0.1-0.5 (small bonuses added to piece movement evaluations)
+
+0.4	MOVEMENT STRATEGIC-VALUE BONUS	www/js/ai-engine.js:660-700
+	# WHAT: General bonus for moves labeled as "strategically valuable"
+	# EFFECT: Encourages calculated/planned moves over random moves
+	# SCALE: Small additive bonus (0.1-1.0 range for fine-tuning)
+
+0.3	BEETLE THREATENING-OPPONENT-QUEEN BONUS	www/js/ai-engine.js:660-700
+	# WHAT: Extra bonus when AI's beetle pieces attack opponent's queen
+	# EFFECT: Encourages using beetles aggressively (beetles can stack/pin)
+	# PERSPECTIVE: AI's beetles attacking opponent (offensive specialization)
+	# SCALE: Piece-specific bonus (0.1-0.5 for subtle piece preferences)
+
+0.2	QUEEN-MOVE IMPORTANCE BONUS	www/js/ai-engine.js:660-700
+	# WHAT: Extra weight for any move involving AI's own queen
+	# EFFECT: Makes AI consider queen moves more carefully (both risky and powerful)
+	# PERSPECTIVE: Affects AI's own queen movement decisions
+	# SCALE: Piece importance modifier (0.1-0.5)
+
+0.15	ANT MOVEMENT BIAS	www/js/ai-engine.js:660-700
+	# WHAT: Slight preference for moving AI's ant pieces
+	# EFFECT: Encourages ant mobility (ants can move unlimited distance)
+	# SCALE: Piece preference (0.05-0.3 for subtle piece favoritism)
+
+0.10	BEETLE MOVEMENT BIAS	www/js/ai-engine.js:660-700
+	# WHAT: Small preference for moving AI's beetle pieces
+	# EFFECT: Encourages beetle activity (beetles have unique stacking ability)
+	# SCALE: Piece preference (0.05-0.3 for piece variety)
+
+(-100.0)	SELF-CAPTURE PREVENTION PENALTY	www/js/ai-engine.js:680-720
+	# WHAT: Massive penalty for moves that would surround AI's own queen
+	# EFFECT: Prevents AI from accidentally losing the game
+	# PERSPECTIVE: Protects AI's own queen from being captured
+	# SCALE: Large negative (typically -50 to -200 for game-losing moves)
+	# RECOMMENDATION: Keep very negative to prevent self-destruction
+
+# ==================================================================================
+
+SECTION 5: POSITION EVALUATION WEIGHTS (AI-EVAL.JS)
+# These evaluate board positions for overall strategic value
+# Scale: 0.1-0.5 (factors multiplied by position differences)
+
+0.35	MATERIAL BALANCE WEIGHT	www/js/ai-eval.js:120-180
+	# WHAT: How much piece count difference affects position evaluation
+	# CALCULATION: materialDiff * 0.35 (where materialDiff = AI pieces - opponent pieces)
+	# EFFECT: 35% emphasis on having more pieces on board than opponent
+	# SCALE: Evaluation factor (0.0-1.0, where 0.35 = moderate material focus)
+
+0.25	COORDINATION WEIGHT	www/js/ai-eval.js:120-180
+	# WHAT: Value placed on having pieces work together/support each other
+	# EFFECT: 25% emphasis on piece synergy and mutual protection
+	# SCALE: Evaluation factor (0.0-1.0, where 0.25 = significant teamwork focus)
+
+0.20	NETWORK STRENGTH WEIGHT	www/js/ai-eval.js:120-180
+	# WHAT: Value of maintaining strong hive connectivity
+	# EFFECT: 20% emphasis on keeping pieces connected and mobile
+	# SCALE: Evaluation factor (0.0-1.0, where 0.20 = moderate connectivity focus)
+
++1 per threat	QUEEN-ADJACENCY THREAT COUNTING	www/js/ai-eval.js:100-140
+	# WHAT: +1 point for each AI piece adjacent to opponent's queen
+	# EFFECT: Directly rewards threatening opponent's queen
+	# PERSPECTIVE: Counts AI's threats against opponent (offensive metric)
+	# SCALE: Linear counting (0-6 typically, since queen has 6 adjacent hexes)
+
+# ==================================================================================
+
+SECTION 6: MOVE ORDERING PRIORITIES (MINIMAX-ENGINE.JS)
+# These help AI search the most promising moves first (optimization)
+# Scale: 0-1000+ (search ordering priorities, not final decision weights)
+
+1000	MINIMAX HIGH-PRIORITY SEARCH BONUS	www/js/minimax-engine.js:40-140
+	# WHAT: Maximum priority for "obviously important" moves (captures, checks, etc.)
+	# EFFECT: AI examines game-changing moves first in its search tree
+	# SCALE: Search priority (0-1000+, where 1000 = examine immediately)
+	# PURPOSE: Optimization only - helps AI find good moves faster, doesn't affect final choice
+
+500 - dist*50	DISTANCE-TO-OPPONENT-QUEEN SEARCH PRIORITY	www/js/minimax-engine.js:40-140
+	# WHAT: Higher priority for moves closer to opponent's queen
+	# CALCULATION: 500 minus (distance × 50), so adjacent = 500, 2 hexes away = 400, etc.
+	# EFFECT: AI searches queen-attack moves before other moves
+	# PERSPECTIVE: Prioritizes examining attacks on opponent's queen
+
+200 - dist*20	DISTANCE-TO-OWN-QUEEN SEARCH PRIORITY	www/js/minimax-engine.js:40-140
+	# WHAT: Higher priority for moves near AI's own queen
+	# EFFECT: AI searches defensive/queen-protection moves early
+	# PERSPECTIVE: Prioritizes examining protection of AI's own queen
+
+100	GENERIC SEARCH BONUS	www/js/minimax-engine.js:40-140
+	# WHAT: Default priority for "normal" moves
+	# EFFECT: Standard baseline for move examination order
+
+50 - dist*5	CENTER-CONTROL SEARCH PRIORITY	www/js/minimax-engine.js:40-140
+	# WHAT: Slight priority for moves toward board center
+	# EFFECT: AI examines central moves before edge moves
+	# SCALE: Priority bonus decreasing with distance from center
+
+# ==================================================================================
+
+SECTION 7: FORMATION/TACTICAL BONUSES (AI-FORMATIONS.JS, AI-TACTICS.JS)
+# These reward specific patterns and tactical awareness
+# Scale: 0.1-1.0 (small pattern recognition bonuses)
+
+0.5	PRESSURE-PIECES ATTACK BONUS	www/js/ai-formations.js:200-280
+	# WHAT: Bonus for maintaining pieces that threaten important targets
+	# EFFECT: Encourages keeping up sustained pressure on opponent
+	# SCALE: Tactical bonus (0.1-1.0 for recognizing good patterns)
+
+0.3	EDGE-CONTROL FORMATION BONUS	www/js/ai-formations.js:200-280
+	# WHAT: Small bonus for controlling board edges or blocking opponent expansion
+	# EFFECT: Rewards territorial control and space restriction
+	# SCALE: Formation recognition (0.1-0.5 for positional patterns)
+
+0.3	V-FORMATION GEOMETRY BONUS	www/js/ai-formations.js:200-280
+	# WHAT: Pattern recognition bonus for creating V-shaped piece arrangements
+	# EFFECT: Encourages specific geometric formations
+	# SCALE: Pattern bonus (0.1-0.5 for recognizing shapes)
+
+0.3	TRIANGULAR FORMATION BONUS	www/js/ai-formations.js:200-280
+	# WHAT: Pattern recognition bonus for triangular piece clusters
+	# EFFECT: Rewards creating stable, mutually-supporting piece groups
+	# SCALE: Formation bonus (0.1-0.5 for geometric patterns)
+
+(-0.1 to -0.5)	PIN-VALUE PENALTIES	www/js/ai-tactics.js:300-460
+	# WHAT: Penalties when AI's pieces become "pinned" (unable to move)
+	# EFFECT: Discourages moves that reduce AI's piece mobility
+	# PERSPECTIVE: Penalty for AI's own pieces being restricted
+	# SCALE: Context-dependent penalty (-0.1 light pin, -0.5 severe pin)
+
+5	DISTANCE PENALTY MULTIPLIER	www/js/ai-engine-v2.js:660-720
+	# WHAT: Penalty scaling factor: score -= distance × 5
+	# EFFECT: Discourages moves that spread pieces too far apart
+	# SCALE: Linear penalty (higher multiplier = stronger distance penalty)
+
+# ==================================================================================
+
+SECTION 8: DEFENSIVE PENALTIES (AI-ENGINE.JS)
+# These prevent AI from making dangerous moves regarding its own queen
+# Scale: -20.0 to +2.0 (large penalties for dangerous situations)
+
+(-10.0)	CATASTROPHIC OWN-QUEEN EXPOSURE PENALTY	www/js/ai-engine.js:6400-6510
+	# WHAT: Huge penalty for moves that expose AI's own queen to capture threat
+	# EFFECT: Prevents AI from making moves that allow opponent to win
+	# PERSPECTIVE: Protects AI's own queen from danger
+	# SCALE: Large defensive penalty (-5.0 to -20.0 for survival-critical moves)
+	# RECOMMENDATION: Keep very negative, but -10.0 might prevent calculated sacrifices
+
+(-5.0)	SEVERE DANGER PENALTY	www/js/ai-engine.js:6400-6510
+	# WHAT: Large penalty for moves putting AI's own queen in serious danger
+	# EFFECT: Strongly discourages risky queen moves
+	# PERSPECTIVE: Self-preservation for AI's own queen
+
+-2.0	ABANDONING-QUEEN-PRESSURE PENALTY	www/js/ai-engine.js:6400-6510
+	# WHAT: Penalty for AI moves that give up attack pressure on opponent's queen
+	# EFFECT: Discourages AI from "backing off" when it has winning chances
+	# PERSPECTIVE: Prevents AI from abandoning attacks on opponent's queen
+
+0.4	SMALL POSITIONING BONUSES	www/js/ai-engine.js:6400-6510
+	# WHAT: Minor bonuses for good positional moves around queens
+	# EFFECT: Fine-tuning for subtly improving piece positions
+	# SCALE: Small positioning adjustment (0.1-1.0)
+
+# ==================================================================================
+
+SECTION 9: SELECTION MATHEMATICS (AI-ENGINE.JS)
+# This controls how AI chooses between evaluated moves
+# Scale: Exponential (no fixed range, affects probability distribution)
+
+exp(score * 2)	SOFTMAX SELECTION TEMPERATURE	www/js/ai-engine.js:700-760
+	# WHAT: Mathematical function converting move scores to selection probabilities
+	# CALCULATION: probability ∝ e^(score × 2), where 2 is the "temperature"
+	# EFFECT: Higher temperature (2) = more random, lower = more deterministic
+	# SCALE: Temperature parameter (0.1 = very focused, 10.0 = very random)
+	# CURRENT: Temperature of 2.0 means moderate randomness in move selection
+	# RECOMMENDATION: 1.0-3.0 range typical (1.0 = more focused, 3.0 = more varied)
+
+# ==================================================================================
+
+SUMMARY OF MAJOR ISSUES:
+1. DEPLOYMENT BONUS (1000) completely dominates - AI almost never moves pieces, only places
+2. AGGRESSIVE THRESHOLD (150) too high - AI rejects good moves that seem "passive"  
+3. Multiple queen-attack bonuses (500+200+150+100) stack up to make AI overly aggressive
+4. NO IMMEDIATE-WIN DETECTION - AI might miss obvious winning moves
+5. DEFENSIVE PENALTIES (-10.0) might be too harsh for calculated risks
+
+RECOMMENDED PRIORITY FIXES:
+1. Lower deployment bonus: 1000 → 200
+2. Lower aggressive threshold: 150 → 80  
+3. Add immediate-win detection that bypasses other scoring
+4. Reduce stacked queen-attack bonuses slightly
+5. Test with more balanced approach vs movement decisions
 
  FORMAT: <weight(s)>\t<short description>\t<file:line or range>\t# short comment / recommended action
  

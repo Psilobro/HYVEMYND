@@ -585,6 +585,7 @@ let state = {
 };
 window.state = state; // Make state globally accessible
 let selected = null;
+window.selected = selected; // Make selected globally accessible for AI
 let legalZones = new Set();
 let animating = false;
 let clickSfx;
@@ -938,12 +939,20 @@ function animateGrasshopperJump(piece, fromQ, fromR, toQ, toR, onComplete) {
 // --- HUD ---
 const hud = document.getElementById('hud');
 function updateHUD(){
+    console.log(`🎯 updateHUD called - current: ${state.current}, move: ${state.moveNumber}`);
+    
     // Check if current player has any legal moves
     if (hasLegalMoves(state.current)) {
         hud.textContent = state.current.charAt(0).toUpperCase()
                        + state.current.slice(1)
                        + ' to move (turn '+state.moveNumber+')';
         hud.style.fontFamily = 'Milonga, serif';
+        
+        // Check if AI should move
+        if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
+          console.log(`🎯 Triggering AI check for ${state.current}`);
+          setTimeout(() => window.AIEngine.checkAndMakeMove(), 100);
+        }
     } else {
         // Current player has no legal moves - pass turn
         passTurn();
@@ -1005,8 +1014,15 @@ function passTurn() {
     }
     
     // Switch turns
+    const oldTurn = state.current;
     state.moveNumber++;
     state.current = state.current === 'white' ? 'black' : 'white';
+    console.log(`🔄 Turn switched from ${oldTurn} to ${state.current} (move ${state.moveNumber})`);
+    
+    // Clear AI turn tracking on turn switch
+    if (window.AIEngineNokamuteMzinga) {
+        window.AIEngineNokamuteMzinga.lastTurn = null;
+    }
     
     // Check if the new current player also has no moves (potential game end)
     setTimeout(() => {
@@ -1026,6 +1042,7 @@ function clearHighlights(){
 function selectPlacement(piece){
     clearHighlights();
     selected = {piece, mode:'place'};
+    window.selected = selected; // Sync with window object for AI access
     legalPlacementZones(piece.meta.color).forEach(k=>{
         const c = window.cells.get(k);
         if(c){ c.gfx.tint = THEME.highlight; legalZones.add(k); }
@@ -1121,8 +1138,16 @@ function commitPlacement(q,r){
         });
 
         animating=false;
+        const oldTurn = state.current;
         state.moveNumber++;
         state.current = state.current==='white'?'black':'white';
+        console.log(`🔄 Placement complete: ${oldTurn} to ${state.current} (move ${state.moveNumber})`);
+        
+        // Clear AI turn tracking on turn switch
+        if (window.AIEngineNokamuteMzinga) {
+            window.AIEngineNokamuteMzinga.lastTurn = null;
+        }
+        
         updateHUD();
     }
     // Take a snapshot of the board state after placement
@@ -1202,6 +1227,7 @@ function commitPlacement(q,r){
 
     clearHighlights();
     selected = null;
+    window.selected = null; // Sync with window object
     clickSfx.play().catch(()=>{});
     
     // Check if board needs expansion after placement
@@ -1260,6 +1286,7 @@ function selectMove(piece) {
     if (selected && selected.piece === piece) {
         clearHighlights();
         selected = null;
+        window.selected = null; // Sync with window object
         tray.forEach(p => p.interactive = true);
         clickSfx.play().catch(() => {});
         return;
@@ -1267,10 +1294,12 @@ function selectMove(piece) {
 
     clearHighlights();
     selected = { piece, mode: 'move' };
+    window.selected = selected; // Sync with window object for AI access
 
     const moves = legalMoveZones(piece);
     if (moves.length === 0) {
         selected = null;
+        window.selected = null; // Sync with window object
         tray.forEach(p => p.interactive = true);
         clickSfx.play().catch(() => {});
         return;
@@ -1312,8 +1341,10 @@ function wouldHiveRemainConnectedAfterMove(fx,fr,tx,tr){
     const fromKey = `${fx},${fr}`;
     const toKey = `${tx},${tr}`;
     const occ = new Set();
+    
     // build occupancy from actual cell stacks
     window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occ.add(key); });
+    
     const fromCell = window.cells.get(fromKey);
     // simulate removal: if the origin cell becomes empty, delete it
     if (!fromCell || !fromCell.stack || fromCell.stack.length <= 1) {
@@ -1324,7 +1355,12 @@ function wouldHiveRemainConnectedAfterMove(fx,fr,tx,tr){
     if (!toCell || !toCell.stack || toCell.stack.length === 0) {
         occ.add(toKey);
     }
-    return isHiveConnected(occ);
+    
+    const connected = isHiveConnected(occ);
+    
+    // Logging disabled to prevent console spam
+    
+    return connected;
 }
 
 function canSlide(fx,fr,tx,tr,occ){
@@ -1379,17 +1415,14 @@ function legalMoveZones(piece){
         occRem.delete(originKey);
     }
 
-    console.log(`🕷️ Checking hive connectivity after removing ${type} from (${q0},${r0})`);
+    // Logging disabled to prevent console spam
     const hiveIntact = hiveIntactAfterRemoval(q0, r0);
-    console.log(`🕷️ Hive intact after removal: ${hiveIntact}`);
     
     if(!hiveIntact) {
-        console.log(`🕷️ Early return: hive would break if ${type} moved`);
         return [];
     }
 
     const zones=new Set();
-    console.log(`🕷️ Proceeding to check movement for piece type: ${type}`);
 
     if(type==='B'){ // If the piece is a Beetle
         DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
@@ -1419,9 +1452,15 @@ function legalMoveZones(piece){
         });
     }
     else if(type==='A'){ // If the piece is an Ant
-        const queue=[[q0,r0]], vis=new Set(); // Initialize BFS queue with starting position and visited set
+        const queue=[[q0,r0,0]], vis=new Set([`${q0},${r0}`]); // Initialize BFS queue with starting position and distance, mark origin as visited
+        const maxDistance = 8; // Reasonable maximum distance for ant movement to prevent excessive exploration
+        
         while(queue.length){ // Continue BFS until all reachable cells are explored
-            const [cx,cy]=queue.shift(); // Dequeue the next cell to explore from
+            const [cx,cy,dist]=queue.shift(); // Dequeue the next cell to explore from with its distance
+            
+            // Skip if we've reached maximum distance to prevent runaway exploration
+            if(dist >= maxDistance) continue;
+            
             DIRS.forEach(d=>{ // Check all 6 adjacent directions from current cell
                 const nx=cx+d.dq, ny=cy+d.dr, k=`${nx},${ny}`; // Calculate neighbor coordinates and key
                 if(!window.cells.has(k) // Skip if cell doesn't exist on board
@@ -1429,11 +1468,17 @@ function legalMoveZones(piece){
                    || vis.has(k) // Skip if cell has already been visited in this search
                    || !canSlide(cx,cy,nx,ny,occRem) // Skip if piece cannot slide to this neighbor (blocked by tight gaps)
                 ) return; // Exit early if any blocking condition is met
-                // ensure making this move would not break the hive
-                if(!wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) return; // Skip if moving to this cell would disconnect the hive
+                
                 vis.add(k); // Mark this cell as visited to prevent revisiting
-                queue.push([nx,ny]); // Add this cell to the queue for further exploration
-                zones.add(k); // Add this cell to the set of legal destination zones
+                
+                // Only check expensive hive connectivity for cells that could be valid destinations
+                // Skip connectivity check for cells too far from the origin (likely impossible anyway)
+                const distFromOrigin = Math.abs(nx-q0) + Math.abs(ny-r0);
+                if(distFromOrigin <= 6 && wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) {
+                    zones.add(k); // Add this cell to the set of legal destination zones
+                }
+                
+                queue.push([nx,ny,dist+1]); // Add this cell to the queue for further exploration with incremented distance
             });
         }
     }
@@ -1564,8 +1609,16 @@ function commitMove(q,r){
         p.meta.q=q; p.meta.r=r;
 
         animating=false;
+        const oldTurn = state.current;
         state.moveNumber++;
         state.current = state.current==='white'?'black':'white';
+        console.log(`🔄 Move complete: ${oldTurn} to ${state.current} (move ${state.moveNumber})`);
+        
+        // Clear AI turn tracking on turn switch
+        if (window.AIEngineNokamuteMzinga) {
+            window.AIEngineNokamuteMzinga.lastTurn = null;
+        }
+        
         updateHUD();
 
         const winner = checkForWinner();
@@ -1589,6 +1642,7 @@ function commitMove(q,r){
 
         clearHighlights();
         selected = null;
+        window.selected = null; // Sync with window object
         tray.forEach(p2=>p2.interactive = true);
         clickSfx.play().catch(()=>{});
 

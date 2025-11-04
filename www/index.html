@@ -5,8 +5,6 @@
   <title>Hive • PIXI Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐝</text></svg>">
-  <link rel="preload" href="assets/Fonts/Beetype-Outline.otf" as="font" type="font/otf" crossorigin>
-  <link rel="preload" href="assets/Fonts/Milonga-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -58,6 +56,7 @@
       <div id="dev-ops-tabs">
         <button class="dev-ops-tab active" data-tab="ai-vs-ai">🤖 AI vs AI</button>
         <button class="dev-ops-tab" data-tab="human-learning">🧠 Human Learning</button>
+        <button class="dev-ops-tab" data-tab="engine">🔧 Engine</button>
         <button class="dev-ops-tab" data-tab="statistics">📊 Statistics</button>
       </div>
       
@@ -110,6 +109,115 @@
           </div>
         </div>
         <div id="learning-status" class="learning-status">Ready to start learning session</div>
+      </div>
+      
+      <!-- Engine Panel -->
+      <div id="engine-panel" class="dev-ops-panel">
+        <h3>🔧 Engine Controller</h3>
+        
+        <div class="engine-status-section">
+          <div class="engine-status-header">
+            <h4>Connection Status</h4>
+            <div id="engine-connection-status" class="connection-status">
+              <span id="connection-indicator" class="status-dot disconnected"></span>
+              <span id="connection-text">Connecting to UHP Bridge...</span>
+            </div>
+          </div>
+          
+          <div id="engine-thinking-indicator" class="thinking-indicator" style="display: none;">
+            <span class="thinking-dots">🧠 Engine thinking</span>
+          </div>
+        </div>
+
+        <div class="engine-controls-section">
+          <h4>Engine Selection</h4>
+          <div class="engine-selection">
+            <div class="control-group">
+              <label for="engine-select">Active Engine:</label>
+              <select id="engine-select">
+                <option value="nokamute">Nokamute (Tournament)</option>
+                <option value="mzinga">Mzinga Engine</option>
+                <option value="custom">Custom Engine</option>
+              </select>
+              <button id="restart-engine" class="engine-action">🔄 Restart</button>
+            </div>
+            
+            <div id="custom-engine-config" class="control-group" style="display: none;">
+              <label for="custom-engine-path">Custom Engine Path:</label>
+              <input type="text" id="custom-engine-path" placeholder="C:\path\to\your\engine.exe">
+              <button id="add-custom-engine" class="engine-action">➕ Add Engine</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="engine-settings-section">
+          <h4>Engine Parameters</h4>
+          <div class="settings-grid">
+            <div class="control-group">
+              <label>
+                <input type="checkbox" id="engine-enabled"> Enable UHP Engine
+              </label>
+              <small>Use external engine for AI moves</small>
+            </div>
+            
+            <div class="control-group">
+              <label for="engine-mode">Mode:</label>
+              <select id="engine-mode">
+                <option value="time">Time Limited</option>
+                <option value="depth">Depth Limited</option>
+              </select>
+            </div>
+            
+            <div class="control-group">
+              <label for="time-limit">Time Limit:</label>
+              <div class="slider-container">
+                <input type="range" id="time-limit" min="1" max="30" value="5" step="1">
+                <span id="time-value">5s</span>
+              </div>
+            </div>
+            
+            <div class="control-group">
+              <label for="depth-limit">Search Depth:</label>
+              <div class="slider-container">
+                <input type="range" id="depth-limit" min="1" max="10" value="4" step="1">
+                <span id="depth-value">4 ply</span>
+              </div>
+            </div>
+            
+            <div class="control-group">
+              <label for="engine-color">Engine Plays:</label>
+              <select id="engine-color">
+                <option value="black">Black (Default AI)</option>
+                <option value="white">White (Human opponent)</option>
+                <option value="both">Both (Engine vs Engine)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="engine-log-section">
+          <h4>Engine Communication</h4>
+          <div id="engine-log" class="engine-log">
+            <div class="log-entry">🔗 Starting UHP client...</div>
+          </div>
+          <div class="log-controls">
+            <button id="clear-log" class="engine-action">🗑️ Clear Log</button>
+            <button id="test-engine" class="engine-action">🧪 Test Engine</button>
+          </div>
+        </div>
+
+        <div class="engine-info-section">
+          <h4>About UHP</h4>
+          <p>Universal Hive Protocol (UHP) allows HYVEMYND to connect with tournament-strength engines like Nokamute and Mzinga.</p>
+          <div class="engine-commands">
+            <strong>Quick Start:</strong>
+            <ol>
+              <li>Start UHP Bridge: <code>node tools/uhp-bridge.js</code></li>
+              <li>Enable UHP Engine above</li>
+              <li>Start a game - engine will play automatically!</li>
+            </ol>
+          </div>
+        </div>
       </div>
       
       <!-- Statistics Panel -->
@@ -165,17 +273,42 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.10/browser/pixi.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"></script>
     <script src="js/board.js"></script>
-    <script src="js/game.js"></script>
-  <script src="js/pieces.js"></script>
+    <script src="js/game.js?v=1.1"></script>
+  <script src="js/pieces.js?v=1.1"></script>
   <script src="js/resize.js"></script>
   <script src="js/main.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <script src="js/multiplayer.js"></script>
   <script src="js/minimax-engine.js"></script>
+  
+  <!-- UHP AI Override MUST load before AI engines -->
+  <script src="js/uhp/uhp-ai-override.js"></script>
+  
   <script src="js/ai-engine.js"></script>
   <script src="js/ai-engine-v2.js"></script>
+  <script src="js/ai-engine-nokamute-mzinga.js?v=1.2"></script>
   <script src="js/personalities.js"></script>
   <script src="js/ai-ui.js"></script>
   <script src="js/dev-ops.js"></script>
+  
+  <!-- UHP Engine Integration -->
+  <script src="js/uhp/uhp-client.js"></script>
+  <script src="js/uhp/engine-integration.js"></script>
+  
+  <!-- Activate Nokamute/Mzinga AI Engine with personality-based difficulty -->
+  <script>
+    window.addEventListener('load', function() {
+      // Small delay to ensure all scripts are loaded
+      setTimeout(function() {
+        if (typeof window.activateNokamuteMzingaAI === 'function') {
+          // Default activation - AI-UI will override with proper difficulty
+          window.activateNokamuteMzingaAI('medium');
+          console.log('🚀 Nokamute/Mzinga AI Engine activated by default!');
+        } else {
+          console.error('❌ activateNokamuteMzingaAI function not found');
+        }
+      }, 100);
+    });
+  </script>
 </body>
 </html>

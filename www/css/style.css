@@ -192,7 +192,7 @@ body {
 }
 html, body {
     width:100%; height:100%; margin:0; padding:0;
-    overflow:hidden; color:var(--text); font-family:sans-serif;
+    overflow-x:hidden; overflow-y:visible; color:var(--text); font-family:sans-serif;
 }
 
 #game-container {
@@ -234,12 +234,13 @@ canvas {
 
 .player-tray {
     position: absolute;
-    top: -2%; /* Position slightly above the top edge */
-    bottom: 0; /* Full height to bottom to give more room */
+    top: 10px; /* Fixed position at 10px from top */
+    transform: scale(0.66); /* Scaled down 10% from 0.73 to give Queens more room */
+    bottom: auto; /* Remove bottom constraint */
     width: 220px; /* Increased width for better 2-column layout */
     pointer-events: all; /* Enable pointer events for piece selection */
-    transform: scale(0.73); /* Scale down to 73% */
-    transform-origin: top center;
+    transform-origin: top center; /* Top-center transform origin */
+    overflow: visible !important; /* Allow Queen pieces to extend beyond tray bounds */
 }
 
 /* Tray positions for desktop will be set in media queries only */
@@ -476,7 +477,7 @@ canvas {
     #white-tray.player-tray {
         left: 32px !important;
         right: auto !important;
-        top: -2% !important;
+        top: 10px !important;
         transform: scale(0.7) !important;
         transform-origin: left top !important;
         width: 220px !important;
@@ -487,7 +488,7 @@ canvas {
     }    #black-tray.player-tray {
         right: 32px !important;
         left: auto !important;
-        top: -2% !important;
+        top: 10px !important;
         transform: scale(0.7) !important;
         transform-origin: right top !important;
         width: 220px !important;
@@ -1614,4 +1615,251 @@ canvas {
     #dev-ops-button {
         left: 280px !important; /* Third button with clear separation */
     }
+}
+
+/* UHP Engine Panel Styles */
+.engine-status-section {
+    background: rgba(138, 43, 226, 0.1);
+    border: 1px solid rgba(138, 43, 226, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.engine-status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Milonga', serif;
+    font-size: 14px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.connected {
+    background: #4caf50;
+}
+
+.status-dot.disconnected {
+    background: #f44336;
+}
+
+.status-dot.connecting {
+    background: #ff9800;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.thinking-indicator {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    text-align: center;
+    color: #ff9800;
+    font-family: 'Milonga', serif;
+    font-size: 13px;
+}
+
+.thinking-dots::after {
+    content: '...';
+    animation: thinking 1.5s infinite;
+}
+
+@keyframes thinking {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
+
+.engine-controls-section,
+.engine-settings-section,
+.engine-log-section,
+.engine-info-section {
+    background: rgba(15, 15, 15, 0.6);
+    border: 1px solid rgba(230, 184, 77, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.engine-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-group label {
+    font-family: 'Milonga', serif;
+    color: #e6b84d;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.control-group select,
+.control-group input[type="text"] {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(230, 184, 77, 0.3);
+    border-radius: 4px;
+    padding: 8px 12px;
+    color: #e6b84d;
+    font-family: 'Milonga', serif;
+    font-size: 12px;
+}
+
+.control-group select:focus,
+.control-group input[type="text"]:focus {
+    border-color: #e6b84d;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(230, 184, 77, 0.2);
+}
+
+.engine-action {
+    background: linear-gradient(135deg, #8A2BE2, #9370DB);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Milonga', serif;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 8px;
+}
+
+.engine-action:hover {
+    background: linear-gradient(135deg, #9370DB, #8A2BE2);
+    transform: translateY(-1px);
+}
+
+.engine-action:active {
+    transform: translateY(0);
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+@media (max-width: 768px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.slider-container input[type="range"] {
+    flex: 1;
+    accent-color: #8A2BE2;
+}
+
+.slider-container span {
+    min-width: 40px;
+    text-align: center;
+    font-family: 'Milonga', serif;
+    color: #e6b84d;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.engine-log {
+    background: #000;
+    border: 1px solid rgba(230, 184, 77, 0.2);
+    border-radius: 4px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #e6b84d;
+    margin-bottom: 10px;
+}
+
+.log-entry {
+    margin-bottom: 4px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(230, 184, 77, 0.1);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.log-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.engine-info-section p {
+    color: #e6b84d;
+    font-family: 'Milonga', serif;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.engine-commands {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    padding: 10px;
+    color: #e6b84d;
+    font-family: 'Milonga', serif;
+    font-size: 11px;
+}
+
+.engine-commands strong {
+    color: #8A2BE2;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.engine-commands ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.engine-commands ol li {
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.engine-commands code {
+    background: rgba(138, 43, 226, 0.2);
+    color: #e6b84d;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
 }
