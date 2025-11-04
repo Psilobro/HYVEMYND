@@ -1760,6 +1760,22 @@ canvas {
     transform: translateY(0);
 }
 
+.start-game-btn {
+    background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+    color: #2C1810 !important;
+    font-weight: bold !important;
+    font-size: 13px !important;
+    padding: 10px 20px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
+.start-game-btn:hover {
+    background: linear-gradient(135deg, #FFA500, #FFD700) !important;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+}
+
 .settings-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

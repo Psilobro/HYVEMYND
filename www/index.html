@@ -195,6 +195,18 @@
           </div>
         </div>
 
+        <div class="engine-settings-section">
+          <h4>🎮 Quick Start</h4>
+          <div class="settings-grid">
+            <div class="control-group">
+              <button id="start-engine-game" class="engine-action start-game-btn">
+                🚀 Start Game Now
+              </button>
+              <small>New game with current engine settings</small>
+            </div>
+          </div>
+        </div>
+
         <div class="engine-log-section">
           <h4>Engine Communication</h4>
           <div id="engine-log" class="engine-log">
@@ -298,16 +310,9 @@
   <!-- Activate Nokamute/Mzinga AI Engine with personality-based difficulty -->
   <script>
     window.addEventListener('load', function() {
-      // Small delay to ensure all scripts are loaded
-      setTimeout(function() {
-        if (typeof window.activateNokamuteMzingaAI === 'function') {
-          // Default activation - AI-UI will override with proper difficulty
-          window.activateNokamuteMzingaAI('medium');
-          console.log('🚀 Nokamute/Mzinga AI Engine activated by default!');
-        } else {
-          console.error('❌ activateNokamuteMzingaAI function not found');
-        }
-      }, 100);
+      // Start in pure sandbox mode - no AI active by default
+      // AI will only activate when explicitly requested via Single Mode or Engine tab
+      console.log('🎮 HYVEMYND loaded in sandbox mode - manual play ready');
     });
   </script>
 </body>

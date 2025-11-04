@@ -118,6 +118,12 @@
             if (testEngineBtn) {
                 testEngineBtn.addEventListener('click', () => this.testEngine());
             }
+            
+            // Start Game Now button
+            const startGameBtn = document.getElementById('start-engine-game');
+            if (startGameBtn) {
+                startGameBtn.addEventListener('click', () => this.startEngineGame());
+            }
         }
         
         setupUHPIntegration() {
@@ -412,6 +418,80 @@
                 }
             } catch (error) {
                 this.logEntry(`❌ Test failed: ${error.message}`);
+            }
+        }
+        
+        startEngineGame() {
+            this.logEntry('🚀 Starting new engine game...');
+            
+            try {
+                // 1. Reset the game to initial state
+                if (window.resetGame) {
+                    window.resetGame();
+                } else {
+                    // Fallback: refresh the page to reset
+                    console.log('🔄 Resetting game state...');
+                    // Reset game state variables
+                    if (window.state) {
+                        window.state.current = 'white';
+                        window.state.move = 1;
+                        window.state.gameOver = false;
+                    }
+                    
+                    // Clear the board
+                    if (window.cells) {
+                        window.cells.forEach(cell => {
+                            if (cell.stack) cell.stack.length = 0;
+                        });
+                    }
+                    
+                    // Reset pieces to tray
+                    if (window.tray) {
+                        window.tray.forEach(piece => {
+                            if (piece.meta) {
+                                piece.meta.placed = false;
+                                piece.meta.q = null;
+                                piece.meta.r = null;
+                            }
+                        });
+                    }
+                }
+                
+                // 2. Enable UHP engine with current settings
+                const engineEnabled = document.getElementById('engine-enabled');
+                if (engineEnabled) {
+                    engineEnabled.checked = true;
+                    this.setEngineEnabled(true);
+                }
+                
+                // 3. Set engine to play black (human plays white)
+                const engineColor = document.getElementById('engine-color');
+                if (engineColor) {
+                    engineColor.value = 'black';
+                }
+                
+                // 4. Close the dev-ops modal
+                const modal = document.querySelector('.dev-ops-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+                
+                // 5. Update the game display
+                if (window.updateHUD) {
+                    window.updateHUD();
+                }
+                
+                // 6. Layout trays if function exists
+                if (window.layoutTrays) {
+                    window.layoutTrays();
+                }
+                
+                this.logEntry('✅ Engine game started - you play white, engine plays black');
+                console.log('🎮 Engine game started! Human: White, Engine: Black');
+                
+            } catch (error) {
+                console.error('❌ Failed to start engine game:', error);
+                this.logEntry(`❌ Failed to start: ${error.message}`);
             }
         }
         

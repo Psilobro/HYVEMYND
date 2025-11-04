@@ -25,8 +25,10 @@
         }
 
         loadSettings() {
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
             const defaults = {
-                autoStart: true,
+                autoStart: isLocalhost, // Only auto-start on localhost
                 defaultEngine: 'nokamute',
                 timeLimit: 5,
                 depthLimit: 4,
@@ -44,6 +46,14 @@
 
         connect() {
             try {
+                // Skip UHP if running on remote server (like Render)
+                if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    console.log('🌐 Running on remote server - UHP bridge not available');
+                    this.connected = false;
+                    this.updateConnectionStatus('Remote server - using built-in AI');
+                    return;
+                }
+                
                 const wsUrl = `ws://localhost:8081`;
                 console.log(`🔗 Connecting to UHP Bridge: ${wsUrl}`);
                 
