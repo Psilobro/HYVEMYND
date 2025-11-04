@@ -146,32 +146,10 @@ window.AIUI.createDifficultyModal = function() {
         text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
       ">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 24px;">�</span>
+          <span style="font-size: 24px;">👑</span>
           <div style="text-align: left;">
-            <strong>Beedric Classic</strong><br>
-            <small style="opacity: 0.9;">🧠 Original MCTS</small>
-          </div>
-        </div>
-      </button>
-      
-      <button class="difficulty-btn" data-difficulty="hard-v2" style="
-        background: linear-gradient(135deg, #2F4F4F, #8B0000); 
-        color: white; 
-        border: 2px solid #2F4F4F;
-        padding: 15px 20px; 
-        border-radius: 12px; 
-        font-size: 14px; 
-        font-family: 'Milonga', serif;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-        flex: 1;
-      ">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 20px;">⚡</span>
-          <div style="text-align: left;">
-            <strong>Beedric V2</strong><br>
-            <small style="opacity: 0.9;">🧠⚔️ Hybrid AI</small>
+            <strong>Beedric Bumbleton</strong><br>
+            <small style="opacity: 0.9;">👑 Hard • Lord of the Royal Hive</small>
           </div>
         </div>
       </button>
@@ -238,23 +216,64 @@ window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
   
-  // Use Nokamute/Mzinga AI for ALL difficulty levels (including V2)
-  console.log(`🎮 Starting Single Player mode with Nokamute/Mzinga AI (${difficulty})!`);
+  // Map difficulty to UHP engine parameters
+  const engineSettings = {
+    'easy': { timeLimit: 2, depthLimit: 3, mode: 'time' },      // Sunny: 1-2s, depth 3
+    'medium': { timeLimit: 4, depthLimit: 5, mode: 'time' },    // Buzzwell: 3-5s, depth 5  
+    'hard': { timeLimit: 10, depthLimit: 8, mode: 'time' },     // Beedric: 8-15s, depth 8+
+    'hard-v2': { timeLimit: 10, depthLimit: 8, mode: 'time' }   // Beedric V2: same as hard for now
+  };
   
-  // Activate Nokamute/Mzinga engine with proper difficulty
-  if (window.activateNokamuteMzingaAI) {
-    // Map hard-v2 to hard for personality but keep the full difficulty for the AI
-    const aiDifficulty = difficulty;
-    window.activateNokamuteMzingaAI(aiDifficulty);
+  const settings = engineSettings[difficulty] || engineSettings['medium'];
+  
+  console.log(`🎮 Starting Single Player mode with UHP engine (${difficulty}): ${JSON.stringify(settings)}`);
+  
+  // Configure UHP engine with personality-specific settings
+  if (window.uhpClient) {
+    // Enable UHP engine
+    window.uhpClient.setSetting('enabled', true);
+    window.uhpClient.setSetting('timeLimit', settings.timeLimit);
+    window.uhpClient.setSetting('depthLimit', settings.depthLimit);
+    window.uhpClient.setSetting('mode', settings.mode);
+    
+    // Update UI elements to match these settings
+    const enabledCheckbox = document.getElementById('engine-enabled');
+    if (enabledCheckbox) enabledCheckbox.checked = true;
+    
+    const timeSlider = document.getElementById('time-limit');
+    const timeValue = document.getElementById('time-value');
+    if (timeSlider && timeValue) {
+      timeSlider.value = settings.timeLimit;
+      timeValue.textContent = `${settings.timeLimit}s`;
+    }
+    
+    const depthSlider = document.getElementById('depth-limit');
+    const depthValue = document.getElementById('depth-value');
+    if (depthSlider && depthValue) {
+      depthSlider.value = settings.depthLimit;
+      depthValue.textContent = `${settings.depthLimit} ply`;
+    }
+    
+    const modeSelect = document.getElementById('engine-mode');
+    if (modeSelect) modeSelect.value = settings.mode;
+    
+    const colorSelect = document.getElementById('engine-color');
+    if (colorSelect) colorSelect.value = 'black'; // AI plays black
+    
+    console.log(`🤖 UHP engine configured for ${difficulty} difficulty`);
+  } else {
+    console.warn('⚠️ UHP client not available, falling back to built-in AI');
+    // Fallback to old system if UHP not available
+    if (window.activateNokamuteMzingaAI) {
+      window.activateNokamuteMzingaAI(difficulty);
+    }
   }
   
-  // Set personality based on difficulty (map hard-v2 to hard for personality)
+  // Set personality for voice lines and theming
   const personalityDifficulty = difficulty === 'hard-v2' ? 'hard' : difficulty;
   if (window.Personalities) {
     window.Personalities.setOpponent(personalityDifficulty);
   }
-  
-  // DON'T call window.AIEngine.enable() - our engine handles this
   
   // Hide difficulty modal
   this.hideDifficultyModal();
@@ -268,7 +287,7 @@ window.AIUI.startAIMode = function(difficulty) {
   // Get opponent name for notification
   const baseDifficulty = difficulty === 'hard-v2' ? 'hard' : difficulty;
   const opponentName = window.Personalities?.opponents[baseDifficulty]?.name || 'AI Opponent';
-  const engineType = difficulty === 'hard-v2' ? ' (V2 Hybrid Engine)' : '';
+  const engineType = window.uhpClient?.connected ? ' (Nokamute Engine)' : ' (Built-in AI)';
   
   // Show success notification
   this.showNotification(`🤖 Challenge accepted!\n\nFacing: ${opponentName}${engineType}\nYou play as White, AI plays as Black.`);
@@ -289,9 +308,26 @@ window.AIUI.returnToSandbox = function() {
   
   console.log('🏖️ Returning to Sandbox mode');
   
-  // Disable AI engine
+  // Disable UHP engine
+  if (window.uhpClient) {
+    window.uhpClient.setSetting('enabled', false);
+    
+    // Update UI elements
+    const enabledCheckbox = document.getElementById('engine-enabled');
+    if (enabledCheckbox) enabledCheckbox.checked = false;
+    
+    console.log('🤖 UHP engine disabled for sandbox mode');
+  }
+  
+  // Also disable any legacy AI engines
   if (window.AIEngine) {
     window.AIEngine.disable();
+  }
+  
+  // Hide personality chat bubble
+  if (window.Personalities) {
+    window.Personalities.hideChatBubble();
+    window.Personalities.currentOpponent = null;
   }
   
   // Update UI
@@ -319,6 +355,10 @@ window.AIUI.updateUIForAIMode = function() {
   // Update HUD to show mode
   const hud = document.getElementById('hud');
   if (hud) {
+    // Remove existing indicator
+    const existingIndicator = document.getElementById('ai-mode-indicator');
+    if (existingIndicator) existingIndicator.remove();
+    
     // Add AI mode indicator
     const indicator = document.createElement('div');
     indicator.id = 'ai-mode-indicator';
@@ -335,7 +375,12 @@ window.AIUI.updateUIForAIMode = function() {
       font-family: 'Milonga', serif;
       white-space: nowrap;
     `;
-    indicator.textContent = `🤖 vs AI (${this.difficulty.charAt(0).toUpperCase() + this.difficulty.slice(1)})`;
+    
+    // Determine engine type for display
+    const engineType = (window.uhpClient && window.uhpClient.connected && window.uhpClient.isEnabled()) ? 'Nokamute' : 'Built-in';
+    const difficultyName = this.difficulty.charAt(0).toUpperCase() + this.difficulty.slice(1);
+    
+    indicator.textContent = `🤖 vs AI (${difficultyName} • ${engineType})`;
     hud.style.position = 'relative';
     hud.appendChild(indicator);
   }
