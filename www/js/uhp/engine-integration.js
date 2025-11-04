@@ -10,7 +10,15 @@
             this.engineLogEntries = [];
             this.maxLogEntries = 100;
             
-            // Initialize when DOM is ready
+            //        updateThinkingIndicator(thinking, data = {}) {
+            const indicator = document.getElementById('engine-thinking-indicator');
+            if (indicator) {
+                indicator.style.display = thinking ? 'block' : 'none';
+            }
+            
+            // Also manage the progress popup
+            this.updateProgressPopup(thinking, data);
+        }ze when DOM is ready
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.init());
             } else {
@@ -143,7 +151,7 @@
             
             // Hook into UHP client status updates
             window.updateUHPStatus = (status) => this.updateConnectionStatus(status);
-            window.updateEngineThinking = (thinking) => this.updateThinkingIndicator(thinking);
+            window.updateEngineThinking = (thinking, data = {}) => this.updateThinkingIndicator(thinking, data);
             window.onEngineReady = (engineName) => this.onEngineReady(engineName);
             window.onEnginesList = (engines) => this.onEnginesList(engines);
             window.logEngineMessage = (data) => this.logEngineMessage(data);
@@ -340,6 +348,110 @@
             if (indicator) {
                 indicator.style.display = thinking ? 'block' : 'none';
             }
+            
+            // Also manage the progress popup
+            this.updateProgressPopup(thinking);
+        }
+        
+        updateProgressPopup(show, data = {}) {
+            const popup = document.getElementById('engine-progress-popup');
+            if (!popup) return;
+            
+            if (show) {
+                this.showProgressPopup(data);
+            } else {
+                this.hideProgressPopup();
+            }
+        }
+        
+        showProgressPopup(data = {}) {
+            const popup = document.getElementById('engine-progress-popup');
+            if (!popup) return;
+            
+            // Reset progress state
+            this.progressStartTime = Date.now();
+            this.progressUpdateInterval = null;
+            
+            // Set initial values
+            const timeElement = document.getElementById('progress-time');
+            const depthElement = document.getElementById('progress-depth');
+            const statusElement = document.getElementById('engine-status');
+            const progressBar = document.getElementById('progress-bar');
+            
+            if (timeElement) timeElement.textContent = '0s';
+            if (depthElement) depthElement.textContent = data.depth || '-';
+            if (statusElement) statusElement.textContent = data.status || 'Analyzing position...';
+            
+            // Determine progress mode based on engine settings
+            const engineMode = document.getElementById('engine-mode')?.value || 'time';
+            const timeLimit = parseInt(document.getElementById('time-limit')?.value) || 5;
+            const depthLimit = parseInt(document.getElementById('depth-limit')?.value) || 4;
+            
+            if (progressBar) {
+                if (engineMode === 'time') {
+                    // Time-based progress
+                    progressBar.classList.remove('indeterminate');
+                    progressBar.style.width = '0%';
+                    this.setupTimeProgress(timeLimit);
+                } else if (engineMode === 'depth') {
+                    // Depth-based progress (indeterminate for now)
+                    progressBar.classList.add('indeterminate');
+                    progressBar.style.width = '100%';
+                } else {
+                    // Unknown mode - indeterminate
+                    progressBar.classList.add('indeterminate');
+                    progressBar.style.width = '100%';
+                }
+            }
+            
+            // Show popup with animation
+            popup.classList.add('show');
+            
+            console.log('🎯 Engine progress popup shown');
+        }
+        
+        hideProgressPopup() {
+            const popup = document.getElementById('engine-progress-popup');
+            if (!popup) return;
+            
+            // Clear any intervals
+            if (this.progressUpdateInterval) {
+                clearInterval(this.progressUpdateInterval);
+                this.progressUpdateInterval = null;
+            }
+            
+            // Hide popup with animation
+            popup.classList.remove('show');
+            
+            console.log('🎯 Engine progress popup hidden');
+        }
+        
+        setupTimeProgress(timeLimit) {
+            const timeElement = document.getElementById('progress-time');
+            const progressBar = document.getElementById('progress-bar');
+            
+            if (!timeElement || !progressBar) return;
+            
+            // Update progress every 100ms
+            this.progressUpdateInterval = setInterval(() => {
+                const elapsed = (Date.now() - this.progressStartTime) / 1000;
+                const progress = Math.min((elapsed / timeLimit) * 100, 100);
+                
+                // Update time display
+                timeElement.textContent = `${elapsed.toFixed(1)}s`;
+                
+                // Update progress bar
+                progressBar.style.width = `${progress}%`;
+                
+                // Stop if we've exceeded the time limit
+                if (elapsed >= timeLimit) {
+                    clearInterval(this.progressUpdateInterval);
+                    this.progressUpdateInterval = null;
+                    
+                    // Add slight pulsing effect when time is up
+                    progressBar.style.animation = 'pulse 1s infinite';
+                }
+            }, 100);
         }
         
         onEngineReady(engineName) {

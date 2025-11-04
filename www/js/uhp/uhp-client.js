@@ -420,7 +420,18 @@
 
             try {
                 console.log('🧠 Requesting best move from engine...');
-                this.updateThinkingStatus(true);
+                
+                // Show progress popup with engine configuration
+                const engineMode = this.settings.mode;
+                const timeLimit = this.settings.timeLimit;
+                const depthLimit = this.settings.depthLimit;
+                
+                this.updateThinkingStatus(true, {
+                    mode: engineMode,
+                    timeLimit: timeLimit,
+                    depthLimit: depthLimit,
+                    status: `Searching ${engineMode === 'time' ? timeLimit + 's' : depthLimit + ' ply'}...`
+                });
 
                 // Export current game state
                 const gameString = this.exportGameString();
@@ -632,9 +643,9 @@
             console.log('🔗 UHP Status:', status);
         }
 
-        updateThinkingStatus(thinking) {
+        updateThinkingStatus(thinking, data = {}) {
             if (window.updateEngineThinking) {
-                window.updateEngineThinking(thinking);
+                window.updateEngineThinking(thinking, data);
             }
         }
 

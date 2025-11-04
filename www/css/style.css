@@ -1879,3 +1879,121 @@ canvas {
     font-family: 'Courier New', monospace;
     font-size: 10px;
 }
+
+/* Engine Progress Popup */
+#engine-progress-popup {
+    position: absolute;
+    bottom: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(40, 40, 40, 0.9));
+    border: 2px solid #E6B84D;
+    border-radius: 12px;
+    padding: 20px 25px;
+    min-width: 300px;
+    max-width: 400px;
+    z-index: 150;
+    box-shadow: 0 8px 32px rgba(230, 184, 77, 0.3);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+}
+
+#engine-progress-popup.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-10px);
+}
+
+#engine-progress-popup .progress-title {
+    color: #E6B84D;
+    font-family: 'Milonga', serif;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 15px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+#engine-progress-popup .progress-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: #fff;
+    font-size: 14px;
+}
+
+#engine-progress-popup .progress-label {
+    color: #FFD700;
+    font-weight: 600;
+}
+
+#engine-progress-popup .progress-value {
+    color: #fff;
+    font-family: 'Courier New', monospace;
+}
+
+.progress-bar-container {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #E6B84D, #FFD700);
+    height: 100%;
+    width: 0%;
+    transition: width 0.5s ease;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(230, 184, 77, 0.6);
+}
+
+.progress-bar.indeterminate {
+    width: 100%;
+    background: linear-gradient(90deg, transparent, #E6B84D, transparent);
+    animation: progressIndeterminate 2s infinite;
+}
+
+@keyframes progressIndeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+#engine-progress-popup .engine-status {
+    text-align: center;
+    color: #ccc;
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 8px;
+}
+
+/* Mobile responsiveness for progress popup */
+@media (max-width: 768px) {
+    #engine-progress-popup {
+        min-width: 250px;
+        max-width: 90%;
+        padding: 16px 20px;
+        bottom: 15%;
+    }
+    
+    #engine-progress-popup .progress-title {
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+    
+    #engine-progress-popup .progress-details {
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+}

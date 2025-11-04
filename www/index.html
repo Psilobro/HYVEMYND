@@ -21,6 +21,24 @@
   <div id="game-container">
     <div id="app"></div>
   </div>
+  
+  <!-- Engine Progress Popup -->
+  <div id="engine-progress-popup">
+    <div class="progress-title">🤖 Engine Thinking...</div>
+    <div class="progress-details">
+      <span class="progress-label">Time:</span>
+      <span class="progress-value" id="progress-time">0s</span>
+    </div>
+    <div class="progress-details">
+      <span class="progress-label">Depth:</span>
+      <span class="progress-value" id="progress-depth">-</span>
+    </div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="engine-status" id="engine-status">Analyzing position...</div>
+  </div>
+  
   <div id="white-tray" class="player-tray"></div>
   <div id="black-tray" class="player-tray"></div>
   <button id="play-music-button">Play Music</button>
