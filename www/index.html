@@ -75,6 +75,7 @@
         <button class="dev-ops-tab active" data-tab="ai-vs-ai">🤖 AI vs AI</button>
         <button class="dev-ops-tab" data-tab="human-learning">🧠 Human Learning</button>
         <button class="dev-ops-tab" data-tab="engine">🔧 Engine</button>
+        <button class="dev-ops-tab" data-tab="personalities">🎭 Personalities</button>
         <button class="dev-ops-tab" data-tab="statistics">📊 Statistics</button>
       </div>
       
@@ -247,6 +248,121 @@
               <li>Start a game - engine will play automatically!</li>
             </ol>
           </div>
+        </div>
+      </div>
+      
+      <!-- Personalities Panel -->
+      <div id="personalities-panel" class="dev-ops-panel">
+        <h3>🎭 AI Personality Configuration</h3>
+        <div class="personalities-intro">
+          <p>Adjust the strength and character of each AI personality used in Single Mode. These settings affect how the Nokamute engine behaves for each difficulty level.</p>
+        </div>
+        
+        <!-- Sunny Pollenpatch (Easy) -->
+        <div class="personality-config">
+          <div class="personality-header">
+            <span class="personality-icon">🌻</span>
+            <div class="personality-info">
+              <h4>Sunny Pollenpatch</h4>
+              <span class="personality-subtitle">The Cheerful Forager • Easy Difficulty</span>
+            </div>
+          </div>
+          <div class="personality-controls">
+            <div class="control-group">
+              <label for="sunny-time-limit">Time Limit (seconds):</label>
+              <input type="range" id="sunny-time-limit" min="1" max="5" value="2" class="personality-slider">
+              <span id="sunny-time-value" class="control-value">2s</span>
+            </div>
+            <div class="control-group">
+              <label for="sunny-depth-limit">Search Depth (ply):</label>
+              <input type="range" id="sunny-depth-limit" min="2" max="6" value="3" class="personality-slider">
+              <span id="sunny-depth-value" class="control-value">3 ply</span>
+            </div>
+            <div class="control-group">
+              <label for="sunny-mode">Search Mode:</label>
+              <select id="sunny-mode" class="personality-select">
+                <option value="time" selected>Time-based</option>
+                <option value="depth">Depth-based</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Buzzwell Stingmore (Medium) -->
+        <div class="personality-config">
+          <div class="personality-header">
+            <span class="personality-icon">⚔️</span>
+            <div class="personality-info">
+              <h4>Buzzwell Stingmore</h4>
+              <span class="personality-subtitle">The Disciplined Guard • Medium Difficulty</span>
+            </div>
+          </div>
+          <div class="personality-controls">
+            <div class="control-group">
+              <label for="buzzwell-time-limit">Time Limit (seconds):</label>
+              <input type="range" id="buzzwell-time-limit" min="2" max="8" value="4" class="personality-slider">
+              <span id="buzzwell-time-value" class="control-value">4s</span>
+            </div>
+            <div class="control-group">
+              <label for="buzzwell-depth-limit">Search Depth (ply):</label>
+              <input type="range" id="buzzwell-depth-limit" min="3" max="8" value="5" class="personality-slider">
+              <span id="buzzwell-depth-value" class="control-value">5 ply</span>
+            </div>
+            <div class="control-group">
+              <label for="buzzwell-mode">Search Mode:</label>
+              <select id="buzzwell-mode" class="personality-select">
+                <option value="time" selected>Time-based</option>
+                <option value="depth">Depth-based</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Beedric Bumbleton (Hard) -->
+        <div class="personality-config">
+          <div class="personality-header">
+            <span class="personality-icon">👑</span>
+            <div class="personality-info">
+              <h4>Beedric Bumbleton</h4>
+              <span class="personality-subtitle">Lord of the Royal Hive • Hard Difficulty</span>
+            </div>
+          </div>
+          <div class="personality-controls">
+            <div class="control-group">
+              <label for="beedric-time-limit">Time Limit (seconds):</label>
+              <input type="range" id="beedric-time-limit" min="5" max="20" value="10" class="personality-slider">
+              <span id="beedric-time-value" class="control-value">10s</span>
+            </div>
+            <div class="control-group">
+              <label for="beedric-depth-limit">Search Depth (ply):</label>
+              <input type="range" id="beedric-depth-limit" min="6" max="12" value="8" class="personality-slider">
+              <span id="beedric-depth-value" class="control-value">8 ply</span>
+            </div>
+            <div class="control-group">
+              <label for="beedric-mode">Search Mode:</label>
+              <select id="beedric-mode" class="personality-select">
+                <option value="time" selected>Time-based</option>
+                <option value="depth">Depth-based</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div class="personality-actions">
+          <button id="save-personalities" class="action-btn primary">💾 Save Settings</button>
+          <button id="reset-personalities" class="action-btn secondary">🔄 Reset to Defaults</button>
+          <button id="test-personalities" class="action-btn secondary">🧪 Test Current Settings</button>
+        </div>
+        
+        <div class="personality-tips">
+          <h4>💡 Tuning Tips</h4>
+          <ul>
+            <li><strong>Time-based:</strong> More consistent difficulty scaling, good for casual play</li>
+            <li><strong>Depth-based:</strong> More tactical depth, may vary in response time</li>
+            <li><strong>Easy (Sunny):</strong> 1-3s or 2-4 ply for beginner-friendly play</li>
+            <li><strong>Medium (Buzzwell):</strong> 3-6s or 4-6 ply for balanced challenge</li>
+            <li><strong>Hard (Beedric):</strong> 8-15s or 7-10 ply for serious competition</li>
+          </ul>
         </div>
       </div>
       

@@ -1309,6 +1309,237 @@ canvas {
     }
 }
 
+/* Personalities Panel Styling */
+.personalities-intro {
+    background: rgba(230, 184, 77, 0.05);
+    border: 2px solid rgba(230, 184, 77, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 25px;
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.personality-config {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(230, 184, 77, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.personality-config:hover {
+    border-color: rgba(230, 184, 77, 0.5);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.personality-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(230, 184, 77, 0.2);
+}
+
+.personality-icon {
+    font-size: 28px;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(230, 184, 77, 0.1);
+    border-radius: 50%;
+    border: 2px solid rgba(230, 184, 77, 0.3);
+}
+
+.personality-info h4 {
+    color: #E6B84D;
+    font-family: 'Milonga', serif;
+    font-size: 18px;
+    margin: 0 0 5px 0;
+}
+
+.personality-subtitle {
+    color: #aaa;
+    font-size: 14px;
+    font-style: italic;
+}
+
+.personality-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.control-group label {
+    color: #E6B84D;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.personality-slider {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.personality-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #E6B84D;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(230, 184, 77, 0.4);
+}
+
+.personality-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #E6B84D;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(230, 184, 77, 0.4);
+}
+
+.personality-select {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(230, 184, 77, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.personality-select:focus {
+    outline: none;
+    border-color: #E6B84D;
+    box-shadow: 0 0 8px rgba(230, 184, 77, 0.3);
+}
+
+.control-value {
+    color: #E6B84D;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 14px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.personality-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin: 30px 0;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: 'Milonga', serif;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid;
+    min-width: 140px;
+}
+
+.action-btn.primary {
+    background: linear-gradient(135deg, #E6B84D, #FFD700);
+    color: #000;
+    border-color: #E6B84D;
+}
+
+.action-btn.primary:hover {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(230, 184, 77, 0.4);
+}
+
+.action-btn.secondary {
+    background: rgba(230, 184, 77, 0.1);
+    color: #E6B84D;
+    border-color: rgba(230, 184, 77, 0.5);
+}
+
+.action-btn.secondary:hover {
+    background: rgba(230, 184, 77, 0.2);
+    border-color: #E6B84D;
+    transform: translateY(-2px);
+}
+
+.personality-tips {
+    background: rgba(42, 42, 42, 0.8);
+    border: 2px solid rgba(230, 184, 77, 0.2);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 25px;
+}
+
+.personality-tips h4 {
+    color: #E6B84D;
+    font-family: 'Milonga', serif;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+}
+
+.personality-tips ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #ccc;
+}
+
+.personality-tips li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.personality-tips strong {
+    color: #E6B84D;
+}
+
+/* Mobile responsiveness for Personalities panel */
+@media (max-width: 768px) {
+    .personality-controls {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .personality-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .personality-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .action-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+}
+
 #chat-header {
     padding: 15px;
     border-bottom: 2px solid #E6B84D;

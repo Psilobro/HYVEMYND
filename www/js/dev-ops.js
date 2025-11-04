@@ -83,6 +83,9 @@ class DevOpsSystem {
                 if (e.target === modal) this.hideModal();
             });
         }
+        
+        // Setup personalities controls
+        this.setupPersonalitiesControls();
     }
     
     showModal() {
@@ -1311,6 +1314,247 @@ class DevOpsSystem {
         } catch (error) {
             console.error('Failed to load statistics:', error);
         }
+        
+        // Load personality settings
+        this.loadPersonalitySettings();
+    }
+    
+    // Personalities Management
+    setupPersonalitiesControls() {
+        // Load saved personality settings
+        this.loadPersonalitySettings();
+        
+        // Setup sliders and controls for each personality
+        const personalities = ['sunny', 'buzzwell', 'beedric'];
+        
+        personalities.forEach(personality => {
+            // Time limit slider
+            const timeSlider = document.getElementById(`${personality}-time-limit`);
+            const timeValue = document.getElementById(`${personality}-time-value`);
+            if (timeSlider && timeValue) {
+                timeSlider.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    timeValue.textContent = `${value}s`;
+                    this.updatePersonalitySetting(personality, 'timeLimit', parseInt(value));
+                });
+            }
+            
+            // Depth limit slider
+            const depthSlider = document.getElementById(`${personality}-depth-limit`);
+            const depthValue = document.getElementById(`${personality}-depth-value`);
+            if (depthSlider && depthValue) {
+                depthSlider.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    depthValue.textContent = `${value} ply`;
+                    this.updatePersonalitySetting(personality, 'depthLimit', parseInt(value));
+                });
+            }
+            
+            // Mode select
+            const modeSelect = document.getElementById(`${personality}-mode`);
+            if (modeSelect) {
+                modeSelect.addEventListener('change', (e) => {
+                    this.updatePersonalitySetting(personality, 'mode', e.target.value);
+                });
+            }
+        });
+        
+        // Action buttons
+        const saveBtn = document.getElementById('save-personalities');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.savePersonalitySettings());
+        }
+        
+        const resetBtn = document.getElementById('reset-personalities');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => this.resetPersonalitySettings());
+        }
+        
+        const testBtn = document.getElementById('test-personalities');
+        if (testBtn) {
+            testBtn.addEventListener('click', () => this.testPersonalitySettings());
+        }
+    }
+    
+    loadPersonalitySettings() {
+        // Default personality settings
+        this.personalitySettings = {
+            sunny: { timeLimit: 2, depthLimit: 3, mode: 'time' },
+            buzzwell: { timeLimit: 4, depthLimit: 5, mode: 'time' },
+            beedric: { timeLimit: 10, depthLimit: 8, mode: 'time' }
+        };
+        
+        try {
+            const saved = localStorage.getItem('hyvemynd-personality-settings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                this.personalitySettings = { ...this.personalitySettings, ...parsed };
+            }
+        } catch (error) {
+            console.error('Failed to load personality settings:', error);
+        }
+        
+        // Apply settings to UI
+        this.applyPersonalitySettingsToUI();
+    }
+    
+    applyPersonalitySettingsToUI() {
+        Object.keys(this.personalitySettings).forEach(personality => {
+            const settings = this.personalitySettings[personality];
+            
+            // Update time slider
+            const timeSlider = document.getElementById(`${personality}-time-limit`);
+            const timeValue = document.getElementById(`${personality}-time-value`);
+            if (timeSlider && timeValue) {
+                timeSlider.value = settings.timeLimit;
+                timeValue.textContent = `${settings.timeLimit}s`;
+            }
+            
+            // Update depth slider
+            const depthSlider = document.getElementById(`${personality}-depth-limit`);
+            const depthValue = document.getElementById(`${personality}-depth-value`);
+            if (depthSlider && depthValue) {
+                depthSlider.value = settings.depthLimit;
+                depthValue.textContent = `${settings.depthLimit} ply`;
+            }
+            
+            // Update mode select
+            const modeSelect = document.getElementById(`${personality}-mode`);
+            if (modeSelect) {
+                modeSelect.value = settings.mode;
+            }
+        });
+    }
+    
+    updatePersonalitySetting(personality, setting, value) {
+        if (!this.personalitySettings[personality]) {
+            this.personalitySettings[personality] = {};
+        }
+        
+        this.personalitySettings[personality][setting] = value;
+        console.log(`🎭 Updated ${personality} ${setting}: ${value}`);
+        
+        // Auto-save after changes
+        this.savePersonalitySettings(false);
+    }
+    
+    savePersonalitySettings(showNotification = true) {
+        try {
+            localStorage.setItem('hyvemynd-personality-settings', JSON.stringify(this.personalitySettings));
+            
+            // Update AI UI system with new settings
+            if (window.AIUI && window.AIUI.updatePersonalitySettings) {
+                window.AIUI.updatePersonalitySettings(this.personalitySettings);
+            }
+            
+            if (showNotification) {
+                this.showPersonalityNotification('💾 Personality settings saved successfully!');
+                console.log('🎭 Personality settings saved:', this.personalitySettings);
+            }
+        } catch (error) {
+            console.error('Failed to save personality settings:', error);
+            if (showNotification) {
+                this.showPersonalityNotification('❌ Failed to save settings');
+            }
+        }
+    }
+    
+    resetPersonalitySettings() {
+        // Reset to defaults
+        this.personalitySettings = {
+            sunny: { timeLimit: 2, depthLimit: 3, mode: 'time' },
+            buzzwell: { timeLimit: 4, depthLimit: 5, mode: 'time' },
+            beedric: { timeLimit: 10, depthLimit: 8, mode: 'time' }
+        };
+        
+        // Apply to UI
+        this.applyPersonalitySettingsToUI();
+        
+        // Save
+        this.savePersonalitySettings();
+        
+        this.showPersonalityNotification('🔄 Personality settings reset to defaults');
+    }
+    
+    testPersonalitySettings() {
+        const personality = 'sunny'; // Test with Sunny for quick results
+        const settings = this.personalitySettings[personality];
+        
+        this.showPersonalityNotification(`🧪 Testing ${personality} settings: ${settings.timeLimit}s, ${settings.depthLimit} ply...`);
+        
+        // Start a quick game against the test personality
+        if (window.AIUI) {
+            // Temporarily apply settings and start game
+            setTimeout(() => {
+                if (window.AIUI.startAIMode) {
+                    window.AIUI.startAIMode(personality);
+                    this.hideModal(); // Close dev-ops to see the game
+                    
+                    setTimeout(() => {
+                        this.showPersonalityNotification(`✅ Test started! Playing against ${personality} with current settings.`);
+                    }, 1000);
+                }
+            }, 500);
+        } else {
+            this.showPersonalityNotification('❌ AI UI system not available for testing');
+        }
+    }
+    
+    showPersonalityNotification(message) {
+        // Create a simple notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            background: rgba(230, 184, 77, 0.95);
+            color: #000;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: 'Milonga', serif;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10002;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 300px;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        // Add CSS animation if not exists
+        if (!document.getElementById('personality-notification-style')) {
+            const style = document.createElement('style');
+            style.id = 'personality-notification-style';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOutRight {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => notification.remove(), 300);
+        }, 4000);
+    }
+    
+    // Public method to get personality settings for AI UI system
+    getPersonalitySettings(personality) {
+        return this.personalitySettings[personality] || null;
+    }
+    
+    // Public method to get all personality settings
+    getAllPersonalitySettings() {
+        return this.personalitySettings;
     }
 }
 

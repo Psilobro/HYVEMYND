@@ -216,15 +216,21 @@ window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
   
-  // Map difficulty to UHP engine parameters
-  const engineSettings = {
-    'easy': { timeLimit: 2, depthLimit: 3, mode: 'time' },      // Sunny: 1-2s, depth 3
-    'medium': { timeLimit: 4, depthLimit: 5, mode: 'time' },    // Buzzwell: 3-5s, depth 5  
-    'hard': { timeLimit: 10, depthLimit: 8, mode: 'time' },     // Beedric: 8-15s, depth 8+
-    'hard-v2': { timeLimit: 10, depthLimit: 8, mode: 'time' }   // Beedric V2: same as hard for now
-  };
+  // Get personality settings from dev-ops system
+  let settings;
+  if (window.devOpsSystem && window.devOpsSystem.getPersonalitySettings) {
+    settings = window.devOpsSystem.getPersonalitySettings(difficulty);
+  }
   
-  const settings = engineSettings[difficulty] || engineSettings['medium'];
+  // Fallback to default settings if not available
+  if (!settings) {
+    const defaultSettings = {
+      'easy': { timeLimit: 2, depthLimit: 3, mode: 'time' },
+      'medium': { timeLimit: 4, depthLimit: 5, mode: 'time' },
+      'hard': { timeLimit: 10, depthLimit: 8, mode: 'time' }
+    };
+    settings = defaultSettings[difficulty] || defaultSettings['medium'];
+  }
   
   console.log(`🎮 Starting Single Player mode with UHP engine (${difficulty}): ${JSON.stringify(settings)}`);
   
@@ -298,6 +304,14 @@ window.AIUI.startAIMode = function(difficulty) {
       window.Personalities.showVoiceLine('intro');
     }
   }, 2000);
+};
+
+/**
+ * Update personality settings from dev-ops system
+ */
+window.AIUI.updatePersonalitySettings = function(settings) {
+  console.log('🎭 AI UI received updated personality settings:', settings);
+  // Settings are now managed by dev-ops system and applied when starting games
 };
 
 /**
