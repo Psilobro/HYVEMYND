@@ -145,6 +145,24 @@ function showHistoryOverlay(moveIdx) {
     
     overlaySVG.appendChild(transformGroup);
     overlay.appendChild(overlaySVG);
+    
+    // Add UHP notation display if available
+    if (snap.uhpMove && snap.uhpMove.trim()) {
+        const uhpDisplay = document.createElement('div');
+        uhpDisplay.style.position = 'absolute';
+        uhpDisplay.style.top = '20px';
+        uhpDisplay.style.left = '20px';
+        uhpDisplay.style.padding = '10px 15px';
+        uhpDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        uhpDisplay.style.color = 'white';
+        uhpDisplay.style.fontFamily = 'monospace';
+        uhpDisplay.style.fontSize = '16px';
+        uhpDisplay.style.borderRadius = '5px';
+        uhpDisplay.style.zIndex = '101';
+        uhpDisplay.style.pointerEvents = 'none';
+        uhpDisplay.textContent = `Move ${snap.moveNumber}: ${snap.uhpMove}`;
+        overlay.appendChild(uhpDisplay);
+    }
 
     // Show return button
     document.getElementById('return-to-live').style.display = 'block';

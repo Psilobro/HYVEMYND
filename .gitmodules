@@ -16,3 +16,6 @@
 [submodule "reference-ai-6"]
 	path = reference-ai-6
 	url = https://github.com/hiveboardgame/hive.git
+[submodule "tools/uhp-samples"]
+	path = tools/uhp-samples
+	url = https://github.com/jonthysell/UHPSampleCode.git

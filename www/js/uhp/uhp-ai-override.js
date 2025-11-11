@@ -15,14 +15,12 @@
     
     // Global function to check if UHP engine should be active
     window.shouldUseUHPEngine = function() {
-        const engineEnabled = document.getElementById('engine-enabled')?.checked;
-        const engineColor = document.getElementById('engine-color')?.value || 'black';
         const currentPlayer = window.state?.current;
         
-        return engineEnabled && 
-               window.uhpClient && 
-               window.uhpClient.connected &&
-               (engineColor === 'both' || engineColor === currentPlayer);
+        // Use the UHP client's built-in color checking logic
+        return window.uhpClient && 
+               window.uhpClient.isEnabled() && 
+               window.uhpClient.shouldPlayForColor(currentPlayer);
     };
     
     // Override the main updateHUD function to control AI flow
@@ -49,15 +47,26 @@
                         window.AIEngineNokamuteMzinga.enabled = false;
                     }
                     
-                    // Use UHP engine
-                    setTimeout(() => {
-                        if (window.uhpClient && window.uhpClient.connected) {
-                            console.log('🎯 Requesting UHP engine move...');
-                            window.uhpClient.getBestMove();
+                    // Only use UHP engine for black moves in single player mode
+                    if (window.state && window.state.current === 'black') {
+                        // Check if UHP engine is already processing to prevent recursion
+                        if (window.uhpClient && window.uhpClient.isProcessingCommand) {
+                            console.log('🎯 UHP engine already processing, skipping duplicate call');
+                            return;
                         }
-                    }, 150);
-                    
-                    return; // Stop any further AI processing
+                        
+                        // Use UHP engine
+                        setTimeout(() => {
+                            if (window.uhpClient && window.uhpClient.connected && !window.uhpClient.isProcessingCommand) {
+                                console.log('🎯 Requesting UHP engine move for black...');
+                                window.uhpClient.getBestMove();
+                            }
+                        }, 150);
+                        
+                        return; // Stop any further AI processing
+                    } else {
+                        console.log('🤖 UHP AI Override: Not black\'s turn, skipping UHP engine');
+                    }
                 }
             };
         }

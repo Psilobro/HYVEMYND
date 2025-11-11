@@ -1,0 +1,3 @@
+newgame Base;InProgress;White[2];wG1;bG1 wG1-;wA1 /wG1;bQ bG1-
+validmoves
+quit

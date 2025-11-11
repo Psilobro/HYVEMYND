@@ -10,7 +10,26 @@
             this.engineLogEntries = [];
             this.maxLogEntries = 100;
             
-            //        updateThinkingIndicator(thinking, data = {}) {
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.init());
+            } else {
+                this.init();
+            }
+        }
+        
+        updateProgressPopup(show, data = {}) {
+            const popup = document.getElementById('engine-progress-popup');
+            if (!popup) return;
+            
+            if (show) {
+                this.showProgressPopup(data);
+            } else {
+                this.hideProgressPopup();
+            }
+        }
+        
+        updateThinkingIndicator(thinking, data = {}) {
             const indicator = document.getElementById('engine-thinking-indicator');
             if (indicator) {
                 indicator.style.display = thinking ? 'block' : 'none';
@@ -18,12 +37,6 @@
             
             // Also manage the progress popup
             this.updateProgressPopup(thinking, data);
-        }ze when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => this.init());
-            } else {
-                this.init();
-            }
         }
         
         init() {
@@ -170,6 +183,9 @@
         setupAIIntegration() {
             // Override AI trigger to use UHP engine when enabled
             const originalPerformAIAction = window.performAIAction;
+            
+            // Store reference for fallback
+            window.originalPerformAIAction = originalPerformAIAction;
             
             window.performAIAction = async () => {
                 const engineEnabled = document.getElementById('engine-enabled')?.checked;

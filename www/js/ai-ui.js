@@ -236,8 +236,9 @@ window.AIUI.startAIMode = function(difficulty) {
   
   // Configure UHP engine with personality-specific settings
   if (window.uhpClient) {
-    // Enable UHP engine
+    // Enable UHP engine and set it to play black
     window.uhpClient.setSetting('enabled', true);
+    window.uhpClient.setSetting('aiColor', 'black');
     window.uhpClient.setSetting('timeLimit', settings.timeLimit);
     window.uhpClient.setSetting('depthLimit', settings.depthLimit);
     window.uhpClient.setSetting('mode', settings.mode);

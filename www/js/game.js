@@ -16,11 +16,22 @@ function snapshotBoardState() {
             return cell.stack.indexOf(p);
         })()
     }));
+    
+    // Try to get UHP notation for this specific move
+    let uhpMove = '';
+    if (window.uhpClient && typeof window.uhpClient.getUHPMoveForTurn === 'function') {
+        uhpMove = window.uhpClient.getUHPMoveForTurn(state.moveNumber) || '';
+        console.log(`📝 History snapshot for move ${state.moveNumber}: UHP = "${uhpMove}"`);
+    } else {
+        console.log(`📝 History snapshot for move ${state.moveNumber}: No UHP client or method available`);
+    }
+    
     // Also store move number and current player
     window.historySnapshots.push({
         pieces,
         moveNumber: state.moveNumber,
-        current: state.current
+        current: state.current,
+        uhpMove: uhpMove // Add UHP notation for this specific move
     });
 }
 // --- CONFIG ---
@@ -949,7 +960,7 @@ function updateHUD(){
         hud.style.fontFamily = 'Milonga, serif';
         
         // Check if AI should move - prioritize UHP engine, fallback to legacy
-        if (window.uhpClient && window.uhpClient.isEnabled()) {
+        if (window.uhpClient && window.uhpClient.isEnabled() && window.uhpClient.shouldPlayForColor(state.current)) {
             // UHP engine will handle this via its own performAIAction flow
             console.log(`🤖 UHP engine will handle AI move for ${state.current}`);
         } else if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
@@ -1123,6 +1134,95 @@ function commitPlacement(q,r){
     const p = selected.piece;
     
     if (!isNearBorder(q,r)) {
+        // Record UHP move for this placement before processing
+        if (window.uhpClient && p && p.meta) {
+            console.log(`🎯 Recording UHP move for ${p.meta.color} ${p.meta.key} at (${q}, ${r}), move ${state.moveNumber || 1}`);
+            try {
+                const colorPrefix = p.meta.color === 'white' ? 'w' : 'b';
+                let uhpPieceId;
+                
+                // Count existing pieces of this type to get the correct number
+                const existingPieces = tray.filter(piece => 
+                    piece.meta.placed && 
+                    piece.meta.color === p.meta.color && 
+                    piece.meta.key === p.meta.key
+                );
+                
+                if (p.meta.key === 'Q') {
+                    uhpPieceId = `${colorPrefix}Q`;
+                } else {
+                    const pieceNumber = existingPieces.length + 1;
+                    uhpPieceId = `${colorPrefix}${p.meta.key}${pieceNumber}`;
+                }
+                
+                // Build position notation
+                let uhpMove = uhpPieceId;
+                
+                // If this isn't the first piece, add positional notation
+                const placedPieces = tray.filter(piece => piece.meta.placed);
+                if (placedPieces.length > 0 && window.uhpClient.buildUHPPositionalMove) {
+                    const mockPiece = {
+                        position: { q, r },
+                        color: p.meta.color,
+                        key: p.meta.key
+                    };
+                    
+                    // Get reference pieces for positioning
+                    const playedPieces = [];
+                    const pieceCounters = {}; // Track instance numbers by piece type
+                    
+                    placedPieces.forEach(piece => {
+                        // Build proper UHP ID with instance number
+                        const colorPrefix = piece.meta.color === 'white' ? 'w' : 'b';
+                        const pieceKey = `${colorPrefix}${piece.meta.key}`;
+                        let pieceUhpId;
+                        
+                        if (piece.meta.key === 'Q') {
+                            pieceUhpId = `${colorPrefix}Q`;
+                        } else {
+                            // Increment counter for this piece type
+                            pieceCounters[pieceKey] = (pieceCounters[pieceKey] || 0) + 1;
+                            pieceUhpId = `${colorPrefix}${piece.meta.key}${pieceCounters[pieceKey]}`;
+                        }
+                        
+                        playedPieces.push({
+                            uhpId: pieceUhpId,
+                            q: piece.meta.q,
+                            r: piece.meta.r,
+                            color: piece.meta.color,
+                            type: piece.meta.key
+                        });
+                    });
+                    
+                    uhpMove = window.uhpClient.buildUHPPositionalMove(uhpPieceId, mockPiece, playedPieces);
+                }
+                
+                // Record this move for the current move number
+                const currentMoveNumber = state.moveNumber || 1;
+                window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
+                console.log(`📝 Recorded UHP move ${currentMoveNumber}: ${uhpMove}`);
+                console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
+                
+                // Update UHP piece mapping for placement  
+                // Extract UHP number from the generated ID (e.g., "bG3" -> "3")
+                const uhpNumberMatch = uhpPieceId.match(/[a-zA-Z]+(\d*)$/);
+                const uhpNumber = uhpNumberMatch ? (uhpNumberMatch[1] || '1') : '1';
+                
+                const uhpKey = `${p.meta.color}_${p.meta.key}_${uhpNumber}`;
+                window.uhpClient.uhpPieceMap.set(uhpKey, {
+                    piece: p,
+                    position: `${q},${r}`,
+                    uhpId: uhpPieceId
+                });
+                console.log(`🗺️ Added to UHP piece map: ${uhpKey} -> ${q},${r} (${uhpPieceId})`);
+                
+            } catch (error) {
+                console.error('❌ Failed to record UHP move:', error);
+            }
+        } else {
+            console.log(`🎯 Not recording UHP move: uhpClient=${!!window.uhpClient}, piece=${!!p}, meta=${!!p?.meta}`);
+        }
+        
         animating=true;
         p.meta.placed = true;
         p.meta.q = q; p.meta.r = r;
@@ -1463,7 +1563,7 @@ function legalMoveZones(piece){
     }
     else if(type==='A'){ // If the piece is an Ant
         const queue=[[q0,r0,0]], vis=new Set([`${q0},${r0}`]); // Initialize BFS queue with starting position and distance, mark origin as visited
-        const maxDistance = 8; // Reasonable maximum distance for ant movement to prevent excessive exploration
+        const maxDistance = 15; // Allow ants to explore further around larger hives
         
         while(queue.length){ // Continue BFS until all reachable cells are explored
             const [cx,cy,dist]=queue.shift(); // Dequeue the next cell to explore from with its distance
@@ -1481,10 +1581,9 @@ function legalMoveZones(piece){
                 
                 vis.add(k); // Mark this cell as visited to prevent revisiting
                 
-                // Only check expensive hive connectivity for cells that could be valid destinations
-                // Skip connectivity check for cells too far from the origin (likely impossible anyway)
-                const distFromOrigin = Math.abs(nx-q0) + Math.abs(ny-r0);
-                if(distFromOrigin <= 6 && wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) {
+                // Check if this destination would keep the hive connected
+                // Ants can move to any reachable cell around the hive perimeter
+                if(wouldHiveRemainConnectedAfterMove(q0,r0,nx,ny)) {
                     zones.add(k); // Add this cell to the set of legal destination zones
                 }
                 
@@ -1617,6 +1716,108 @@ function commitMove(q,r){
         });
 
         p.meta.q=q; p.meta.r=r;
+
+        // Record UHP movement move before updating turn state
+        if (window.uhpClient && p && p.meta) {
+            console.log(`🎯 Recording UHP movement for ${p.meta.color} ${p.meta.key} from (${fromQ}, ${fromR}) to (${q}, ${r}), move ${state.moveNumber || 1}`);
+            
+            try {
+                // Get current move number before incrementing
+                const currentMoveNumber = state.moveNumber || 1;
+                
+                    // Get all placed pieces for reference (after the move)
+                    const placedPieces = tray.filter(p2 => p2.meta.placed).map(p2 => {
+                        // Find correct UHP ID from piece map
+                        let pieceUhpId = null;
+                        if (window.uhpClient && window.uhpClient.uhpPieceMap) {
+                            for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
+                                if (mapData && mapData.piece === p2) {
+                                    pieceUhpId = mapData.uhpId;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Fallback ID generation if not found in map
+                        if (!pieceUhpId) {
+                            const colorPrefix = p2.meta.color.charAt(0);
+                            if (p2.meta.key === 'Q') {
+                                pieceUhpId = `${colorPrefix}Q`;
+                            } else {
+                                // Use placement order logic
+                                const sameTypePieces = tray.filter(piece => 
+                                    piece.meta.placed && 
+                                    piece.meta.color === p2.meta.color && 
+                                    piece.meta.key === p2.meta.key &&
+                                    piece.meta.i <= p2.meta.i
+                                ).length;
+                                pieceUhpId = `${colorPrefix}${p2.meta.key}${sameTypePieces}`;
+                            }
+                        }
+                        
+                        return {
+                            q: p2.meta.q,
+                            r: p2.meta.r,
+                            uhpId: pieceUhpId,
+                            color: p2.meta.color,
+                            key: p2.meta.key
+                        };
+                    });
+                    
+                    // Build UHP piece ID - find the correct ID from UHP piece map
+                    let uhpPieceId = null;
+                    
+                    // Search UHP piece map to find the correct ID for this piece
+                    if (window.uhpClient && window.uhpClient.uhpPieceMap) {
+                        for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
+                            if (mapData && mapData.piece === p) {
+                                // Extract the UHP notation from the uhpId
+                                uhpPieceId = mapData.uhpId;
+                                console.log(`🔍 Found UHP ID for moving piece: ${uhpPieceId} (map key: ${mapKey})`);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Fallback: generate using placement order logic (should not be needed if map is correct)
+                    if (!uhpPieceId) {
+                        console.log(`⚠️ UHP ID not found in map, using fallback generation for ${p.meta.color} ${p.meta.key}`);
+                        const colorPrefix = p.meta.color.charAt(0);
+                        if (p.meta.key === 'Q') {
+                            uhpPieceId = `${colorPrefix}Q`;
+                        } else {
+                            // Count how many pieces of this type and color have been placed
+                            const sameTypePieces = tray.filter(piece => 
+                                piece.meta.placed && 
+                                piece.meta.color === p.meta.color && 
+                                piece.meta.key === p.meta.key &&
+                                piece.meta.i <= p.meta.i // Only count pieces placed before or at the same time
+                            ).length;
+                            uhpPieceId = `${colorPrefix}${p.meta.key}${sameTypePieces}`;
+                        }
+                        console.log(`🔧 Fallback UHP ID: ${uhpPieceId}`);
+                    }
+                    
+                    // Generate movement notation
+                let uhpMove = '';
+                if (placedPieces.length > 1 && window.uhpClient.buildMovementNotation) {
+                    uhpMove = window.uhpClient.buildMovementNotation(uhpPieceId, q, r, placedPieces);
+                }
+                
+                if (uhpMove) {
+                    console.log(`📝 Recorded UHP movement ${currentMoveNumber}: ${uhpMove}`);
+                    window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
+                    console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
+                } else {
+                    console.log(`⚠️ Could not generate UHP movement notation for ${uhpPieceId}`);
+                }
+                
+            } catch (error) {
+                console.error(`❌ Error recording UHP movement:`, error);
+            }
+        } else {
+            console.log(`🎯 Not recording UHP movement: uhpClient=${!!window.uhpClient}, piece=${!!p}, meta=${!!p?.meta}`);
+        }
 
         animating=false;
         const oldTurn = state.current;
