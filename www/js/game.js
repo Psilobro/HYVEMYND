@@ -1134,87 +1134,44 @@ function commitPlacement(q,r){
     const p = selected.piece;
     
     if (!isNearBorder(q,r)) {
-        // Record UHP move for this placement before processing
+        // Record UHP move for this placement using CHRONOLOGICAL placement order
         if (window.uhpClient && p && p.meta) {
-            console.log(`🎯 Recording UHP move for ${p.meta.color} ${p.meta.key} at (${q}, ${r}), move ${state.moveNumber || 1}`);
+            console.log(`🎯 Recording UHP placement: ${p.meta.color} ${p.meta.key} at (${q}, ${r}), move ${state.moveNumber || 1}`);
             try {
-                const colorPrefix = p.meta.color === 'white' ? 'w' : 'b';
-                let uhpPieceId;
+                const currentMoveNumber = state.moveNumber || 1;
                 
-                // Count existing pieces of this type to get the correct number
-                const existingPieces = tray.filter(piece => 
-                    piece.meta.placed && 
-                    piece.meta.color === p.meta.color && 
-                    piece.meta.key === p.meta.key
-                );
+                // Use UHP client's proper chronological tracking
+                const uhpPieceId = window.uhpClient.recordPiecePlacement(p, q, r, currentMoveNumber);
                 
-                if (p.meta.key === 'Q') {
-                    uhpPieceId = `${colorPrefix}Q`;
-                } else {
-                    const pieceNumber = existingPieces.length + 1;
-                    uhpPieceId = `${colorPrefix}${p.meta.key}${pieceNumber}`;
-                }
-                
-                // Build position notation
+                // Build position notation using chronological placement history
                 let uhpMove = uhpPieceId;
                 
                 // If this isn't the first piece, add positional notation
-                const placedPieces = tray.filter(piece => piece.meta.placed);
-                if (placedPieces.length > 0 && window.uhpClient.buildUHPPositionalMove) {
+                if (window.uhpClient.placementOrder.length > 1 && window.uhpClient.buildUHPPositionalMove) {
                     const mockPiece = {
                         position: { q, r },
                         color: p.meta.color,
                         key: p.meta.key
                     };
                     
-                    // Get reference pieces for positioning
-                    const playedPieces = [];
-                    const pieceCounters = {}; // Track instance numbers by piece type
-                    
-                    placedPieces.forEach(piece => {
-                        // Build proper UHP ID with instance number
-                        const colorPrefix = piece.meta.color === 'white' ? 'w' : 'b';
-                        const pieceKey = `${colorPrefix}${piece.meta.key}`;
-                        let pieceUhpId;
-                        
-                        if (piece.meta.key === 'Q') {
-                            pieceUhpId = `${colorPrefix}Q`;
-                        } else {
-                            // Increment counter for this piece type
-                            pieceCounters[pieceKey] = (pieceCounters[pieceKey] || 0) + 1;
-                            pieceUhpId = `${colorPrefix}${piece.meta.key}${pieceCounters[pieceKey]}`;
-                        }
-                        
-                        playedPieces.push({
-                            uhpId: pieceUhpId,
-                            q: piece.meta.q,
-                            r: piece.meta.r,
-                            color: piece.meta.color,
-                            type: piece.meta.key
-                        });
-                    });
+                    // Get reference pieces from chronological placement order (exclude current piece)
+                    const playedPieces = window.uhpClient.placementOrder
+                        .slice(0, -1) // Exclude the piece we just placed
+                        .map(record => ({
+                            uhpId: record.uhpId,
+                            q: record.position.q,
+                            r: record.position.r,
+                            color: record.color,
+                            type: record.pieceType
+                        }));
                     
                     uhpMove = window.uhpClient.buildUHPPositionalMove(uhpPieceId, mockPiece, playedPieces);
                 }
                 
-                // Record this move for the current move number
-                const currentMoveNumber = state.moveNumber || 1;
+                // Record this move in the move history
                 window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
                 console.log(`📝 Recorded UHP move ${currentMoveNumber}: ${uhpMove}`);
                 console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
-                
-                // Update UHP piece mapping for placement  
-                // Extract UHP number from the generated ID (e.g., "bG3" -> "3")
-                const uhpNumberMatch = uhpPieceId.match(/[a-zA-Z]+(\d*)$/);
-                const uhpNumber = uhpNumberMatch ? (uhpNumberMatch[1] || '1') : '1';
-                
-                const uhpKey = `${p.meta.color}_${p.meta.key}_${uhpNumber}`;
-                window.uhpClient.uhpPieceMap.set(uhpKey, {
-                    piece: p,
-                    position: `${q},${r}`,
-                    uhpId: uhpPieceId
-                });
-                console.log(`🗺️ Added to UHP piece map: ${uhpKey} -> ${q},${r} (${uhpPieceId})`);
                 
             } catch (error) {
                 console.error('❌ Failed to record UHP move:', error);
@@ -1551,14 +1508,53 @@ function legalMoveZones(piece){
         });
     }
     else if(type==='G'){ // If the piece is a Grasshopper
+        console.log(`🦗 Grasshopper at (${q0},${r0}) checking legal moves`);
+        console.log(`🦗 Occupied cells:`, Array.from(occAll));
         DIRS.forEach(d=>{ // Iterate through all 6 hexagonal directions
             let x=q0+d.dq, y=r0+d.dr, jumped=0; // Start at first adjacent cell and initialize jump counter
+            console.log(`🦗 Checking direction (${d.dq},${d.dr}) starting at (${x},${y})`);
+            
+            // CRITICAL FIX: Ensure we're jumping over at least one piece before finding empty space
             while(occAll.has(`${x},${y}`)){ // Continue jumping while there are pieces to jump over
                 jumped++; // Increment the number of pieces jumped over
+                console.log(`🦗 Jumped over piece at (${x},${y}), total jumped: ${jumped}`);
                 x+=d.dq; y+=d.dr; // Move to the next cell in the same direction
             }
+            
             const k=`${x},${y}`; // Create key for the landing cell (first empty cell after jumping)
-            if(jumped>0 && window.cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) zones.add(k); // Add to legal zones if at least one piece was jumped, landing cell exists and is empty, and hive stays connected
+            console.log(`🦗 Landing at (${x},${y}), jumped=${jumped}, exists=${window.cells.has(k)}, empty=${!occAll.has(k)}`);
+            
+            // CRITICAL VALIDATION: Only add if we jumped over at least one piece AND this is truly the first empty space
+            if(jumped > 0 && window.cells.has(k) && !occAll.has(k) && wouldHiveRemainConnectedAfterMove(q0,r0,x,y)) {
+                // Double-check: verify no gaps in the jump path
+                let validJump = true;
+                let checkX = q0 + d.dq, checkY = r0 + d.dr;
+                let piecesInPath = 0;
+                
+                while(checkX !== x || checkY !== y) {
+                    if(occAll.has(`${checkX},${checkY}`)) {
+                        piecesInPath++;
+                    } else if(piecesInPath === 0) {
+                        console.log(`🦗 ❌ Gap detected at (${checkX},${checkY}) before jumping any pieces - invalid jump`);
+                        validJump = false;
+                        break;
+                    } else {
+                        // Found empty space after jumping pieces - this should be our target
+                        if(checkX === x && checkY === y) break;
+                        console.log(`🦗 ❌ Unexpected empty space at (${checkX},${checkY}) in jump path - invalid`);
+                        validJump = false;
+                        break;
+                    }
+                    checkX += d.dq; checkY += d.dr;
+                }
+                
+                if(validJump && piecesInPath > 0) {
+                    zones.add(k); // Add to legal zones if at least one piece was jumped, landing cell exists and is empty, and hive stays connected
+                    console.log(`🦗 ✅ Added legal zone: ${k} (jumped over ${piecesInPath} pieces)`);
+                } else {
+                    console.log(`🦗 ❌ Rejected invalid jump to ${k} (validJump=${validJump}, piecesInPath=${piecesInPath})`);
+                }
+            }
         });
     }
     else if(type==='A'){ // If the piece is an Ant
@@ -1683,7 +1679,86 @@ function legalMoveZones(piece){
 
 function commitMove(q,r){
     animating=true;
+    
+    // Check if a piece is selected
+    if (!selected || !selected.piece) {
+        console.error('❌ commitMove called but no piece is selected:', { selected, q, r });
+        animating = false;
+        return;
+    }
+    
     const p=selected.piece;
+    
+    // Debug grasshopper moves specifically
+    if(p.meta.key === 'G') {
+        console.log(`🦗 COMMITTING Grasshopper move from (${p.meta.q},${p.meta.r}) to (${q},${r})`);
+        const currentLegalZones = window.legalMoveZones(p);
+        console.log(`🦗 Current legal zones for this grasshopper:`, currentLegalZones);
+        
+        // VALIDATION: Ensure the target is actually in the legal zones
+        const targetKey = `${q},${r}`;
+        const isLegal = Array.isArray(currentLegalZones) ? 
+            currentLegalZones.includes(targetKey) : 
+            currentLegalZones.has && currentLegalZones.has(targetKey);
+            
+        if (!isLegal) {
+            console.error(`❌ ILLEGAL GRASSHOPPER MOVE BLOCKED! Target ${targetKey} not in legal zones:`, currentLegalZones);
+            animating = false;
+            return; // Block the illegal move
+        }
+        
+        // Additional validation: manually verify grasshopper jump logic
+        const fromQ = p.meta.q, fromR = p.meta.r;
+        const dq = q - fromQ, dr = r - fromR;
+        
+        // Check if this is a valid hex direction
+        const gcd = Math.max(Math.abs(dq), Math.abs(dr));
+        if (gcd === 0) {
+            console.error(`❌ GRASSHOPPER MOVE BLOCKED: Zero distance move`);
+            animating = false;
+            return;
+        }
+        
+        const unitDq = dq / gcd, unitDr = dr / gcd;
+        const validDirections = [[1,0], [1,-1], [0,-1], [-1,0], [-1,1], [0,1]];
+        const isValidDirection = validDirections.some(dir => dir[0] === unitDq && dir[1] === unitDr);
+        
+        if (!isValidDirection) {
+            console.error(`❌ GRASSHOPPER MOVE BLOCKED: Invalid direction (${unitDq}, ${unitDr})`);
+            animating = false;
+            return;
+        }
+        
+        // Check that grasshopper jumped over at least one piece
+        const occAll = new Set();
+        window.cells.forEach((c, key) => { if (c && c.stack && c.stack.length > 0) occAll.add(key); });
+        
+        let jumpedPieces = 0;
+        let checkQ = fromQ + unitDq, checkR = fromR + unitDr;
+        
+        while (checkQ !== q || checkR !== r) {
+            if (occAll.has(`${checkQ},${checkR}`)) {
+                jumpedPieces++;
+            } else if (jumpedPieces === 0) {
+                console.error(`❌ GRASSHOPPER MOVE BLOCKED: No pieces to jump over at (${checkQ},${checkR})`);
+                animating = false;
+                return;
+            } else {
+                break; // Found empty space after jumping pieces - this should be our target
+            }
+            checkQ += unitDq;
+            checkR += unitDr;
+        }
+        
+        if (jumpedPieces === 0) {
+            console.error(`❌ GRASSHOPPER MOVE BLOCKED: Did not jump over any pieces`);
+            animating = false;
+            return;
+        }
+        
+        console.log(`✅ Grasshopper move validated: jumped over ${jumpedPieces} pieces`);
+    }
+    
     // capture occupancy prior to move (includes the moving piece at its old position)
     const occBefore = new Set(tray.filter(p2=>p2.meta.placed).map(p2=>`${p2.meta.q},${p2.meta.r}`));
     const oldKey=`${p.meta.q},${p.meta.r}`,
@@ -1717,7 +1792,7 @@ function commitMove(q,r){
 
         p.meta.q=q; p.meta.r=r;
 
-        // Record UHP movement move before updating turn state
+        // Record UHP movement using CHRONOLOGICAL placement order
         if (window.uhpClient && p && p.meta) {
             console.log(`🎯 Recording UHP movement for ${p.meta.color} ${p.meta.key} from (${fromQ}, ${fromR}) to (${q}, ${r}), move ${state.moveNumber || 1}`);
             
@@ -1725,93 +1800,65 @@ function commitMove(q,r){
                 // Get current move number before incrementing
                 const currentMoveNumber = state.moveNumber || 1;
                 
-                    // Get all placed pieces for reference (after the move)
-                    const placedPieces = tray.filter(p2 => p2.meta.placed).map(p2 => {
-                        // Find correct UHP ID from piece map
-                        let pieceUhpId = null;
-                        if (window.uhpClient && window.uhpClient.uhpPieceMap) {
-                            for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
-                                if (mapData && mapData.piece === p2) {
-                                    pieceUhpId = mapData.uhpId;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        // Fallback ID generation if not found in map
-                        if (!pieceUhpId) {
-                            const colorPrefix = p2.meta.color.charAt(0);
-                            if (p2.meta.key === 'Q') {
-                                pieceUhpId = `${colorPrefix}Q`;
-                            } else {
-                                // Use placement order logic
-                                const sameTypePieces = tray.filter(piece => 
-                                    piece.meta.placed && 
-                                    piece.meta.color === p2.meta.color && 
-                                    piece.meta.key === p2.meta.key &&
-                                    piece.meta.i <= p2.meta.i
-                                ).length;
-                                pieceUhpId = `${colorPrefix}${p2.meta.key}${sameTypePieces}`;
-                            }
-                        }
-                        
-                        return {
-                            q: p2.meta.q,
-                            r: p2.meta.r,
-                            uhpId: pieceUhpId,
-                            color: p2.meta.color,
-                            key: p2.meta.key
-                        };
-                    });
-                    
-                    // Build UHP piece ID - find the correct ID from UHP piece map
-                    let uhpPieceId = null;
-                    
-                    // Search UHP piece map to find the correct ID for this piece
-                    if (window.uhpClient && window.uhpClient.uhpPieceMap) {
-                        for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
-                            if (mapData && mapData.piece === p) {
-                                // Extract the UHP notation from the uhpId
-                                uhpPieceId = mapData.uhpId;
-                                console.log(`🔍 Found UHP ID for moving piece: ${uhpPieceId} (map key: ${mapKey})`);
-                                break;
-                            }
+                // Find the UHP ID for the moving piece using chronological tracking
+                let uhpPieceId = null;
+                if (window.uhpClient && window.uhpClient.uhpPieceMap) {
+                    for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
+                        if (mapData && mapData.piece === p) {
+                            uhpPieceId = mapData.uhpId;
+                            console.log(`🔍 Found UHP ID for moving piece: ${uhpPieceId} (chronological order)`);
+                            break;
                         }
                     }
-                    
-                    // Fallback: generate using placement order logic (should not be needed if map is correct)
-                    if (!uhpPieceId) {
-                        console.log(`⚠️ UHP ID not found in map, using fallback generation for ${p.meta.color} ${p.meta.key}`);
-                        const colorPrefix = p.meta.color.charAt(0);
-                        if (p.meta.key === 'Q') {
-                            uhpPieceId = `${colorPrefix}Q`;
-                        } else {
-                            // Count how many pieces of this type and color have been placed
-                            const sameTypePieces = tray.filter(piece => 
-                                piece.meta.placed && 
-                                piece.meta.color === p.meta.color && 
-                                piece.meta.key === p.meta.key &&
-                                piece.meta.i <= p.meta.i // Only count pieces placed before or at the same time
-                            ).length;
-                            uhpPieceId = `${colorPrefix}${p.meta.key}${sameTypePieces}`;
-                        }
-                        console.log(`🔧 Fallback UHP ID: ${uhpPieceId}`);
-                    }
-                    
-                    // Generate movement notation
+                }
+                
+                if (!uhpPieceId) {
+                    console.warn(`⚠️ UHP ID not found for moving piece ${p.meta.color} ${p.meta.key} - this indicates chronological tracking issue!`);
+                    // Emergency fallback (should not happen with proper chronological tracking)
+                    const colorPrefix = p.meta.color.charAt(0);
+                    uhpPieceId = p.meta.key === 'Q' ? `${colorPrefix}Q` : `${colorPrefix}${p.meta.key}1`;
+                }
+                
+                // Get reference pieces from chronological placement order
+                const playedPieces = window.uhpClient.placementOrder.map(record => ({
+                    uhpId: record.uhpId,
+                    q: record.position.q,
+                    r: record.position.r,
+                    color: record.color,
+                    type: record.pieceType
+                }));
+                
+                // Generate movement notation using chronological data
                 let uhpMove = '';
-                if (placedPieces.length > 1 && window.uhpClient.buildMovementNotation) {
-                    uhpMove = window.uhpClient.buildMovementNotation(uhpPieceId, q, r, placedPieces);
+                if (playedPieces.length > 1 && window.uhpClient.buildMovementNotation) {
+                    uhpMove = window.uhpClient.buildMovementNotation(uhpPieceId, q, r, playedPieces);
                 }
                 
                 if (uhpMove) {
-                    console.log(`📝 Recorded UHP movement ${currentMoveNumber}: ${uhpMove}`);
+                    console.log(`� Recorded UHP movement ${currentMoveNumber}: ${uhpMove}`);
                     window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
-                    console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
+                    
+                    // Update piece position in chronological tracking
+                    const placementRecord = window.uhpClient.placementOrder.find(record => 
+                        record.uhpId === uhpPieceId
+                    );
+                    if (placementRecord) {
+                        placementRecord.position.q = q;
+                        placementRecord.position.r = r;
+                        console.log(`🗺️ Updated chronological position: ${uhpPieceId} -> (${q}, ${r})`);
+                    }
+                    
+                    // Update UHP piece map
+                    for (const [mapKey, mapData] of window.uhpClient.uhpPieceMap.entries()) {
+                        if (mapData && mapData.piece === p) {
+                            mapData.position = `${q},${r}`;
+                            console.log(`�️ Updated UHP piece map: ${mapKey} -> ${q},${r}`);
+                            break;
+                        }
+                    }
                 } else {
-                    console.log(`⚠️ Could not generate UHP movement notation for ${uhpPieceId}`);
+                    console.warn(`⚠️ Could not generate UHP movement notation for ${uhpPieceId}`);
                 }
-                
             } catch (error) {
                 console.error(`❌ Error recording UHP movement:`, error);
             }

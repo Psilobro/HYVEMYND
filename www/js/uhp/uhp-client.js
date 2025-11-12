@@ -14,11 +14,13 @@
             this.currentEngine = null;
             this.reconnectAttempts = 0;
             this.maxReconnectAttempts = 5;
-            // Track UHP piece numbering by placement order
+            // Track UHP piece numbering by PLACEMENT ORDER (chronological)
             this.uhpPieceMap = new Map(); // Maps "color_pieceType_uhpNumber" to piece object
             this.uhpCounters = {}; // Tracks next UHP number for each color_pieceType
+            this.placementOrder = []; // Chronological record of all piece placements
             this.reconnectDelay = 3000;
             this.isConnecting = false; // Track if we're currently trying to connect
+            this.lastRecommendedMove = null; // Track last move to prevent duplicates
             this.settings = this.loadSettings();
             
             // Failure tracking to prevent infinite loops
@@ -44,6 +46,168 @@
             
             // Track UHP moves by move number for history display
             this.uhpMoveHistory = new Map(); // moveNumber -> uhpMove
+        }
+
+        /**
+         * Validate piece mobility for current player to catch pinned pieces
+         * Returns count of pieces that can actually move
+         */
+        validatePieceMobility(color) {
+            if (!window.legalMoveZones || !window.tray) {
+                console.warn('🔍 Mobility validation: Required functions not available');
+                return 0;
+            }
+
+            const placedPieces = window.tray.filter(p => 
+                p.meta && p.meta.color === color && p.meta.placed
+            );
+
+            let mobilePieceCount = 0;
+            const pinnedPieces = [];
+
+            for (const piece of placedPieces) {
+                try {
+                    const moveZones = window.legalMoveZones(piece);
+                    const zones = Array.isArray(moveZones) ? moveZones : Array.from(moveZones);
+                    
+                    if (zones.length > 0) {
+                        mobilePieceCount++;
+                        console.log(`🔍 Mobile: ${piece.meta.key} at (${piece.meta.q},${piece.meta.r}) - ${zones.length} moves`);
+                    } else {
+                        pinnedPieces.push(`${piece.meta.key}@(${piece.meta.q},${piece.meta.r})`);
+                    }
+                } catch (error) {
+                    console.warn(`🔍 Error checking mobility for ${piece.meta.key}:`, error);
+                }
+            }
+
+            if (pinnedPieces.length > 0) {
+                console.log(`🔍 Pinned pieces for ${color}:`, pinnedPieces);
+            }
+
+            return mobilePieceCount;
+        }
+
+        /**
+         * Record a piece placement in chronological order for correct UHP numbering
+         */
+        recordPiecePlacement(piece, q, r, moveNumber) {
+            const color = piece.meta?.color || piece.color;
+            const pieceType = piece.meta?.key || piece.key;
+            
+            // Initialize counter if needed
+            const counterKey = `${color}_${pieceType}`;
+            if (!this.uhpCounters[counterKey]) {
+                this.uhpCounters[counterKey] = 0;
+            }
+            
+            // Increment placement counter for this piece type
+            this.uhpCounters[counterKey]++;
+            const uhpNumber = this.uhpCounters[counterKey];
+            
+            // Generate UHP piece ID (Queens don't have numbers)
+            const uhpId = pieceType === 'Q' ? 
+                `${color.charAt(0)}Q` : 
+                `${color.charAt(0)}${pieceType}${uhpNumber}`;
+            
+            // Store in placement order tracking
+            const placementRecord = {
+                moveNumber: moveNumber,
+                piece: piece,
+                uhpId: uhpId,
+                color: color,
+                pieceType: pieceType,
+                uhpNumber: uhpNumber,
+                position: { q: q, r: r }
+            };
+            
+            this.placementOrder.push(placementRecord);
+            
+            // Store in UHP piece map for quick lookup
+            const mapKey = `${color}_${pieceType}_${uhpNumber}`;
+            this.uhpPieceMap.set(mapKey, {
+                piece: piece,
+                position: `${q},${r}`,
+                uhpId: uhpId,
+                placementOrder: uhpNumber
+            });
+            
+            console.log(`📝 Recorded placement: ${uhpId} at (${q}, ${r}) - move ${moveNumber} - placement order ${uhpNumber}`);
+            return uhpId;
+        }
+
+        /**
+         * Get piece by UHP placement order (chronological numbering)
+         */
+        getPieceByUHPId(uhpKey) {
+            console.log(`🔍 Looking up UHP piece: ${uhpKey}`);
+            
+            // Parse UHP key format (e.g., "bG2" -> black grasshopper #2)
+            const match = uhpKey.match(/^([wb])([QAGBS])(\d*)$/);
+            if (!match) {
+                console.warn(`❌ Invalid UHP key format: ${uhpKey}`);
+                return null;
+            }
+            
+            const [, colorCode, pieceType, numberStr] = match;
+            const color = colorCode === 'w' ? 'white' : 'black';
+            const uhpNumber = numberStr ? parseInt(numberStr) : 1;
+            
+            // Look up in placement order tracking
+            const mapKey = `${color}_${pieceType}_${uhpNumber}`;
+            if (this.uhpPieceMap.has(mapKey)) {
+                const data = this.uhpPieceMap.get(mapKey);
+                console.log(`✅ Found UHP piece ${uhpKey}: ${data.uhpId} at ${data.position}`);
+                return data;
+            }
+            
+            // Fallback: search placement order chronologically
+            const matchingPlacements = this.placementOrder.filter(p => 
+                p.color === color && p.pieceType === pieceType
+            );
+            
+            if (uhpNumber > 0 && uhpNumber <= matchingPlacements.length) {
+                const placement = matchingPlacements[uhpNumber - 1]; // Convert to 0-based
+                console.log(`✅ Found via placement order: ${uhpKey} -> ${placement.uhpId}`);
+                return {
+                    piece: placement.piece,
+                    position: `${placement.position.q},${placement.position.r}`,
+                    uhpId: placement.uhpId,
+                    placementOrder: placement.uhpNumber
+                };
+            }
+            
+            console.warn(`❌ UHP piece not found: ${uhpKey} (looking for ${color} ${pieceType} #${uhpNumber})`);
+            console.warn(`   Available ${color} ${pieceType}:`, matchingPlacements.map(p => p.uhpId));
+            return null;
+        }
+
+        /**
+         * Get the current turn color from game state
+         */
+        getCurrentTurnColor() {
+            if (window.state && typeof window.state.current === 'string') {
+                return window.state.current;
+            }
+            
+            // Fallback: determine from move count
+            const gameState = this.exportGameState();
+            if (gameState && gameState.hasState) {
+                return gameState.current || 'white';
+            }
+            
+            return 'white'; // Default fallback
+        }
+
+        /**
+         * Find piece object at a specific board position
+         */
+        findPieceByPosition(q, r) {
+            if (!window.tray) return null;
+            
+            return window.tray.find(p => 
+                p.meta && p.meta.placed && p.meta.q === q && p.meta.r === r
+            );
         }
 
         getUHPMoveForTurn(moveNumber) {
@@ -999,7 +1163,7 @@
                     status: `Searching ${engineMode === 'time' ? timeLimit + 's' : depthLimit + ' ply'}...`
                 });
 
-                // Export current game state
+                // Export current game state - pure UHP notation
                 const gameString = this.exportGameString();
                 console.log('📤 Sending to engine:', gameString);
                 
@@ -1040,15 +1204,66 @@
 
                 if (moveString && moveString !== 'pass') {
                     console.log('🎯 Engine recommends:', moveString);
+                    
+                    // Check for duplicate moves
+                    if (this.lastRecommendedMove === moveString) {
+                        console.warn('⚠️ UHP engine recommended the same move twice:', moveString);
+                        console.warn('   This indicates engine internal issue with complex board state');
+                        console.warn('   Engine may be stuck in logic loop - switching to manual control');
+                        this.showAIGaveUpMessage();
+                        return false;
+                    }
+                    
+                    // Check for repeated invalid moves (engine stuck in logic loop)
+                    if (!this.invalidMoveHistory) {
+                        this.invalidMoveHistory = new Map();
+                    }
+                    const invalidCount = this.invalidMoveHistory.get(moveString) || 0;
+                    if (invalidCount >= 2) {
+                        console.warn(`⚠️ UHP engine repeatedly suggesting invalid move: ${moveString}`);
+                        console.warn(`   Move has been rejected ${invalidCount} times - engine appears stuck`);
+                        this.showAIGaveUpMessage();
+                        return false;
+                    }
+                    
+                    this.lastRecommendedMove = moveString;
+                    
+                    // Debug: Log current board state when UHP recommends questionable moves
+                    if (moveString && moveString.includes(' ') && !moveString.includes('\\') && !moveString.includes('/') && !moveString.includes('-')) {
+                        console.log('🤔 UHP recommended potential beetle climb move:', moveString);
+                        console.log('🗺️ Current UHP piece positions:');
+                        if (this.uhpPieceMap) {
+                            for (const [key, value] of this.uhpPieceMap.entries()) {
+                                console.log(`   ${key}: ${value.position} (${value.uhpId})`);
+                            }
+                        }
+                    }
                     const action = this.importMove(moveString);
                     
                     if (action) {
                         this.consecutiveFailures = 0; // Reset on success
+                        this.lastRecommendedMove = null; // Reset after successful move
+                        
+                        // Clear invalid move history on successful move
+                        if (this.invalidMoveHistory) {
+                            this.invalidMoveHistory.clear();
+                        }
+                        
                         this.executeEngineMove(action);
                         return true;
                     } else {
                         console.warn('❌ Could not parse engine move');
-                        this.consecutiveFailures++;
+                        
+                        // Track failed moves to detect repeated invalid suggestions
+                        if (!this.invalidMoveHistory) {
+                            this.invalidMoveHistory = new Map();
+                        }
+                        const currentCount = this.invalidMoveHistory.get(moveString) || 0;
+                        this.invalidMoveHistory.set(moveString, currentCount + 1);
+                        console.log(`📊 Invalid move count for "${moveString}": ${currentCount + 1}`);
+                        
+                        this.showAIGaveUpMessage();
+                        return false;
                     }
                 } else if (moveString === 'pass') {
                     console.log('🤖 Engine passes turn');
@@ -1072,8 +1287,9 @@
                 this.isProcessingCommand = false;
             }
 
-            // Fallback to built-in AI
-            return this.fallbackToBuiltinAI();
+            // Show AI gave up message instead of fallback
+            this.showAIGaveUpMessage();
+            return false;
         }
 
         // Convert UHP MoveString to HYVEMYND action
@@ -1112,27 +1328,24 @@
                     return null;
                 }
                 
-                console.log(`🔍 Looking for: ${color} ${pieceType}${actualPieceNum} (UHP placement order)`);
+                console.log(`🔍 Looking for: ${color} ${pieceType}${actualPieceNum} (UHP chronological placement order)`);
                 
                 // Check if this piece is already on the board (movement vs placement)
                 let placedPiece = null;
                 let placedPosition = null;
                 
-                if (window.cells) {
-                    console.log(`🔎 Searching for UHP piece ${color}${pieceType}${actualPieceNum}...`);
+                // Use correct UHP piece lookup by chronological placement order
+                const uhpPieceData = this.getPieceByUHPId(pieceKey);
+                if (uhpPieceData) {
+                    console.log(`✅ Found UHP piece: ${pieceKey} -> ${uhpPieceData.uhpId} at ${uhpPieceData.position}`);
+                    placedPiece = uhpPieceData.piece;
+                    placedPosition = uhpPieceData.position;
+                } else {
+                    console.log(`🔍 UHP piece ${pieceKey} not found in placement records, checking board state...`);
                     
-                    // Use the UHP piece map if available
-                    const uhpKey = `${color}_${pieceType}_${actualPieceNum}`;
-                    if (this.uhpPieceMap.has(uhpKey)) {
-                        const mappedPieceData = this.uhpPieceMap.get(uhpKey);
-                        console.log(`✅ Found in UHP map: ${uhpKey} at ${mappedPieceData.position}`);
-                        placedPiece = mappedPieceData.piece;
-                        placedPosition = mappedPieceData.position;
-                    } else {
-                        console.log(`🔍 UHP piece ${uhpKey} not in map, searching board directly...`);
-                        
-                        // Fallback: find pieces on board and use placement order logic
-                        const allMatchingPieces = [];
+                    // Emergency fallback: scan board for pieces and try to infer placement order
+                    const allMatchingPieces = [];
+                    if (window.cells) {
                         for (const [key, cell] of window.cells.entries()) {
                             if (cell.stack && cell.stack.length > 0) {
                                 for (const boardPiece of cell.stack) {
@@ -1150,19 +1363,20 @@
                             }
                         }
                         
-                        console.log(`� Found ${allMatchingPieces.length} ${color}${pieceType} pieces on board`);
+                        console.log(`🔍 Emergency fallback: Found ${allMatchingPieces.length} ${color}${pieceType} pieces on board`);
                         
                         if (allMatchingPieces.length > 0) {
-                            // Sort by meta.i to ensure consistent ordering
+                            // Sort by internal numbering as best guess for placement order
                             allMatchingPieces.sort((a, b) => a.metaI - b.metaI);
                             
-                            // Use UHP number as 1-based index
+                            // Use UHP number as 1-based index (may not be accurate)
                             const targetIndex = parseInt(actualPieceNum) - 1;
                             if (targetIndex >= 0 && targetIndex < allMatchingPieces.length) {
                                 const target = allMatchingPieces[targetIndex];
                                 placedPiece = target.piece;
                                 placedPosition = target.position;
-                                console.log(`✅ Fallback match: ${color}${pieceType}${actualPieceNum} = piece with meta.i=${target.metaI} at ${placedPosition}`);
+                                console.warn(`⚠️ Emergency fallback match: ${color}${pieceType}${actualPieceNum} = piece with meta.i=${target.metaI} at ${placedPosition}`);
+                                console.warn(`   This may be inaccurate - UHP numbering relies on chronological placement order!`);
                             }
                         }
                     }
@@ -1279,6 +1493,21 @@
             try {
                 console.log(`🔍 Parsing movement: ${moveString} from ${currentPosition}`);
                 
+                // Validate input piece position
+                if (currentPosition && piece && piece.meta) {
+                    const [currentQ, currentR] = currentPosition.split(',').map(Number);
+                    const pieceQ = piece.meta.q;
+                    const pieceR = piece.meta.r;
+                    
+                    if (currentQ !== pieceQ || currentR !== pieceR) {
+                        console.warn('⚠️ UHP piece position mismatch detected');
+                        console.warn(`   Expected piece at (${currentQ}, ${currentR}) but found at (${pieceQ}, ${pieceR})`);
+                        console.warn(`   This indicates stale piece data - AI may be trying to move a piece that already moved`);
+                        this.showAIGaveUpMessage();
+                        return null;
+                    }
+                }
+                
                 // Extract destination from UHP notation like "bA3 \wG2"
                 const parts = moveString.trim().split(' ');
                 if (parts.length < 2) {
@@ -1346,7 +1575,7 @@
                 }
                 
                 // Calculate destination coordinates based on separator and side
-                const destination = this.calculateMovementDestination(refPosition, separator, beforeSep ? 'left' : 'right');
+                const destination = this.calculateMovementDestination(refPosition, separator, beforeSep ? 'left' : 'right', piece);
                 if (!destination) {
                     console.warn('❌ Could not calculate destination');
                     return null;
@@ -1360,11 +1589,36 @@
                 const currentR = currentPos[1];
                 
                 if (destination.q === currentQ && destination.r === currentR) {
-                    console.warn('⚠️ UHP engine recommended moving to same position - this is invalid!');
-                    console.warn(`   Current: (${currentQ}, ${currentR}) → Destination: (${destination.q}, ${destination.r})`);
-                    console.warn('   Falling back to built-in AI due to invalid UHP move');
-                    this.fallbackToBuiltinAI();
+                    console.warn('⚠️ UHP engine recommended same-position move:', moveString);
+                    console.warn('   UHP engine may be indicating no legal moves available');
+                    
+                    // Show "AI gave up" message and switch to manual control
+                    this.showAIGaveUpMessage();
                     return null;
+                }
+                
+                // CRITICAL: Validate move against game rules before executing
+                if (window.legalMoveZones && piece) {
+                    const legalZones = window.legalMoveZones(piece);
+                    const destKey = `${destination.q},${destination.r}`;
+                    
+                    let isLegal = false;
+                    if (Array.isArray(legalZones)) {
+                        isLegal = legalZones.includes(destKey);
+                    } else if (legalZones && legalZones.has) {
+                        isLegal = legalZones.has(destKey);
+                    }
+                    
+                    if (!isLegal) {
+                        console.warn('❌ UHP engine suggested ILLEGAL move according to game rules!');
+                        console.warn(`   ${piece.meta?.color || piece.color} ${piece.meta?.key || piece.key} cannot move to (${destination.q}, ${destination.r})`);
+                        console.warn(`   Legal destinations:`, Array.isArray(legalZones) ? legalZones : Array.from(legalZones || []));
+                        console.warn(`   This indicates UHP/engine rule mismatch - AI giving up for safety`);
+                        this.showAIGaveUpMessage();
+                        return null;
+                    } else {
+                        console.log(`✅ UHP move validated: ${piece.meta?.color || piece.color} ${piece.meta?.key || piece.key} can legally move to (${destination.q}, ${destination.r})`);
+                    }
                 }
                 
                 // Check if destination is occupied (pieces cannot stack except beetles)
@@ -1377,8 +1631,8 @@
                         console.warn('⚠️ UHP engine recommended illegal move - destination occupied!');
                         console.warn(`   ${piece.meta?.color || piece.color} ${movingPieceType} trying to move to occupied position (${destination.q}, ${destination.r})`);
                         console.warn(`   Occupied by: ${destCell.stack.map(p => `${p.meta?.color || p.color} ${p.meta?.key || p.key}`).join(', ')}`);
-                        console.warn('   Falling back to built-in AI due to illegal UHP move');
-                        this.fallbackToBuiltinAI();
+                        console.warn('   AI gave up due to illegal UHP move');
+                        this.showAIGaveUpMessage();
                         return null;
                     }
                 }
@@ -1397,37 +1651,33 @@
             }
         }
 
-        // Find position of a piece on the board by UHP key
+        // Find position of a piece on the board by UHP key (chronological placement order)
         findPiecePosition(uhpKey) {
             console.log(`[UHP] Looking for reference piece: ${uhpKey}`);
             
-            // Convert UHP notation (wA1) to UHP piece map key format (white_A_1)
+            // Use correct UHP piece lookup by chronological placement order
+            const uhpPieceData = this.getPieceByUHPId(uhpKey);
+            if (uhpPieceData && uhpPieceData.piece.meta) {
+                const piece = uhpPieceData.piece;
+                const q = piece.meta.q;
+                const r = piece.meta.r;
+                
+                console.log(`[UHP] Reference piece ${uhpKey} found at (${q}, ${r}) via placement order`);
+                return { q: q, r: r, key: `${q},${r}` };
+            }
+            
+            console.log(`[UHP] Piece ${uhpKey} not found in placement records, using emergency fallback...`);
+            
+            // Emergency fallback: try to parse and find pieces directly on board
             const pieceMatch = uhpKey.match(/^([wb])([QAGBS])(\d*)$/);
             if (!pieceMatch) {
-                console.log(`[UHP] Invalid UHP key format: ${uhpKey}`);
+                console.warn(`[UHP] Invalid UHP key format: ${uhpKey}`);
                 return null;
             }
             
             const [, colorCode, pieceType, pieceNumStr] = pieceMatch;
             const color = colorCode === 'w' ? 'white' : 'black';
-            const pieceNumber = pieceNumStr || '1'; // Default to 1 if no number (Queen case)
-            const mapKey = `${color}_${pieceType}_${pieceNumber}`;
-            
-            console.log(`[UHP] Converting ${uhpKey} to map key: ${mapKey}`);
-            
-            // First check the UHP piece map
-            if (this.uhpPieceMap.has(mapKey)) {
-                const mappedPieceData = this.uhpPieceMap.get(mapKey);
-                const piece = mappedPieceData.piece;
-                console.log(`[UHP] Found piece in map:`, piece);
-                
-                if (piece.meta && piece.meta.placed && piece.meta.q !== undefined && piece.meta.r !== undefined) {
-                    console.log(`[UHP] Reference piece ${uhpKey} found at (${piece.meta.q}, ${piece.meta.r})`);
-                    return { q: piece.meta.q, r: piece.meta.r, key: `${piece.meta.q},${piece.meta.r}` };
-                }
-            }
-            
-            console.log(`[UHP] Piece ${uhpKey} not found in UHP map, searching board directly...`);
+            const pieceNumber = parseInt(pieceNumStr) || 1;
             
             // Get all pieces of this type and color from the board
             const matchingPieces = [];
@@ -1440,43 +1690,38 @@
                             
                             if (bColor === color && bKey === pieceType) {
                                 const [q, r] = key.split(',').map(Number);
-                                matchingPieces.push({ piece: boardPiece, q, r, key });
+                                matchingPieces.push({ 
+                                    piece: boardPiece, 
+                                    q, r, key,
+                                    metaI: boardPiece.meta?.i || 1
+                                });
                             }
                         }
                     }
                 }
             }
             
-            console.log(`[UHP] Found ${matchingPieces.length} ${color} ${pieceType} pieces on board`);
+            console.warn(`[UHP] Emergency fallback: Found ${matchingPieces.length} ${color} ${pieceType} pieces on board`);
             
-            // If there's a specific number in the UHP key, use placement order
-            if (pieceNumber !== '1' || pieceType !== 'Q') {
-                const targetIndex = parseInt(pieceNumber) - 1; // Convert to 0-based index
+            if (matchingPieces.length > 0) {
+                // Sort by internal numbering as best guess for placement order
+                matchingPieces.sort((a, b) => a.metaI - b.metaI);
+                
+                // Use UHP number as 1-based index (may not be accurate)
+                const targetIndex = pieceNumber - 1;
                 if (targetIndex >= 0 && targetIndex < matchingPieces.length) {
-                    // Sort by placement order (assuming meta.i represents internal order, convert to placement order)
-                    matchingPieces.sort((a, b) => {
-                        const aOrder = a.piece.meta?.i || 0;
-                        const bOrder = b.piece.meta?.i || 0;
-                        return aOrder - bOrder;
-                    });
-                    
                     const targetPiece = matchingPieces[targetIndex];
-                    console.log(`[UHP] Reference piece ${uhpKey} found at (${targetPiece.q}, ${targetPiece.r})`);
+                    console.warn(`[UHP] Emergency fallback: Reference piece ${uhpKey} -> (${targetPiece.q}, ${targetPiece.r}) (may be inaccurate!)`);
                     return { q: targetPiece.q, r: targetPiece.r, key: targetPiece.key };
                 }
-            } else if (pieceType === 'Q' && matchingPieces.length > 0) {
-                // Queen has no number suffix, just take the first (and only) one
-                const queenPiece = matchingPieces[0];
-                console.log(`[UHP] Reference piece ${uhpKey} (queen) found at (${queenPiece.q}, ${queenPiece.r})`);
-                return { q: queenPiece.q, r: queenPiece.r, key: queenPiece.key };
             }
             
-            console.log(`[UHP] Reference piece ${uhpKey} not found on board`);
+            console.error(`[UHP] Reference piece ${uhpKey} not found anywhere!`);
             return null;
         }
 
         // Calculate movement destination based on UHP separator and side
-        calculateMovementDestination(refPosition, separator, side) {
+    calculateMovementDestination(refPosition, separator, side, movingPiece) {
             // UHP uses pointy-top hex coordinates, HYVEMYND uses flat-top
             // Need to convert UHP directions to HYVEMYND coordinates
             
@@ -1516,7 +1761,16 @@
             } else if (separator === '' || !separator) {
                 // Beetle climbing: piece moves to same position as reference (stacks on top)
                 console.log('🎯 Beetle climbing: moving to same position as reference piece');
-                return { q: refPosition.q, r: refPosition.r };
+                // VALIDATION: Check if this is actually a valid beetle climbing move
+                const movingPieceKey = movingPiece?.key || movingPiece?.meta?.key;
+                if (movingPieceKey && movingPieceKey.includes('B')) {
+                    // This is a beetle - beetle climbing is valid
+                    return { q: refPosition.q, r: refPosition.r };
+                } else {
+                    // Not a beetle trying to climb - this is likely an invalid move
+                    console.warn('❌ Non-beetle piece cannot climb to same position as reference');
+                    return null;
+                }
             } else {
                 console.warn('❌ Unknown separator:', separator);
                 return null;
@@ -1559,7 +1813,7 @@
                 }
             } catch (error) {
                 console.error('❌ Failed to execute engine move:', error);
-                this.fallbackToBuiltinAI();
+                this.showAIGaveUpMessage();
             }
         }
 
@@ -1669,8 +1923,43 @@
 
             } catch (error) {
                 console.error('❌ Error in direct move:', error);
-                this.fallbackToBuiltinAI();
+                this.showAIGaveUpMessage();
             }
+        }
+
+        showAIGaveUpMessage() {
+            console.log('🤖💀 AI gave up - switching to manual control');
+            
+            // Disable UHP AI for this turn by temporarily setting aiColor to null
+            const originalAiColor = this.aiColor;
+            this.aiColor = null;
+            
+            // Update HUD to show "AI gave up" message
+            if (window.updateHUD) {
+                // Store original AI state and show message
+                setTimeout(() => {
+                    const hudElement = document.getElementById('hud');
+                    if (hudElement) {
+                        const originalText = hudElement.textContent;
+                        hudElement.style.color = '#ff6b6b';
+                        hudElement.textContent = `${window.state.current.charAt(0).toUpperCase() + window.state.current.slice(1)} Turn - A.I. gave up`;
+                        
+                        // Restore color after a few seconds but keep the message
+                        setTimeout(() => {
+                            hudElement.style.color = '';
+                        }, 3000);
+                    }
+                    
+                    // Re-enable AI for next turn
+                    setTimeout(() => {
+                        this.aiColor = originalAiColor;
+                        console.log('🤖🔄 AI re-enabled for next turn');
+                    }, 1000);
+                }, 100);
+            }
+            
+            // Make sure manual input is enabled for this turn
+            this.isManualControlActive = true;
         }
 
         fallbackToBuiltinAI() {
@@ -1691,12 +1980,18 @@
             
             this.isFallbackActive = true;
             
-            // Use the original built-in AI instead of performAIAction
-            if (window.originalPerformAIAction || (window.AIEngine && window.AIEngine.checkAndMakeMove)) {
+            // Use available built-in AI engines as fallback
+            if (window.originalPerformAIAction || 
+                (window.AIEngine && window.AIEngine.checkAndMakeMove) ||
+                (window.AIEngineNokamuteMzinga && window.AIEngineNokamuteMzinga.makeMove)) {
                 setTimeout(() => {
                     try {
                         if (window.originalPerformAIAction) {
+                            console.log('🔄 Using original AI action');
                             window.originalPerformAIAction();
+                        } else if (window.AIEngineNokamuteMzinga && window.AIEngineNokamuteMzinga.makeMove) {
+                            console.log('🔄 Using Nokamute-Mzinga AI engine as fallback');
+                            window.AIEngineNokamuteMzinga.makeMove();
                         } else if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
                             window.AIEngine.checkAndMakeMove();
                         }

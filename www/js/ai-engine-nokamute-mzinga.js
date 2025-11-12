@@ -581,6 +581,15 @@ window.activateNokamuteMzingaAI = function(difficulty = 'medium') {
                 // Double-check selection state
                 if (window.selected && window.selected.piece && window.selected.piece === targetPiece) {
                   console.log('🤖 Committing move for piece:', targetPiece.meta.key);
+                  
+                  // Extra debug for grasshopper moves
+                  if (targetPiece.meta.key === 'G') {
+                    console.log(`🤖🦗 AI moving grasshopper from (${targetPiece.meta.q},${targetPiece.meta.r}) to (${move.q},${move.r})`);
+                    const legalZones = window.legalMoveZones(targetPiece);
+                    console.log(`🤖🦗 Legal zones for this grasshopper:`, legalZones);
+                    console.log(`🤖🦗 Target (${move.q},${move.r}) is in legal zones:`, legalZones.includes(`${move.q},${move.r}`));
+                  }
+                  
                   window.commitMove(move.q, move.r);
                   window.AIEngineNokamuteMzinga.lastTurn = window.state.current; // Mark turn as completed
                 } else {
