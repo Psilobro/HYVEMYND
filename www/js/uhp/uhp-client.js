@@ -1033,6 +1033,7 @@
             // Find the best reference piece (prefer adjacent pieces)
             let bestReference = null;
             let minDistance = Infinity;
+            let adjacentPieces = [];
             
             for (const placedPiece of playedPieces) {
                 // Use direct q,r coordinates from our historical tracking
@@ -1042,22 +1043,39 @@
                 
                 console.log(`🔧 Distance to ${placedPiece.uhpId} at (${refQ}, ${refR}): ${distance}`);
                 
-                // Prefer adjacent pieces (distance = 1)
+                // Collect all adjacent pieces (distance = 1)
                 if (distance === 1) {
-                    bestReference = placedPiece;
-                    minDistance = distance;
-                    break; // Adjacent is best, stop searching
-                } else if (distance < minDistance) {
+                    adjacentPieces.push(placedPiece);
+                    console.log(`✅ Found adjacent piece: ${placedPiece.uhpId}`);
+                }
+                
+                // Track closest piece as backup
+                if (distance < minDistance) {
                     minDistance = distance;
                     bestReference = placedPiece;
                 }
+            }
+            
+            // Use the first adjacent piece if any exist
+            if (adjacentPieces.length > 0) {
+                bestReference = adjacentPieces[0];
+                minDistance = 1;
+                console.log(`🎯 Using adjacent reference: ${bestReference.uhpId}`);
             }
             
             if (!bestReference) {
                 // No reference found, use last piece
                 const lastPiece = playedPieces[playedPieces.length - 1];
                 console.log(`🔧 No reference found, using last piece ${lastPiece.uhpId}`);
-                return `${uhpPieceId} ${lastPiece.uhpId}\\`;
+                return `${uhpPieceId} ${lastPiece.uhpId}-`;
+            }
+            
+            // Validate that we have an adjacent reference
+            if (minDistance !== 1) {
+                console.log(`⚠️ WARNING: Best reference is not adjacent (distance: ${minDistance})`);
+                console.log(`⚠️ This may result in invalid UHP notation that Nokamute will reject`);
+                console.log(`⚠️ Piece position: (${myPos.q}, ${myPos.r})`);
+                console.log(`⚠️ Reference position: (${bestReference.q}, ${bestReference.r})`);
             }
             
             // Calculate relative direction and determine correct UHP notation
@@ -1079,43 +1097,91 @@
             
             let result;
             
-            // UHP Direction Mapping: POSITIONAL/VISUAL notation
-            // Directions are visual pointers relative to the reference piece:
-            // / = "northeast pointer" (up-right direction)
-            // \ = "northwest pointer" (up-left direction) 
-            // - = "horizontal pointer" (left/right direction based on position)
-            //
-            // When piece is BEFORE symbol (left side): moving TO that direction FROM reference
-            // When piece is AFTER symbol (right side): moving FROM that direction TO reference
+            // Standard UHP Direction Mapping (based on real Nokamute/Mzinga examples):
+            // UHP uses axial coordinates with these 6 adjacent directions:
+            // (0,-1) = North → piece referencepiece/
+            // (1,-1) = NorthEast → piece referencepiece-  
+            // (1,0) = SouthEast → piece referencepiece\
+            // (0,1) = South → piece /referencepiece
+            // (-1,1) = SouthWest → piece -referencepiece
+            // (-1,0) = NorthWest → piece \referencepiece
             
             if (deltaQ === 0 && deltaR === -1) {
-                // North (straight up): piece/
+                // North: piece referencepiece/
                 result = `${uhpPieceId} ${bestReference.uhpId}/`;
                 console.log(`🎯 Delta (0,-1) → North: ${uhpPieceId} ${bestReference.uhpId}/`);
             } else if (deltaQ === 1 && deltaR === -1) {
-                // NorthEast: piece-
+                // NorthEast: piece referencepiece-
                 result = `${uhpPieceId} ${bestReference.uhpId}-`;
                 console.log(`🎯 Delta (1,-1) → NorthEast: ${uhpPieceId} ${bestReference.uhpId}-`);
             } else if (deltaQ === 1 && deltaR === 0) {
-                // SouthEast: piece\
+                // SouthEast: piece referencepiece\
                 result = `${uhpPieceId} ${bestReference.uhpId}\\`;
                 console.log(`🎯 Delta (1,0) → SouthEast: ${uhpPieceId} ${bestReference.uhpId}\\`);
             } else if (deltaQ === 0 && deltaR === 1) {
-                // South (straight down): /piece reference
+                // South: piece /referencepiece
                 result = `${uhpPieceId} /${bestReference.uhpId}`;
                 console.log(`🎯 Delta (0,1) → South: ${uhpPieceId} /${bestReference.uhpId}`);
             } else if (deltaQ === -1 && deltaR === 1) {
-                // SouthWest: piece -reference  
+                // SouthWest: piece -referencepiece
                 result = `${uhpPieceId} -${bestReference.uhpId}`;
                 console.log(`🎯 Delta (-1,1) → SouthWest: ${uhpPieceId} -${bestReference.uhpId}`);
             } else if (deltaQ === -1 && deltaR === 0) {
-                // NorthWest: piece \reference
+                // NorthWest: piece \referencepiece
                 result = `${uhpPieceId} \\${bestReference.uhpId}`;
                 console.log(`🎯 Delta (-1,0) → NorthWest: ${uhpPieceId} \\${bestReference.uhpId}`);
             } else {
-                // Non-adjacent - use fallback with / pointer
-                result = `${uhpPieceId} ${bestReference.uhpId}/`;
-                console.log(`🎯 DEFAULT direction (fallback): ${bestReference.uhpId}/ (piece right of /)`);
+                // Non-adjacent - find an actually adjacent piece or use proper multi-step notation
+                console.log(`⚠️ Non-adjacent reference (${deltaQ}, ${deltaR}) - finding adjacent alternative`);
+                
+                // Look for an adjacent piece instead
+                let adjacentReference = null;
+                for (const placedPiece of playedPieces) {
+                    const refQ = placedPiece.q;
+                    const refR = placedPiece.r;
+                    const adjDeltaQ = myPos.q - refQ;
+                    const adjDeltaR = myPos.r - refR;
+                    const distance = Math.abs(adjDeltaQ) + Math.abs(adjDeltaR);
+                    
+                    if (distance === 1) {
+                        adjacentReference = placedPiece;
+                        console.log(`✅ Found adjacent alternative: ${adjacentReference.uhpId} at (${refQ}, ${refR})`);
+                        
+                        // Use the adjacent reference with standard UHP direction
+                        if (adjDeltaQ === 0 && adjDeltaR === -1) {
+                            result = `${uhpPieceId} ${adjacentReference.uhpId}/`;
+                            console.log(`🎯 Adjacent North: ${uhpPieceId} ${adjacentReference.uhpId}/`);
+                        } else if (adjDeltaQ === 1 && adjDeltaR === -1) {
+                            result = `${uhpPieceId} ${adjacentReference.uhpId}-`;
+                            console.log(`🎯 Adjacent NorthEast: ${uhpPieceId} ${adjacentReference.uhpId}-`);
+                        } else if (adjDeltaQ === 1 && adjDeltaR === 0) {
+                            result = `${uhpPieceId} ${adjacentReference.uhpId}\\`;
+                            console.log(`🎯 Adjacent SouthEast: ${uhpPieceId} ${adjacentReference.uhpId}\\`);
+                        } else if (adjDeltaQ === 0 && adjDeltaR === 1) {
+                            result = `${uhpPieceId} /${adjacentReference.uhpId}`;
+                            console.log(`🎯 Adjacent South: ${uhpPieceId} /${adjacentReference.uhpId}`);
+                        } else if (adjDeltaQ === -1 && adjDeltaR === 1) {
+                            result = `${uhpPieceId} -${adjacentReference.uhpId}`;
+                            console.log(`🎯 Adjacent SouthWest: ${uhpPieceId} -${adjacentReference.uhpId}`);
+                        } else if (adjDeltaQ === -1 && adjDeltaR === 0) {
+                            result = `${uhpPieceId} \\${adjacentReference.uhpId}`;
+                            console.log(`🎯 Adjacent NorthWest: ${uhpPieceId} \\${adjacentReference.uhpId}`);
+                        }
+                        break;
+                    }
+                }
+                
+                if (!adjacentReference) {
+                    // This is a critical error - the piece is not adjacent to any existing piece
+                    // This violates Hive placement rules and will be rejected by Nokamute
+                    console.error(`❌ CRITICAL: Attempted invalid placement at (${myPos.q}, ${myPos.r})`);
+                    console.error(`❌ No adjacent pieces found - this violates Hive placement rules`);
+                    console.error(`❌ Available pieces:`, playedPieces.map(p => `${p.uhpId} at (${p.q}, ${p.r})`));
+                    
+                    // Return null to prevent recording this invalid move
+                    result = null;
+                    console.log(`❌ INVALID PLACEMENT: Returning null to prevent UHP corruption`);
+                }
             }
             
             console.log(`🔧 Final UHP move: ${result}`);
@@ -1468,14 +1534,28 @@
                     return null;
                 }
 
-                // Use legal placement zones for positioning
+                // Parse the UHP notation to determine where to place the piece
+                const uhpMatch = moveString.match(/^([wb][A-Z]\d+)\s+(.+)$/);
+                if (uhpMatch) {
+                    const [, pieceId, positionNotation] = uhpMatch;
+                    console.log(`🎯 Parsing placement UHP: ${pieceId} ${positionNotation}`);
+                    
+                    // Try to parse the position from the UHP notation
+                    const placement = this.parseUHPPlacementPosition(positionNotation);
+                    if (placement) {
+                        console.log(`🎯 Placing ${color} ${pieceType} at (${placement.q}, ${placement.r}) from UHP notation`);
+                        return { type: 'place', piece, q: placement.q, r: placement.r };
+                    }
+                }
+
+                // Fallback: Use legal placement zones
                 if (window.legalPlacementZones) {
                     const legalZones = window.legalPlacementZones(color);
                     if (legalZones && legalZones.size > 0) {
                         const firstZone = Array.from(legalZones)[0];
                         const [q, r] = firstZone.split(',').map(Number);
                         
-                        console.log(`🎯 Placing ${color} ${pieceType} at (${q}, ${r})`);
+                        console.log(`🎯 Placing ${color} ${pieceType} at (${q}, ${r}) from legal zones`);
                         return { type: 'place', piece, q, r };
                     }
                 }
@@ -1484,6 +1564,107 @@
                 return null;
             } catch (error) {
                 console.error('❌ Failed to import move:', error);
+                return null;
+            }
+        }
+
+        // Parse UHP placement position from notation like "-bS1" or "wG1-"
+        parseUHPPlacementPosition(positionNotation) {
+            try {
+                // Extract reference piece and direction
+                let refPieceMatch, direction, refPieceId;
+                
+                if (positionNotation.match(/^-\w+$/)) {
+                    // Format: -refPiece (piece is southwest of reference)
+                    refPieceId = positionNotation.substring(1);
+                    direction = 'southwest';
+                } else if (positionNotation.match(/^\\\w+$/)) {
+                    // Format: \refPiece (piece is northwest of reference)
+                    refPieceId = positionNotation.substring(1);
+                    direction = 'northwest';
+                } else if (positionNotation.match(/^\/\w+$/)) {
+                    // Format: /refPiece (piece is south of reference)
+                    refPieceId = positionNotation.substring(1);
+                    direction = 'south';
+                } else if (positionNotation.match(/^\w+-$/)) {
+                    // Format: refPiece- (piece is northeast of reference)
+                    refPieceId = positionNotation.slice(0, -1);
+                    direction = 'northeast';
+                } else if (positionNotation.match(/^\w+\\$/)) {
+                    // Format: refPiece\ (piece is southeast of reference)
+                    refPieceId = positionNotation.slice(0, -1);
+                    direction = 'southeast';
+                } else if (positionNotation.match(/^\w+\/$/)) {
+                    // Format: refPiece/ (piece is north of reference)
+                    refPieceId = positionNotation.slice(0, -1);
+                    direction = 'north';
+                } else {
+                    console.log(`❌ Unrecognized UHP placement format: ${positionNotation}`);
+                    return null;
+                }
+
+                // Find the reference piece
+                const refPiece = this.getPieceByUHPId(refPieceId);
+                if (!refPiece) {
+                    console.log(`❌ Reference piece not found: ${refPieceId}`);
+                    return null;
+                }
+
+                // Get the reference piece coordinates - handle different possible formats
+                let refQ, refR;
+                if (refPiece.q !== undefined && refPiece.r !== undefined) {
+                    refQ = refPiece.q;
+                    refR = refPiece.r;
+                } else if (typeof refPiece.position === 'string') {
+                    // Position is in format "q,r"
+                    const [qStr, rStr] = refPiece.position.split(',');
+                    refQ = parseInt(qStr);
+                    refR = parseInt(rStr);
+                } else if (refPiece.position && typeof refPiece.position === 'object') {
+                    refQ = refPiece.position.q;
+                    refR = refPiece.position.r;
+                } else if (refPiece.meta) {
+                    refQ = refPiece.meta.q;
+                    refR = refPiece.meta.r;
+                } else {
+                    console.log(`❌ Reference piece ${refPieceId} has no valid coordinates:`, refPiece);
+                    return null;
+                }
+
+                console.log(`🎯 Reference piece ${refPieceId} at (${refQ}, ${refR})`);
+
+                // Validate coordinates
+                if (isNaN(refQ) || isNaN(refR)) {
+                    console.log(`❌ Invalid reference coordinates: (${refQ}, ${refR})`);
+                    return null;
+                }
+
+                // Calculate position based on direction
+                let targetQ, targetR;
+
+                switch (direction) {
+                    case 'north':     // (0, -1)
+                        targetQ = refQ; targetR = refR - 1; break;
+                    case 'northeast': // (1, -1)
+                        targetQ = refQ + 1; targetR = refR - 1; break;
+                    case 'southeast': // (1, 0)
+                        targetQ = refQ + 1; targetR = refR; break;
+                    case 'south':     // (0, 1)
+                        targetQ = refQ; targetR = refR + 1; break;
+                    case 'southwest': // (-1, 1)
+                        targetQ = refQ - 1; targetR = refR + 1; break;
+                    case 'northwest': // (-1, 0)
+                        targetQ = refQ - 1; targetR = refR; break;
+                    default:
+                        console.log(`❌ Unknown direction: ${direction}`);
+                        return null;
+                }
+
+                console.log(`🎯 Parsed UHP placement: ${direction} of ${refPieceId} at (${refQ}, ${refR}) → (${targetQ}, ${targetR})`);
+                return { q: targetQ, r: targetR };
+
+            } catch (error) {
+                console.error('❌ Failed to parse UHP placement position:', error);
                 return null;
             }
         }

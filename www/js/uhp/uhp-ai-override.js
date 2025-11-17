@@ -17,10 +17,38 @@
     window.shouldUseUHPEngine = function() {
         const currentPlayer = window.state?.current;
         
-        // Use the UHP client's built-in color checking logic
-        return window.uhpClient && 
-               window.uhpClient.isEnabled() && 
-               window.uhpClient.shouldPlayForColor(currentPlayer);
+        console.log('🔍 shouldUseUHPEngine check:', {
+            currentPlayer,
+            wasmEngine: !!window.wasmEngine,
+            wasmAvailable: window.wasmEngine?.isAvailable(),
+            wasmInitialized: window.wasmEngine?.initialized,
+            uhpClient: !!window.uhpClient,
+            uhpEnabled: window.uhpClient?.isEnabled()
+        });
+        
+        // Always prioritize WASM engine when available (even in browser)
+        if (window.wasmEngine && window.wasmEngine.isAvailable()) {
+            console.log('✅ Using WASM engine for AI');
+            return true; // Use WASM engine whenever possible for offline AI
+        }
+        
+        // Fallback to WebSocket UHP client
+        const useWebSocket = window.uhpClient && 
+                            window.uhpClient.isEnabled() && 
+                            window.uhpClient.shouldPlayForColor(currentPlayer);
+        
+        console.log('🔍 WebSocket fallback:', useWebSocket);
+        return useWebSocket;
+    };
+    
+    // Global function to determine which engine to use
+    window.getActiveEngine = function() {
+        if (window.wasmEngine && window.wasmEngine.isAvailable()) {
+            return 'wasm'; // Always prefer WASM for offline AI
+        } else if (window.uhpClient && window.uhpClient.connected) {
+            return 'websocket';
+        }
+        return null;
     };
     
     // Override the main updateHUD function to control AI flow
@@ -47,25 +75,38 @@
                         window.AIEngineNokamuteMzinga.enabled = false;
                     }
                     
-                    // Only use UHP engine for black moves in single player mode
-                    if (window.state && window.state.current === 'black') {
-                        // Check if UHP engine is already processing to prevent recursion
-                        if (window.uhpClient && window.uhpClient.isProcessingCommand) {
-                            console.log('🎯 UHP engine already processing, skipping duplicate call');
-                            return;
-                        }
+                    // Check if current player is an AI opponent
+                    const currentPlayer = window.state?.current;
+                    const isAITurn = window.singlePlayerMode && currentPlayer === 'black'; // AI plays black
+                    
+                    if (isAITurn) {
+                        const activeEngine = window.getActiveEngine();
                         
-                        // Use UHP engine
-                        setTimeout(() => {
-                            if (window.uhpClient && window.uhpClient.connected && !window.uhpClient.isProcessingCommand) {
-                                console.log('🎯 Requesting UHP engine move for black...');
-                                window.uhpClient.getBestMove();
+                        if (activeEngine === 'wasm') {
+                            // Use WASM engine (offline mode)
+                            setTimeout(() => {
+                                console.log(`🧩 Requesting WASM engine move for ${currentPlayer}...`);
+                                window.requestWASMMove();
+                            }, 150);
+                        } else if (activeEngine === 'websocket') {
+                            // Check if UHP engine is already processing to prevent recursion
+                            if (window.uhpClient && window.uhpClient.isProcessingCommand) {
+                                console.log('🎯 UHP engine already processing, skipping duplicate call');
+                                return;
                             }
-                        }, 150);
+                            
+                            // Use WebSocket UHP engine
+                            setTimeout(() => {
+                                if (window.uhpClient && window.uhpClient.connected && !window.uhpClient.isProcessingCommand) {
+                                    console.log(`🎯 Requesting UHP engine move for ${currentPlayer}...`);
+                                    window.uhpClient.getBestMove();
+                                }
+                            }, 150);
+                        }
                         
                         return; // Stop any further AI processing
                     } else {
-                        console.log('🤖 UHP AI Override: Not black\'s turn, skipping UHP engine');
+                        console.log(`🤖 Engine Override: Not AI turn (current: ${currentPlayer}), skipping engine`);
                     }
                 }
             };
@@ -114,6 +155,187 @@
         interceptNokamuteMzinga();
         
         console.log('✅ UHP AI Override System active');
+    }
+    
+    // WASM engine move request function
+    window.requestWASMMove = async function() {
+        console.log('🧩 requestWASMMove called');
+        
+        if (!window.wasmEngine) {
+            console.error('❌ WASM engine not available');
+            return;
+        }
+        
+        try {
+            // Initialize WASM engine if needed
+            if (!window.wasmEngine.initialized) {
+                console.log('🧩 Initializing WASM engine...');
+                await window.wasmEngine.initialize();
+            }
+            
+            // Get current game state as UHP string
+            const gameString = getCurrentUHPGameString();
+            console.log('📝 Current game state:', gameString);
+            
+            // Get personality settings for AI difficulty
+            const personality = getCurrentPersonality();
+            const options = {
+                mode: 'time',
+                timeLimit: personality?.timeLimit || 2 // seconds
+            };
+            
+            console.log('🎯 Getting best move with options:', options);
+            
+            // Request best move from WASM engine
+            const bestMove = await window.wasmEngine.getBestMove(gameString, options);
+            console.log('✅ WASM engine returned move:', bestMove);
+            
+            if (bestMove && bestMove !== 'null' && bestMove !== 'error') {
+                // Apply the move to the game
+                applyWASMMove(bestMove);
+            } else {
+                console.error('❌ WASM engine returned invalid move:', bestMove);
+            }
+            
+        } catch (error) {
+            console.error('❌ WASM move request failed:', error);
+        }
+    };
+    
+    // Convert current game state to UHP format
+    function getCurrentUHPGameString() {
+        // Use existing UHP history if available
+        if (window.uhpMoveHistory && window.uhpMoveHistory.length > 0) {
+            return window.uhpMoveHistory.join(';');
+        }
+        
+        // If no UHP history, return empty string for new game
+        return '';
+    }
+    
+    // Get current AI personality settings
+    function getCurrentPersonality() {
+        if (window.currentAIPersonality && window.aiPersonalities) {
+            return window.aiPersonalities[window.currentAIPersonality];
+        }
+        return { timeLimit: 2, difficulty: 'easy' };
+    }
+    
+    // Apply WASM move to the game
+    function applyWASMMove(uhpMove) {
+        console.log('🎯 Applying WASM move:', uhpMove);
+        
+        if (!uhpMove || uhpMove === 'pass') {
+            console.log('🎯 AI passes turn');
+            if (window.passTurn) {
+                window.passTurn();
+            }
+            return;
+        }
+        
+        // Parse UHP move format (e.g., "bG1", "wQ -bG1")
+        try {
+            if (uhpMove.includes(' -')) {
+                // Movement (e.g., "wQ -bG1")
+                applyWASMMovement(uhpMove);
+            } else {
+                // Placement (e.g., "bG1")
+                applyWASMPlacement(uhpMove);
+            }
+        } catch (error) {
+            console.error('❌ Error applying WASM move:', error);
+        }
+    }
+    
+    // Apply WASM placement move
+    function applyWASMPlacement(uhpMove) {
+        console.log('🎯 Applying WASM placement:', uhpMove);
+        
+        // Parse piece type from UHP (e.g., "bG1" -> color: black, type: G)
+        const color = uhpMove.charAt(0) === 'w' ? 'white' : 'black';
+        const pieceType = uhpMove.charAt(1);
+        
+        // Find the piece in the tray
+        const piece = window.tray.find(p => 
+            p.meta.color === color && 
+            p.meta.key === pieceType && 
+            !p.meta.placed
+        );
+        
+        if (!piece) {
+            console.error('❌ Could not find piece for placement:', uhpMove);
+            return;
+        }
+        
+        // Get legal placement zones
+        const legalZones = window.legalPlacementZones(color);
+        if (legalZones.size === 0) {
+            console.error('❌ No legal placement zones available');
+            return;
+        }
+        
+        // For now, place at first available legal zone
+        // TODO: Parse exact position from UHP move
+        const firstZone = Array.from(legalZones)[0];
+        const [q, r] = firstZone.split(',').map(Number);
+        
+        console.log(`🎯 Placing ${color} ${pieceType} at (${q}, ${r})`);
+        
+        // Use existing placement system
+        if (window.selectPlacement && window.commitPlacement) {
+            window.selectPlacement(piece);
+            window.commitPlacement(q, r);
+        }
+    }
+    
+    // Apply WASM movement move
+    function applyWASMMovement(uhpMove) {
+        console.log('🎯 Applying WASM movement:', uhpMove);
+        
+        // Parse movement (e.g., "wQ -bG1")
+        const parts = uhpMove.split(' -');
+        if (parts.length !== 2) {
+            console.error('❌ Invalid movement format:', uhpMove);
+            return;
+        }
+        
+        const movingPiece = parts[0];
+        const targetRef = parts[1];
+        
+        // Find the piece to move
+        const color = movingPiece.charAt(0) === 'w' ? 'white' : 'black';
+        const pieceType = movingPiece.charAt(1);
+        
+        const piece = window.tray.find(p => 
+            p.meta.color === color && 
+            p.meta.key === pieceType && 
+            p.meta.placed
+        );
+        
+        if (!piece) {
+            console.error('❌ Could not find piece for movement:', uhpMove);
+            return;
+        }
+        
+        // Get legal move zones
+        const legalMoves = window.legalMoveZones(piece);
+        if (legalMoves.length === 0) {
+            console.error('❌ No legal moves available for piece');
+            return;
+        }
+        
+        // For now, move to first available legal zone
+        // TODO: Parse exact target position from UHP reference
+        const firstMove = legalMoves[0];
+        const [q, r] = firstMove.split(',').map(Number);
+        
+        console.log(`🎯 Moving ${color} ${pieceType} to (${q}, ${r})`);
+        
+        // Use existing movement system
+        if (window.selectMove && window.commitMove) {
+            window.selectMove(piece);
+            window.commitMove(q, r);
+        }
     }
     
     // Apply overrides when everything is loaded

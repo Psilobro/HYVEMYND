@@ -234,6 +234,9 @@ window.AIUI.startAIMode = function(difficulty) {
   
   console.log(`🎮 Starting Single Player mode with UHP engine (${difficulty}): ${JSON.stringify(settings)}`);
   
+  // Set global single player mode flag
+  window.singlePlayerMode = true;
+  
   // Configure UHP engine with personality-specific settings
   if (window.uhpClient) {
     // Enable UHP engine and set it to play black

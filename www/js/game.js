@@ -959,8 +959,11 @@ function updateHUD(){
                        + ' to move (turn '+state.moveNumber+')';
         hud.style.fontFamily = 'Milonga, serif';
         
-        // Check if AI should move - prioritize UHP engine, fallback to legacy
-        if (window.uhpClient && window.uhpClient.isEnabled() && window.uhpClient.shouldPlayForColor(state.current)) {
+        // Check if AI should move - prioritize WASM engine, then UHP, then legacy
+        if (window.shouldUseUHPEngine && window.shouldUseUHPEngine()) {
+            console.log(`🧩 WASM/UHP engine will handle AI move for ${state.current}`);
+            // The UHP AI override system will handle this automatically
+        } else if (window.uhpClient && window.uhpClient.isEnabled() && window.uhpClient.shouldPlayForColor(state.current)) {
             // UHP engine will handle this via its own performAIAction flow
             console.log(`🤖 UHP engine will handle AI move for ${state.current}`);
         } else if (window.AIEngine && window.AIEngine.checkAndMakeMove) {
@@ -1168,10 +1171,18 @@ function commitPlacement(q,r){
                     uhpMove = window.uhpClient.buildUHPPositionalMove(uhpPieceId, mockPiece, playedPieces);
                 }
                 
-                // Record this move in the move history
-                window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
-                console.log(`📝 Recorded UHP move ${currentMoveNumber}: ${uhpMove}`);
-                console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
+                // Validate UHP move before recording
+                if (uhpMove && !uhpMove.includes('INVALID')) {
+                    // Record this move in the move history
+                    window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
+                    console.log(`📝 Recorded UHP move ${currentMoveNumber}: ${uhpMove}`);
+                    console.log(`🔍 Current UHP move history:`, Array.from(window.uhpClient.uhpMoveHistory.entries()));
+                } else {
+                    console.log(`❌ BLOCKING invalid UHP move from history: ${uhpMove}`);
+                    console.log(`⚠️ This prevents WASM engine desync and crash`);
+                    // Instead of recording invalid move, record nothing for this turn
+                    // This maintains move number sequence but avoids engine corruption
+                }
                 
             } catch (error) {
                 console.error('❌ Failed to record UHP move:', error);
@@ -1834,7 +1845,8 @@ function commitMove(q,r){
                     uhpMove = window.uhpClient.buildMovementNotation(uhpPieceId, q, r, playedPieces);
                 }
                 
-                if (uhpMove) {
+                // Validate UHP movement before recording
+                if (uhpMove && !uhpMove.includes('INVALID')) {
                     console.log(`� Recorded UHP movement ${currentMoveNumber}: ${uhpMove}`);
                     window.uhpClient.uhpMoveHistory.set(currentMoveNumber, uhpMove);
                     
@@ -1856,6 +1868,9 @@ function commitMove(q,r){
                             break;
                         }
                     }
+                } else if (uhpMove) {
+                    console.log(`❌ BLOCKING invalid UHP movement from history: ${uhpMove}`);
+                    console.log(`⚠️ This prevents WASM engine desync and crash`);
                 } else {
                     console.warn(`⚠️ Could not generate UHP movement notation for ${uhpPieceId}`);
                 }

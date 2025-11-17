@@ -2,13 +2,81 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Hive • PIXI Edition</title>
+  <title>HYVEMYND</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐝</text></svg>">
+  
+  <!-- App Icons and Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="assets/images/logo.png">
+  <meta name="msapplication-TileImage" content="assets/images/logo.png">
+  <meta name="msapplication-TileColor" content="#ffd700">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ffd700">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <video autoplay muted loop playsinline id="bg-video" src="assets/videos/honeycells.mp4"></video>
+  <!-- Background video - loads first with high priority -->
+  <video autoplay muted loop playsinline preload="metadata" webkit-playsinline="true" id="bg-video" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -10;">
+    <source src="assets/videos/honeycells.mp4" type="video/mp4">
+    <source src="assets/videos/honeycells.webm" type="video/webm">
+  </video>
+  
+  <!-- Hidden video fallback background -->
+  <div id="video-fallback" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(45deg, #1a1a1a, #2d2d2d); z-index: -11; display: none;"></div>
+  
+  <!-- Force video loading priority -->
+  <script>
+    // Ensure background video loads first on mobile
+    (function() {
+      const video = document.getElementById('bg-video');
+      const fallback = document.getElementById('video-fallback');
+      
+      if (video) {
+        // Force video to load immediately
+        video.load();
+        
+        // Handle mobile autoplay restrictions
+        const playVideo = () => {
+          video.play().catch(e => {
+            console.log('Video autoplay blocked, trying muted play:', e);
+            video.muted = true;
+            video.play().catch(e2 => {
+              console.log('Video play failed, showing fallback:', e2);
+              if (fallback) fallback.style.display = 'block';
+            });
+          });
+        };
+        
+        // Try to play immediately
+        playVideo();
+        
+        // Also try on user interaction
+        document.addEventListener('touchstart', playVideo, { once: true });
+        document.addEventListener('click', playVideo, { once: true });
+        
+        // Show fallback on error
+        video.addEventListener('error', (e) => {
+          console.error('🎥 Video error, showing fallback:', e);
+          if (fallback) fallback.style.display = 'block';
+        });
+        
+        // Hide fallback when video plays
+        video.addEventListener('playing', () => {
+          console.log('🎥 Video is playing');
+          if (fallback) fallback.style.display = 'none';
+        });
+        
+        // Debug logging
+        video.addEventListener('loadstart', () => console.log('🎥 Video loading started'));
+        video.addEventListener('canplay', () => console.log('🎥 Video can play'));
+      }
+    })();
+  </script>
+  
+  <div id="game-title" style="font-family: 'Milonga', serif;">HYVEMYND</div>
   <div id="game-title" style="font-family: 'Milonga', serif;">HYVEMYND</div>
   <div id="hud">White to move</div>
   <div id="move-history">
@@ -45,8 +113,9 @@
   <button id="auto-zoom-toggle">Auto-Center: ON</button>
   <button id="move-history-toggle">History</button>
   <button id="single-mode-button">🤖 Single Mode</button>
-  <button id="dev-ops-button">⚙️ Dev. Ops</button>
   <button id="multiplayer-button">🌐 Multiplayer</button>
+  <button id="dev-ops-button">⚙️ Dev Ops</button>
+  <button id="tray-ops-button">📐 Tray Ops</button>
   <button id="chat-toggle" style="display: none;">💬 Chat</button>
   <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
   
@@ -434,11 +503,81 @@
   <!-- Legacy AI engines - kept commented for debugging if needed -->
   <!-- <script src="js/ai-engine.js"></script> -->
   <!-- <script src="js/ai-engine-v2.js"></script> -->
+    </div>
+
+  <!-- Tray Operations Modal -->
+  <div id="tray-ops-modal" style="display: none;">
+    <div class="modal-content tray-ops-content">
+      <div class="modal-header">
+        <h3>📐 Tray Operations</h3>
+        <button class="close-btn" id="close-tray-ops">×</button>
+      </div>
+      
+      <!-- Link Trays Toggle -->
+      <div class="link-trays-section">
+        <label class="link-toggle">
+          <input type="checkbox" id="link-trays-checkbox">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">🔗 Link Trays (Symmetrical)</span>
+        </label>
+      </div>
+      
+      <div class="tray-ops-container">
+        <!-- White Tray Controls -->
+        <div class="tray-controls white-controls">
+          <h4>⚪ White Tray</h4>
+          <div class="slider-group">
+            <label>Scale (10% - 250%)</label>
+            <input type="range" id="white-tray-scale" min="10" max="250" value="100" class="tray-slider">
+            <span id="white-scale-value">100%</span>
+          </div>
+          <div class="slider-group">
+            <label>Horizontal Position</label>
+            <input type="range" id="white-tray-x" min="-200" max="200" value="0" class="tray-slider">
+            <span id="white-x-value">0px</span>
+          </div>
+          <div class="slider-group">
+            <label>Vertical Position</label>
+            <input type="range" id="white-tray-y" min="-200" max="200" value="0" class="tray-slider">
+            <span id="white-y-value">0px</span>
+          </div>
+        </div>
+        
+        <!-- Black Tray Controls -->
+        <div class="tray-controls black-controls">
+          <h4>⚫ Black Tray</h4>
+          <div class="slider-group">
+            <label>Scale (10% - 250%)</label>
+            <input type="range" id="black-tray-scale" min="10" max="250" value="100" class="tray-slider">
+            <span id="black-scale-value">100%</span>
+          </div>
+          <div class="slider-group">
+            <label>Horizontal Position</label>
+            <input type="range" id="black-tray-x" min="-200" max="200" value="0" class="tray-slider">
+            <span id="black-x-value">0px</span>
+          </div>
+          <div class="slider-group">
+            <label>Vertical Position</label>
+            <input type="range" id="black-tray-y" min="-200" max="200" value="0" class="tray-slider">
+            <span id="black-y-value">0px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
   <!-- Only load nokamute-mzinga for UHP fallback compatibility -->
   <script src="js/ai-engine-nokamute-mzinga.js?v=1.2"></script>
   <script src="js/personalities.js"></script>
   <script src="js/ai-ui.js"></script>
   <script src="js/dev-ops.js"></script>
+  <script src="js/tray-ops.js"></script>
+  
+  <!-- WASM Engine Integration (loads first for offline support) -->
+  <script src="js/wasm-engine.js"></script>
+  <script src="js/wasm-integration.js"></script>
   
   <!-- UHP Engine Integration -->
   <script src="js/uhp/uhp-client.js"></script>

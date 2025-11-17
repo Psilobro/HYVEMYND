@@ -247,7 +247,7 @@ canvas {
 
 #hud {
     position: fixed;
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     left: 50%;
     transform: translateX(-50%);
     width: 200px;
@@ -424,7 +424,7 @@ canvas {
     display: block !important;
     position: fixed;
     right: 12px;
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     z-index: 20;
     background: #E6B84D;
     color: #4B382A;
@@ -645,18 +645,18 @@ canvas {
     
     /* Game container - adjusted margins for smaller scaled trays */
     #game-container {
-        left: 100px !important; /* Less space needed for smaller trays */
-        right: 100px !important;
+        left: 80px !important; /* Less space needed for smaller trays */
+        right: 80px !important;
     }
     
     /* Tray positioning - adjusted for mobile landscape with smaller scale */
     #white-tray.player-tray {
-        left: 10px !important; /* Move further left to make room */
+        left: 5px !important; /* Move further left to make room */
         top: 5px !important; /* Higher up */
         bottom: unset !important;
-        width: 220px !important;
-        height: 260px !important; /* Shorter height for mobile */
-        transform: scale(0.90) !important; /* Larger scale for better visibility */
+        width: 180px !important; /* Smaller width */
+        height: 200px !important; /* Much shorter height for mobile */
+        transform: scale(0.65) !important; /* Much smaller scale for fold front screen */
         transform-origin: left top !important;
         overflow: visible !important;
         position: fixed !important;
@@ -664,12 +664,12 @@ canvas {
     }
     
     #black-tray.player-tray {
-        right: 10px !important; /* Move further right to make room */
+        right: 5px !important; /* Move further right to make room */
         top: 5px !important; /* Higher up */
         bottom: unset !important;
-        width: 220px !important;
-        height: 260px !important; /* Shorter height for mobile */
-        transform: scale(0.90) !important; /* Larger scale for better visibility */
+        width: 180px !important; /* Smaller width */
+        height: 200px !important; /* Much shorter height for mobile */
+        transform: scale(0.65) !important; /* Much smaller scale for fold front screen */
         transform-origin: right top !important;
         overflow: visible !important;
         position: fixed !important;
@@ -773,12 +773,47 @@ canvas {
         right: 100px !important;
         font-size: 12px !important;
         padding: 4px 8px !important;
+        z-index: 1000 !important;
+        pointer-events: all !important;
+        touch-action: manipulation !important;
     }
     
     #move-history-toggle {
         bottom: 5px !important;
         font-size: 12px !important;
         padding: 4px 8px !important;
+        z-index: 1000 !important;
+        pointer-events: all !important;
+        touch-action: manipulation !important;
+    }
+    
+    /* Ensure all control buttons work on mobile */
+    #single-mode-button, #dev-ops-button, #multiplayer-button, #tray-ops-button {
+        z-index: 1000 !important;
+        pointer-events: all !important;
+        touch-action: manipulation !important;
+    }
+}
+
+/* Galaxy Fold inside screen - wider landscape mode */
+@media screen and (min-width: 1700px) and (min-height: 1100px) and (orientation: landscape) {
+    /* Ensure buttons have proper z-index and touch interaction */
+    #single-mode-button, #dev-ops-button, #multiplayer-button, #tray-ops-button,
+    #chat-toggle, #move-history-toggle, #zoom-in, #zoom-out, #zoom-reset {
+        z-index: 1000 !important;
+        pointer-events: all !important;
+        touch-action: manipulation !important;
+        position: relative !important;
+    }
+    
+    /* Make sure overlay containers don't block interactions */
+    #game-container {
+        pointer-events: none !important;
+    }
+    
+    /* Allow pointer events on interactive elements within game container */
+    #board-container, .player-tray, canvas {
+        pointer-events: all !important;
     }
 }
 
@@ -787,7 +822,7 @@ canvas {
     display: block !important;
     position: fixed;
     right: 120px; /* Position to the left of history button */
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     z-index: 20;
     background: #E6B84D;
     color: #4B382A;
@@ -811,7 +846,7 @@ canvas {
     display: block !important;
     position: fixed;
     left: 12px; /* First button - far left */
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     z-index: 20;
     background: #E6B84D;
     color: #4B382A;
@@ -836,7 +871,7 @@ canvas {
     display: block !important;
     position: fixed;
     left: 180px; /* Second button - center with good spacing */
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     z-index: 20;
     background: #E6B84D;
     color: #4B382A;
@@ -861,7 +896,7 @@ canvas {
     display: block !important;
     position: fixed;
     left: 360px; /* Third button - far right with clear separation */
-    bottom: 12px;
+    bottom: 37px; /* Moved down by 25px from 62px */
     z-index: 20;
     background: #E6B84D;
     color: #4B382A;
@@ -876,6 +911,30 @@ canvas {
 }
 
 #dev-ops-button:hover {
+    background: #f4c965; /* Match hover color */
+    border-color: #f4c965; /* Match hover border */
+}
+
+/* Tray Ops button - positioned next to Dev Ops button */
+#tray-ops-button {
+    display: block !important;
+    position: fixed;
+    left: 490px; /* Fourth button - proper spacing from Dev Ops */
+    bottom: 37px; /* Moved down by 25px from 62px */
+    z-index: 20;
+    background: #E6B84D;
+    color: #4B382A;
+    font-family: 'Milonga', serif;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 2px solid #E6B84D;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px #e6b84d44;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#tray-ops-button:hover {
     background: #f4c965; /* Match hover color */
     border-color: #f4c965; /* Match hover border */
 }
@@ -1789,7 +1848,7 @@ canvas {
     /* History overlay - keep it available on all screen sizes */
     
     /* Make bottom buttons smaller on very small screens */
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button, #tray-ops-button {
         padding: 4px 12px !important;
         font-size: 13px !important;
         bottom: 8px !important;
@@ -1813,6 +1872,12 @@ canvas {
     
     #dev-ops-button {
         left: 220px !important; /* Position Dev Ops button properly on mobile */
+        bottom: 37px !important; /* Moved down by 25px from 62px */
+    }
+    
+    #tray-ops-button {
+        left: 330px !important; /* Position Tray Ops button with proper separation on mobile */
+        bottom: 37px !important; /* Moved down by 25px from 62px */
     }
 }
 
@@ -1829,10 +1894,10 @@ canvas {
         max-height: calc(100vh - 80px) !important;
     }
     
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button {
+    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button, #tray-ops-button {
         padding: 3px 10px !important;
         font-size: 12px !important;
-        bottom: 5px !important;
+        bottom: 30px !important; /* Moved down by 25px from 55px */
     }
     
     #single-mode-button, #return-to-sandbox-button {
@@ -1845,6 +1910,76 @@ canvas {
     
     #dev-ops-button {
         left: 280px !important; /* Third button with clear separation */
+    }
+    
+    #tray-ops-button {
+        left: 390px !important; /* Fourth button with proper separation */
+    }
+}
+
+/* Mobile landscape - compact Tray Ops modal */
+@media screen and (max-width: 900px) and (orientation: landscape) {
+    .modal-content {
+        width: 60% !important;
+        max-width: 400px !important;
+        max-height: 60vh !important;
+        padding: 15px !important;
+    }
+    
+    .tray-controls {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .tray-panel {
+        flex: 1;
+    }
+    
+    .slider-group {
+        margin-bottom: 8px;
+    }
+    
+    .slider-group label {
+        font-size: 11px !important;
+        margin-bottom: 3px;
+    }
+    
+    .slider {
+        height: 15px !important;
+    }
+    
+    .modal h2 {
+        font-size: 18px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .link-trays-section {
+        margin-bottom: 15px !important;
+    }
+    
+    .toggle-label {
+        font-size: 12px !important;
+    }
+    
+    .toggle-slider {
+        width: 40px !important;
+        height: 20px !important;
+    }
+    
+    .toggle-slider::before {
+        width: 16px !important;
+        height: 16px !important;
+    }
+    
+    .link-toggle input:checked + .toggle-slider::before {
+        transform: translateX(20px) !important;
+    }
+}
+
+/* Tablet mode - ensure all buttons are above gesture areas */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+    #single-mode-button, #return-to-sandbox-button, #multiplayer-button, #chat-toggle, #move-history-toggle, #dev-ops-button, #tray-ops-button {
+        bottom: 55px !important; /* Moved down by 25px from 80px */
     }
 }
 
@@ -2227,4 +2362,157 @@ canvas {
         font-size: 12px;
         margin-bottom: 10px;
     }
+}
+
+/* Tray Operations Modal Styles */
+#tray-ops-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+}
+
+.tray-ops-content {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 3px solid #e6b84d;
+  border-radius: 15px;
+  padding: 25px;
+  max-width: 700px;
+  width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+  color: #fff;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e6b84d;
+  padding-bottom: 10px;
+}
+
+.modal-header h3 {
+  color: #e6b84d;
+  margin: 0;
+  font-size: 22px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  font-weight: bold;
+}
+
+.close-btn {
+  background: linear-gradient(135deg, #8b4513, #a0522d);
+  color: #e6b84d;
+  border: 2px solid #e6b84d;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: linear-gradient(135deg, #a0522d, #8b4513);
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(230, 184, 77, 0.3);
+}
+
+.tray-ops-container {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.tray-controls {
+  flex: 1;
+  min-width: 280px;
+  background: rgba(230, 184, 77, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  border: 1px solid rgba(230, 184, 77, 0.3);
+}
+
+.tray-controls h4 {
+  color: #f39c12;
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.slider-group {
+  margin-bottom: 20px;
+}
+
+.slider-group label {
+  display: block;
+  color: #ecf0f1;
+  font-size: 14px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.tray-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #2c2c54;
+  outline: none;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.tray-slider:hover {
+  opacity: 1;
+}
+
+.tray-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f39c12;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tray-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f39c12;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.slider-group span {
+  display: inline-block;
+  margin-top: 5px;
+  color: #f39c12;
+  font-weight: bold;
+  font-size: 13px;
+  min-width: 50px;
+}
+
+@media (max-width: 600px) {
+  .tray-ops-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .tray-controls {
+    min-width: unset;
+  }
 }

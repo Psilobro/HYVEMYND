@@ -1,0 +1,281 @@
+/**
+ * HYVEMYND WASM Engine Integration
+ * Provides offline Nokamute engine via WebAssembly
+ * Maintains identical API to UHP WebSocket system for seamless integration
+ */
+
+(function() {
+    'use strict';
+    
+    class WASMEngine {
+        constructor() {
+            this.initialized = false;
+            this.initPromise = null;
+            this.wasmModule = null;
+            this.uhpFunction = null;
+            this.eventListeners = {};
+            
+            console.log('🧩 WASM Engine initializing...');
+        }
+        
+        /**
+         * Initialize the WASM module
+         * Returns a promise that resolves when ready
+         */
+        async initialize() {
+            if (this.initPromise) {
+                return this.initPromise;
+            }
+            
+            this.initPromise = this._loadWASM();
+            return this.initPromise;
+        }
+        
+        async _loadWASM() {
+            try {
+                console.log('📦 Loading Nokamute WASM module...');
+                
+                // Try multiple import paths
+                let wasmModule;
+                try {
+                    // First try: same directory
+                    wasmModule = await import('./nokamute.js');
+                } catch (e1) {
+                    try {
+                        // Second try: js directory  
+                        wasmModule = await import('../js/nokamute.js');
+                    } catch (e2) {
+                        try {
+                            // Third try: absolute path
+                            wasmModule = await import('/js/nokamute.js');
+                        } catch (e3) {
+                            console.error('❌ All WASM import paths failed:', {e1, e2, e3});
+                            throw e3;
+                        }
+                    }
+                }
+                
+                // Initialize the WASM module
+                await wasmModule.default();
+                
+                this.wasmModule = wasmModule;
+                this.uhpFunction = wasmModule.uhp;
+                this.initialized = true;
+                
+                console.log('✅ Nokamute WASM engine ready (100MB transposition table)');
+                this._emit('initialized');
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Failed to initialize WASM engine:', error);
+                this._emit('error', error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Execute UHP command via WASM
+         * Maintains identical API to WebSocket UHP client
+         */
+        async sendCommand(command) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            try {
+                console.log(`📤 WASM Command: ${command}`);
+                const response = this.uhpFunction(command);
+                console.log(`📥 WASM Response: ${response}`);
+                
+                // Emit response event for compatibility with UHP client
+                this._emit('response', { command, response });
+                
+                return response;
+            } catch (error) {
+                console.error('❌ WASM command failed:', error);
+                this._emit('error', error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Get best move for current position
+         * Compatible with personality system
+         */
+        async getBestMove(gameString, options = {}) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            try {
+                // Start a new base game
+                console.log('🎯 Starting new Base game');
+                const gameResponse = await this.sendCommand('newgame Base');
+                console.log(`🎯 New game response: ${gameResponse}`);
+                
+                // Apply moves if provided, with error handling
+                if (gameString && gameString.trim()) {
+                    const moves = gameString.split(';');
+                    console.log(`🎯 Applying ${moves.length} moves: ${moves.join(', ')}`);
+                    
+                    // Safeguard: Limit to prevent excessive message processing
+                    const maxMoves = 200; // Reasonable limit for a Hive game
+                    if (moves.length > maxMoves) {
+                        console.warn(`⚠️ Move count (${moves.length}) exceeds safety limit (${maxMoves})`);
+                        console.warn(`⚠️ Truncating to prevent engine overload`);
+                        moves.splice(maxMoves);
+                    }
+                    
+                    for (let i = 0; i < moves.length; i++) {
+                        const move = moves[i].trim();
+                        if (move) {
+                            console.log(`🎯 Playing move ${i + 1}: ${move}`);
+                            const moveResponse = await this.sendCommand(`play ${move}`);
+                            console.log(`🎯 Move response: ${moveResponse}`);
+                            
+                            // Check for invalid moves and stop sending further moves
+                            if (moveResponse.includes('invalidmove')) {
+                                console.warn(`❌ Invalid move detected: ${move}`);
+                                console.warn(`⚠️ Stopping move replay at position ${i + 1}/${moves.length}`);
+                                console.warn(`⚠️ WASM game state may be out of sync with UI`);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Use bestmove with time parameter (UHP requires parameters)
+                const { mode, timeLimit, depthLimit } = options;
+                let searchCommand;
+                
+                if (mode === 'depth' && depthLimit) {
+                    searchCommand = `bestmove depth ${depthLimit}`;
+                } else {
+                    // Default to time-based search (2 seconds)
+                    const seconds = timeLimit || 2;
+                    const timeString = `00:00:${seconds.toString().padStart(2, '0')}`;
+                    searchCommand = `bestmove time ${timeString}`;
+                }
+                
+                console.log(`🎯 Getting best move with: ${searchCommand}`);
+                this._emit('thinking', { phase: 'starting', progress: 0 });
+                
+                const bestMove = await this.sendCommand(searchCommand);
+                
+                this._emit('thinking', { phase: 'complete', progress: 100 });
+                
+                return bestMove.trim();
+            } catch (error) {
+                console.error('❌ Failed to get best move:', error);
+                this._emit('error', error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Get valid moves for current position
+         */
+        async getValidMoves(gameString = null) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            try {
+                if (gameString) {
+                    await this.sendCommand(`newgame ${gameString}`);
+                }
+                
+                const validMoves = await this.sendCommand('validmoves');
+                return validMoves.split(';').filter(move => move.trim());
+            } catch (error) {
+                console.error('❌ Failed to get valid moves:', error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Get engine information
+         */
+        async getInfo() {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            return await this.sendCommand('info');
+        }
+        
+        /**
+         * Play a move and get updated game state
+         */
+        async playMove(move) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            return await this.sendCommand(`play ${move}`);
+        }
+        
+        /**
+         * Event system for compatibility with existing code
+         */
+        on(event, callback) {
+            if (!this.eventListeners[event]) {
+                this.eventListeners[event] = [];
+            }
+            this.eventListeners[event].push(callback);
+        }
+        
+        off(event, callback) {
+            if (this.eventListeners[event]) {
+                this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
+            }
+        }
+        
+        _emit(event, data) {
+            if (this.eventListeners[event]) {
+                this.eventListeners[event].forEach(callback => {
+                    try {
+                        callback(data);
+                    } catch (error) {
+                        console.error(`Error in event listener for ${event}:`, error);
+                    }
+                });
+            }
+        }
+        
+        /**
+         * Check if WASM engine is available
+         */
+        isAvailable() {
+            // Return true if WebAssembly is supported and we have a module or are initializing
+            return typeof WebAssembly !== 'undefined' && (this.initialized || this.initPromise);
+        }
+        
+        /**
+         * Get engine status for UI
+         */
+        getStatus() {
+            if (this.initialized) {
+                return 'ready';
+            } else if (this.initPromise) {
+                return 'initializing';
+            } else {
+                return 'not-initialized';
+            }
+        }
+    }
+    
+    // Create global instance
+    window.wasmEngine = new WASMEngine();
+    
+    // Auto-initialize WASM engine immediately (for both browser and Capacitor)
+    console.log('🧩 Auto-initializing WASM engine for offline AI...');
+    window.wasmEngine.initialize().then(() => {
+        console.log('✅ WASM engine auto-initialized successfully');
+    }).catch(error => {
+        console.error('❌ Failed to auto-initialize WASM engine:', error);
+    });
+    
+    console.log('🧩 WASM Engine integration loaded');
+    
+})();

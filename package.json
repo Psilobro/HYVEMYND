@@ -8,7 +8,12 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["hive", "board-game", "multiplayer", "real-time"],
+  "keywords": [
+    "hive",
+    "board-game",
+    "multiplayer",
+    "real-time"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -21,5 +26,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
   }
 }
