@@ -1266,6 +1266,8 @@
   // Initialize chat when page loads
   window.addEventListener('load', () => {
     ChatUI.init();
+    // Ensure chat button is hidden by default (only shown in multiplayer mode)
+    ChatUI.hideChatButton();
   });
 
   // Export for global access

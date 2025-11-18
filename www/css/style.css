@@ -247,10 +247,10 @@ canvas {
 
 #hud {
     position: fixed;
-    bottom: 37px; /* Moved down by 25px from 62px */
+    bottom: 35px; /* Match settings button height */
     left: 50%;
     transform: translateX(-50%);
-    width: 200px;
+    width: auto;
     background: rgba(0,0,0,0.7);
     padding: 8px 12px;
     border-radius: 6px;
@@ -258,6 +258,31 @@ canvas {
     z-index: 20;
     margin-bottom: 0;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+#hud-controls {
+    display: flex;
+    gap: 10px;
+}
+
+#hud button {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 1px solid #666;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Milonga', serif;
+    font-size: 0.8em;
+    transition: background-color 0.2s;
+}
+
+#hud button:hover {
+    background: rgba(0, 0, 0, 0.9);
 }
 
 #game-title {
@@ -365,7 +390,7 @@ canvas {
     position: fixed;
     right: 10px;
     bottom: 10px;
-    z-index: 30; /* Higher than chat button (20) */
+    z-index: 100; /* Much higher than button to ensure it's on top */
     width: 250px;
     height: 300px;
     max-height: 300px;
@@ -488,8 +513,8 @@ canvas {
     display: block !important;
     position: fixed;
     right: 12px;
-    bottom: 37px; /* Moved down by 25px from 62px */
-    z-index: 20;
+    bottom: 35px; /* Match settings button height */
+    z-index: 50; /* High enough to be clickable, but lower than history panel (100) */
     background: #E6B84D;
     color: #4B382A;
     font-family: 'Milonga', serif;
@@ -499,6 +524,13 @@ canvas {
     padding: 6px 16px;
     box-shadow: 0 2px 8px #e6b84d44;
     cursor: pointer;
+    transition: opacity 0.2s ease;
+    pointer-events: auto !important; /* Ensure button is always clickable */
+}
+
+#move-history-toggle.hidden-by-panel {
+    opacity: 0;
+    pointer-events: none !important;
 }
 
 
@@ -852,7 +884,7 @@ canvas {
     }
     
     /* Ensure all control buttons work on mobile */
-    #single-mode-button, #dev-ops-button, #multiplayer-button, #tray-ops-button {
+    #settings-menu-container {
         z-index: 1000 !important;
         pointer-events: all !important;
         touch-action: manipulation !important;
@@ -862,8 +894,7 @@ canvas {
 /* Galaxy Fold inside screen - wider landscape mode */
 @media screen and (min-width: 1700px) and (min-height: 1100px) and (orientation: landscape) {
     /* Ensure buttons have proper z-index and touch interaction */
-    #single-mode-button, #dev-ops-button, #multiplayer-button, #tray-ops-button,
-    #chat-toggle, #move-history-toggle, #zoom-in, #zoom-out, #zoom-reset {
+    #settings-menu-container, #chat-toggle, #move-history-toggle, #zoom-in, #zoom-out, #zoom-reset {
         z-index: 1000 !important;
         pointer-events: all !important;
         touch-action: manipulation !important;
@@ -883,7 +914,7 @@ canvas {
 
 /* Chat System Styles */
 #chat-toggle {
-    display: block !important;
+    display: none; /* Hidden by default, shown only in multiplayer mode */
     position: fixed;
     right: 120px; /* Position to the left of history button */
     bottom: 37px; /* Moved down by 25px from 62px */
@@ -905,102 +936,82 @@ canvas {
     border-color: #f4c965;
 }
 
-/* Multiplayer button - positioned in lower left */
-#multiplayer-button {
-    display: block !important;
-    position: fixed;
-    left: 12px; /* First button - far left */
-    bottom: 37px; /* Moved down by 25px from 62px */
-    z-index: 20;
-    background: #E6B84D;
-    color: #4B382A;
-    font-family: 'Milonga', serif;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 2px solid #E6B84D;
-    padding: 6px 16px;
-    box-shadow: 0 2px 8px #e6b84d44;
-    cursor: pointer;
-    transition: all 0.3s ease;
+/* Settings Menu Styles */
+#settings-menu-container {
+  position: fixed;
+  bottom: 35px;
+  left: 10px;
+  z-index: 1000;
 }
 
-#multiplayer-button:hover {
-    background: #f4c965;
-    border-color: #f4c965;
+#settings-button {
+  background: #E6B84D;
+  color: #4B382A;
+  font-family: 'Milonga', serif;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 2px solid #E6B84D;
+  padding: 8px 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(230, 184, 77, 0.44);
+  transition: all 0.2s;
+  display: block;
 }
 
-/* AI Single Mode button - positioned to the left of multiplayer */
-/* Single Mode button - center */
-#single-mode-button {
-    display: block !important;
-    position: fixed;
-    left: 180px; /* Second button - center with good spacing */
-    bottom: 37px; /* Moved down by 25px from 62px */
-    z-index: 20;
-    background: #E6B84D;
-    color: #4B382A;
-    font-family: 'Milonga', serif;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 2px solid #E6B84D;
-    padding: 6px 16px;
-    box-shadow: 0 2px 8px #e6b84d44;
-    cursor: pointer;
-    transition: all 0.3s ease;
+#settings-button:hover {
+  background: #d4a63d;
+  box-shadow: 0 4px 12px rgba(230, 184, 77, 0.66);
 }
 
-#single-mode-button:hover {
-    background: #f4c965;
-    border-color: #f4c965;
+#settings-menu {
+  position: absolute;
+  bottom: 50px;
+  left: 0;
+  background: rgba(0, 0, 0, 0.95);
+  border: 2px solid #E6B84D;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+  transform-origin: bottom left;
+  transition: all 0.3s ease-out;
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  pointer-events: none;
 }
 
-/* Dev. Ops button - positioned next to other buttons with matching honey styling */
-/* Dev Ops button - right */
-#dev-ops-button {
-    display: block !important;
-    position: fixed;
-    left: 360px; /* Third button - far right with clear separation */
-    bottom: 37px; /* Moved down by 25px from 62px */
-    z-index: 20;
-    background: #E6B84D;
-    color: #4B382A;
-    font-family: 'Milonga', serif;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 2px solid #E6B84D;
-    padding: 6px 16px;
-    box-shadow: 0 2px 8px #e6b84d44;
-    cursor: pointer;
-    transition: all 0.3s ease;
+#settings-menu.settings-menu-hidden {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  pointer-events: none;
 }
 
-#dev-ops-button:hover {
-    background: #f4c965; /* Match hover color */
-    border-color: #f4c965; /* Match hover border */
+#settings-menu.settings-menu-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
 }
 
-/* Tray Ops button - positioned next to Dev Ops button */
-#tray-ops-button {
-    display: block !important;
-    position: fixed;
-    left: 490px; /* Fourth button - proper spacing from Dev Ops */
-    bottom: 37px; /* Moved down by 25px from 62px */
-    z-index: 20;
-    background: #E6B84D;
-    color: #4B382A;
-    font-family: 'Milonga', serif;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 2px solid #E6B84D;
-    padding: 6px 16px;
-    box-shadow: 0 2px 8px #e6b84d44;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.settings-menu-item {
+  background: #E6B84D;
+  color: #4B382A;
+  font-family: 'Milonga', serif;
+  font-size: 15px;
+  border-radius: 6px;
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-#tray-ops-button:hover {
-    background: #f4c965; /* Match hover color */
-    border-color: #f4c965; /* Match hover border */
+.settings-menu-item:hover {
+  background: #d4a63d;
+  transform: translateX(4px);
 }
 
 /* Return to Sandbox button - positioned near Single Mode button */
@@ -1912,10 +1923,19 @@ canvas {
     /* History overlay - keep it available on all screen sizes */
     
     /* Make bottom buttons smaller on very small screens */
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button, #tray-ops-button {
-        padding: 4px 12px !important;
+    #settings-menu-container, #chat-toggle, #move-history-toggle, #return-to-sandbox-button {
         font-size: 13px !important;
         bottom: 8px !important;
+    }
+    
+    #settings-menu-container {
+        left: 8px !important;
+    }
+    
+    #settings-button {
+        width: auto !important;
+        font-size: 14px !important;
+        padding: 8px 12px !important;
     }
     
     #chat-toggle {
@@ -1926,8 +1946,8 @@ canvas {
         right: 8px !important;
     }
     
-    #single-mode-button, #return-to-sandbox-button {
-        left: 8px !important; /* Move AI buttons to far left on mobile */
+    #return-to-sandbox-button {
+        left: 60px !important; /* Position next to settings dropdown */
     }
     
     #multiplayer-button {
@@ -1958,26 +1978,19 @@ canvas {
         max-height: calc(100vh - 80px) !important;
     }
     
-    #multiplayer-button, #chat-toggle, #move-history-toggle, #single-mode-button, #return-to-sandbox-button, #dev-ops-button, #tray-ops-button {
-        padding: 3px 10px !important;
+    #settings-menu-container, #chat-toggle, #move-history-toggle, #return-to-sandbox-button {
         font-size: 12px !important;
         bottom: 30px !important; /* Moved down by 25px from 55px */
     }
     
-    #single-mode-button, #return-to-sandbox-button {
+    #settings-button {
+        width: auto !important;
+        font-size: 13px !important;
+        padding: 6px 10px !important;
+    }
+    
+    #settings-menu-container, #return-to-sandbox-button {
         left: 5px !important; /* First button */
-    }
-    
-    #multiplayer-button {
-        left: 140px !important; /* Second button with good spacing */
-    }
-    
-    #dev-ops-button {
-        left: 280px !important; /* Third button with clear separation */
-    }
-    
-    #tray-ops-button {
-        left: 390px !important; /* Fourth button with proper separation */
     }
 }
 

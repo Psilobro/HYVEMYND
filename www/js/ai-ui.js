@@ -15,7 +15,7 @@ window.AIUI = {
 window.AIUI.init = function() {
   if (this.initialized) return;
   
-  this.createSingleModeButton();
+  // Don't create single mode button - now handled by settings menu
   this.createReturnToSandboxButton();
   this.createDifficultyModal();
   this.initialized = true;
@@ -24,15 +24,12 @@ window.AIUI.init = function() {
 };
 
 /**
- * Create the Single Mode button
+ * Show difficulty modal - called by settings menu
  */
-window.AIUI.createSingleModeButton = function() {
-  const button = document.createElement('button');
-  button.id = 'single-mode-button';
-  button.innerHTML = '🤖 Single Mode';
-  button.onclick = () => this.showDifficultyModal();
-  
-  document.body.appendChild(button);
+window.showAIDifficultyModal = function() {
+  if (window.AIUI && window.AIUI.showDifficultyModal) {
+    window.AIUI.showDifficultyModal();
+  }
 };
 
 /**
@@ -250,14 +247,13 @@ window.AIUI.startAIMode = function(difficulty) {
       });
     }
     
-    // Store settings on the single mode button for personality detection
-    const singleModeBtn = document.getElementById('single-mode-button');
-    if (singleModeBtn) {
-      singleModeBtn.dataset.difficulty = difficulty;
-      singleModeBtn.dataset.timeLimit = settings.timeLimit;
-      singleModeBtn.dataset.depthLimit = settings.depthLimit;
-      singleModeBtn.dataset.mode = settings.mode;
-    }
+    // Store settings in AIUI object for personality detection
+    this.currentDifficulty = difficulty;
+    this.currentSettings = {
+      timeLimit: settings.timeLimit,
+      depthLimit: settings.depthLimit,
+      mode: settings.mode
+    };
     
     // Update UI elements to reflect these settings
     const enabledCheckbox = document.getElementById('engine-enabled');
@@ -369,11 +365,13 @@ window.AIUI.returnToSandbox = function() {
  * Update UI elements for AI mode
  */
 window.AIUI.updateUIForAIMode = function() {
-  const singleModeBtn = document.getElementById('single-mode-button');
   const sandboxBtn = document.getElementById('return-to-sandbox-button');
   
-  if (singleModeBtn) {
-    singleModeBtn.style.display = 'none';
+  // Hide settings menu while in AI mode (optional)
+  const settingsContainer = document.getElementById('settings-menu-container');
+  if (settingsContainer) {
+    settingsContainer.style.opacity = '0.5';
+    settingsContainer.style.pointerEvents = 'none';
   }
   
   if (sandboxBtn) {
@@ -418,11 +416,13 @@ window.AIUI.updateUIForAIMode = function() {
  * Update UI elements for sandbox mode
  */
 window.AIUI.updateUIForSandboxMode = function() {
-  const singleModeBtn = document.getElementById('single-mode-button');
   const sandboxBtn = document.getElementById('return-to-sandbox-button');
   
-  if (singleModeBtn) {
-    singleModeBtn.style.display = 'block';
+  // Re-enable settings menu
+  const settingsContainer = document.getElementById('settings-menu-container');
+  if (settingsContainer) {
+    settingsContainer.style.opacity = '1';
+    settingsContainer.style.pointerEvents = 'all';
   }
   
   if (sandboxBtn) {

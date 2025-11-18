@@ -77,8 +77,12 @@
   </script>
   
   <div id="game-title" style="font-family: 'Milonga', serif;">HYVEMYND</div>
-  <div id="game-title" style="font-family: 'Milonga', serif;">HYVEMYND</div>
-  <div id="hud">White to move</div>
+  <div id="hud">
+    <div id="turn-display">White to move</div>
+    <div id="hud-controls">
+      <button id="reset-button">Reset Game</button>
+    </div>
+  </div>
   <div id="move-history">
     <button id="history-close-btn" style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #E6B84D; border: 2px solid #4B382A; color: #4B382A; font-size: 14px; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 31;" title="Close History">▼</button>
     <div id="history-content" style="height: 100%; overflow-y: auto; overflow-x: hidden;">
@@ -115,13 +119,21 @@
   
   <div id="white-tray" class="player-tray"></div>
   <div id="black-tray" class="player-tray"></div>
-  <button id="play-music-button">Play Music</button>
-  <button id="auto-zoom-toggle">Auto-Center: ON</button>
+  <button id="play-music-button">🎵 Play Music</button>
+  <button id="auto-zoom-toggle">🎯 Auto-Center: ON</button>
   <button id="move-history-toggle">History</button>
-  <button id="single-mode-button">🤖 Single Mode</button>
-  <button id="multiplayer-button">🌐 Multiplayer</button>
-  <button id="dev-ops-button">⚙️ Dev Ops</button>
-  <button id="tray-ops-button">📐 Tray Ops</button>
+  
+  <!-- Settings Menu -->
+  <div id="settings-menu-container">
+    <div id="settings-menu" class="settings-menu-hidden">
+      <button class="settings-menu-item" data-action="single-mode">🤖 Single Mode</button>
+      <button class="settings-menu-item" data-action="multiplayer">🌐 Multiplayer</button>
+      <button class="settings-menu-item" data-action="dev-ops">⚙️ Dev Ops</button>
+      <button class="settings-menu-item" data-action="tray-ops">📐 Tray Ops</button>
+    </div>
+    <button id="settings-button">⚙️ Settings</button>
+  </div>
+  
   <button id="chat-toggle" style="display: none;">💬 Chat</button>
   <audio id="background-music" src="assets/sounds/cosmic-ambient.mp3" loop></audio>
   

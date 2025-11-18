@@ -343,6 +343,15 @@
         }
     };
 
+    // Global function to show Tray Ops modal from settings menu
+    window.showTrayOpsModal = function() {
+        const trayOpsModal = document.getElementById('tray-ops-modal');
+        if (trayOpsModal) {
+            trayOpsModal.style.display = 'flex';
+            updateSliderValues();
+        }
+    };
+
     // Initialize when DOM is loaded
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initTrayOps);

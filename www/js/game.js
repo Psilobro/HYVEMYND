@@ -949,15 +949,17 @@ function animateGrasshopperJump(piece, fromQ, fromR, toQ, toR, onComplete) {
 
 // --- HUD ---
 const hud = document.getElementById('hud');
+const turnDisplay = document.getElementById('turn-display');
 function updateHUD(){
     console.log(`🎯 updateHUD called - current: ${state.current}, move: ${state.moveNumber}`);
     
     // Check if current player has any legal moves
     if (hasLegalMoves(state.current)) {
-        hud.textContent = state.current.charAt(0).toUpperCase()
+        const displayElement = turnDisplay || hud;
+        displayElement.textContent = state.current.charAt(0).toUpperCase()
                        + state.current.slice(1)
                        + ' to move (turn '+state.moveNumber+')';
-        hud.style.fontFamily = 'Milonga, serif';
+        displayElement.style.fontFamily = 'Milonga, serif';
         
         // Check if AI should move - prioritize WASM engine, then UHP, then legacy
         if (window.shouldUseUHPEngine && window.shouldUseUHPEngine()) {
@@ -1003,6 +1005,104 @@ function hasLegalMoves(color) {
     console.log(`🎯 hasLegalMoves: ${color} has NO legal moves - this should only happen in true stalemate!`);
     return false; // No legal moves available
 }
+
+function resetGame() {
+    console.log('🔄 Resetting game to initial state');
+    
+    // Stop any ongoing animations
+    animating = false;
+    
+    // Clear board state
+    window.cells.clear();
+    
+    // Reset all pieces to unplaced state
+    tray.forEach(piece => {
+        piece.meta.placed = false;
+        piece.meta.q = undefined;
+        piece.meta.r = undefined;
+        
+        // Move piece back to tray visually
+        if (piece.gfx && piece.gfx.parent) {
+            const trayApp = piece.meta.color === 'white' ? window.whiteTrayApp : window.blackTrayApp;
+            if (trayApp && trayApp.stage) {
+                trayApp.stage.addChild(piece.gfx);
+                // Reset position in tray - will be repositioned by layoutTrays
+            }
+        }
+    });
+    
+    // Reset game state
+    state.turn = 1;
+    state.moveNumber = 1;
+    state.current = 'white';
+    state.whiteQueenPlaced = false;
+    state.blackQueenPlaced = false;
+    state.gameOver = false;
+    state.winner = null;
+    
+    // Clear selections and legal zones
+    selected = null;
+    legalZones.clear();
+    
+    // Clear visual elements
+    if (window.pieceLayer) {
+        window.pieceLayer.removeChildren();
+    }
+    if (window.legalZoneLayer) {
+        window.legalZoneLayer.removeChildren();
+    }
+    if (window.winBanner) {
+        window.winBanner.visible = false;
+    }
+    
+    // Clear move history
+    const movesList = document.getElementById('moves-list');
+    if (movesList) {
+        movesList.innerHTML = '';
+    }
+    
+    // Reset history snapshots
+    if (window.historySnapshots) {
+        window.historySnapshots = [];
+    }
+    
+    // Hide history overlay if visible
+    const overlay = document.getElementById('history-board-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+    const returnBtn = document.getElementById('return-to-live');
+    if (returnBtn) {
+        returnBtn.style.display = 'none';
+    }
+    
+    // Recreate board 
+    if (window.boardLayer && window.app) {
+        createBoard(window.boardLayer, window.app);
+    }
+    
+    // Layout trays (move existing pieces back to trays)
+    setTimeout(() => {
+        if (window.layoutTrays) {
+            layoutTrays();
+        }
+    }, 100);
+    
+    // Update HUD
+    updateHUD();
+    
+    // Auto zoom to show empty board
+    if (window.autoZoomToFitPieces) {
+        setTimeout(() => {
+            window.autoZoomToFitPieces();
+        }, 200);
+    }
+    
+    console.log('✅ Game reset complete');
+}
+
+// Expose resetGame globally
+window.resetGame = resetGame;
 
 function passTurn() {
     console.log(`${state.current} has no legal moves - passing turn`);

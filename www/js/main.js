@@ -323,6 +323,9 @@ blackTrayApp.view.style.zIndex = '6';
     // Initialize zoom system
     setupZoomControls(app);
     
+    // Setup HUD controls
+    setupHUD();
+    
     // Force board visibility by triggering a minimal zoom operation
     setTimeout(() => {
         if (window.zoomAt && app) {
@@ -362,7 +365,8 @@ blackTrayApp.view.style.zIndex = '6';
         } else {
             moveHistory.classList.add('expanded');
         }
-        // Button text always stays 'History'
+        // Hide button when panel opens
+        moveHistoryToggle.classList.add('hidden-by-panel');
     });
     
     // History close button handler
@@ -371,6 +375,9 @@ blackTrayApp.view.style.zIndex = '6';
         historyCloseBtn.addEventListener('click', (e) => {
             // Add closing animation class
             moveHistory.classList.add('closing');
+            
+            // Show button again when panel closes
+            moveHistoryToggle.classList.remove('hidden-by-panel');
             
             // After animation completes, actually hide the panel
             setTimeout(() => {
@@ -461,6 +468,107 @@ blackTrayApp.view.style.zIndex = '6';
 
     // Expose for other modules
     window.showToast = showToast;
+
+    // Setup HUD controls
+    function setupHUD() {
+        const historyButton = document.getElementById('history-button');
+        const resetButton = document.getElementById('reset-button');
+        
+        if (historyButton) {
+            historyButton.addEventListener('click', () => {
+                const moveHistory = document.getElementById('move-history');
+                if (moveHistory) {
+                    if (window.innerWidth >= 769 && window.innerWidth <= 850) {
+                        moveHistory.classList.add('tablet-expanded');
+                    } else {
+                        moveHistory.classList.add('expanded');
+                    }
+                }
+            });
+        }
+        
+        if (resetButton) {
+            resetButton.addEventListener('click', () => {
+                if (confirm('Are you sure you want to reset the game? This will clear the board and start over.')) {
+                    if (window.resetGame) {
+                        window.resetGame();
+                    }
+                }
+            });
+        }
+    }
+    
+    // Setup settings dropdown menu
+    function setupSettingsDropdown() {
+        const settingsButton = document.getElementById('settings-button');
+        const settingsMenu = document.getElementById('settings-menu');
+        
+        if (!settingsButton || !settingsMenu) return;
+        
+        // Ensure menu starts hidden
+        settingsMenu.classList.add('settings-menu-hidden');
+        settingsMenu.classList.remove('settings-menu-visible');
+        
+        // Toggle menu on button click
+        settingsButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = settingsMenu.classList.contains('settings-menu-hidden');
+            if (isHidden) {
+                settingsMenu.classList.remove('settings-menu-hidden');
+                settingsMenu.classList.add('settings-menu-visible');
+            } else {
+                settingsMenu.classList.add('settings-menu-hidden');
+                settingsMenu.classList.remove('settings-menu-visible');
+            }
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#settings-menu-container')) {
+                settingsMenu.classList.add('settings-menu-hidden');
+                settingsMenu.classList.remove('settings-menu-visible');
+            }
+        });
+        
+        // Handle menu item clicks
+        const menuItems = settingsMenu.querySelectorAll('.settings-menu-item');
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = item.getAttribute('data-action');
+                
+                // Close menu after selection
+                settingsMenu.classList.add('settings-menu-hidden');
+                settingsMenu.classList.remove('settings-menu-visible');
+                
+                // Execute the corresponding action
+                switch (action) {
+                    case 'single-mode':
+                        if (window.showAIDifficultyModal) {
+                            window.showAIDifficultyModal();
+                        }
+                        break;
+                    case 'multiplayer':
+                        if (window.showMultiplayerModal) {
+                            window.showMultiplayerModal();
+                        }
+                        break;
+                    case 'dev-ops':
+                        if (window.devOpsSystem && window.devOpsSystem.showModal) {
+                            window.devOpsSystem.showModal();
+                        }
+                        break;
+                    case 'tray-ops':
+                        if (window.showTrayOpsModal) {
+                            window.showTrayOpsModal();
+                        }
+                        break;
+                }
+            });
+        });
+    }
+    
+    setupSettingsDropdown();
 
     // --- Export Learning Data Button ---
     const exportBtn = document.createElement('button');
