@@ -14,6 +14,8 @@
             this.wasmModule = null;
             this.uhpFunction = null;
             this.eventListeners = {};
+            this.tableSizeMB = 100; // Default 100MB
+            this.pendingTableSize = null; // For changes requiring restart
             
             console.log('🧩 WASM Engine initializing...');
         }
@@ -62,7 +64,15 @@
                 this.uhpFunction = wasmModule.uhp;
                 this.initialized = true;
                 
-                console.log('✅ Nokamute WASM engine ready (100MB transposition table)');
+                // Apply configured table size if it differs from default
+                if (this.pendingTableSize && this.pendingTableSize !== this.tableSizeMB) {
+                    this.tableSizeMB = this.pendingTableSize;
+                    this.pendingTableSize = null;
+                }
+                
+                const tableSizeDisplay = this.tableSizeMB >= 1000 ? 
+                    `${(this.tableSizeMB / 1000).toFixed(1)}GB` : `${this.tableSizeMB}MB`;
+                console.log(`✅ Nokamute WASM engine ready (${tableSizeDisplay} transposition table)`);
                 this._emit('initialized');
                 
                 return true;
@@ -244,6 +254,65 @@
         }
         
         /**
+         * Set transposition table size (requires engine restart to take effect)
+         */
+        setTableSize(sizeMB) {
+            const oldSize = this.tableSizeMB;
+            this.pendingTableSize = sizeMB;
+            
+            const newSizeDisplay = sizeMB >= 1000 ? `${(sizeMB / 1000).toFixed(1)}GB` : `${sizeMB}MB`;
+            const oldSizeDisplay = oldSize >= 1000 ? `${(oldSize / 1000).toFixed(1)}GB` : `${oldSize}MB`;
+            
+            console.log(`🔧 Table size changed: ${oldSizeDisplay} → ${newSizeDisplay} (restart required)`);
+            
+            if (this.initialized) {
+                console.log('⚠️ Engine restart required for table size change to take effect');
+                this._emit('table-size-changed', { 
+                    oldSize: oldSize, 
+                    newSize: sizeMB, 
+                    requiresRestart: true 
+                });
+            } else {
+                // Engine not initialized yet, change will apply on next init
+                this.tableSizeMB = sizeMB;
+                this.pendingTableSize = null;
+                console.log(`✅ Table size set to ${newSizeDisplay} for next initialization`);
+            }
+        }
+        
+        /**
+         * Get current table size configuration
+         */
+        getTableSize() {
+            return this.pendingTableSize || this.tableSizeMB;
+        }
+        
+        /**
+         * Restart engine with new settings (if supported by future implementation)
+         */
+        async restart() {
+            if (!this.initialized) {
+                console.log('🔄 Engine not initialized, performing fresh initialization...');
+                return this.initialize();
+            }
+            
+            console.log('🔄 Restarting WASM engine with new settings...');
+            
+            // Apply pending table size
+            if (this.pendingTableSize) {
+                this.tableSizeMB = this.pendingTableSize;
+                this.pendingTableSize = null;
+            }
+            
+            // For now, we don't support hot restart of WASM modules
+            // This would require reloading the WASM module with new memory settings
+            console.log('⚠️ WASM engine restart not fully implemented - settings will apply on page refresh');
+            this._emit('restart-required');
+            
+            return Promise.resolve();
+        }
+        
+        /**
          * Check if WASM engine is available
          */
         isAvailable() {
@@ -263,10 +332,40 @@
                 return 'not-initialized';
             }
         }
+        
+        /**
+         * Get detailed engine info including table size
+         */
+        getEngineInfo() {
+            const tableSizeDisplay = this.getTableSize() >= 1000 ? 
+                `${(this.getTableSize() / 1000).toFixed(1)}GB` : `${this.getTableSize()}MB`;
+                
+            return {
+                initialized: this.initialized,
+                status: this.getStatus(),
+                tableSizeMB: this.getTableSize(),
+                tableSizeDisplay: tableSizeDisplay,
+                requiresRestart: this.pendingTableSize !== null
+            };
+        }
     }
     
     // Create global instance
     window.wasmEngine = new WASMEngine();
+    
+    // Load saved table size setting before initialization
+    try {
+        const savedSettings = localStorage.getItem('hyvemynd-engine-settings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            if (settings.tableSize && settings.tableSize >= 100 && settings.tableSize <= 2000) {
+                window.wasmEngine.setTableSize(settings.tableSize);
+                console.log(`🔧 Loaded saved table size: ${settings.tableSize}MB`);
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not load saved table size setting:', error);
+    }
     
     // Auto-initialize WASM engine immediately (for both browser and Capacitor)
     console.log('🧩 Auto-initializing WASM engine for offline AI...');

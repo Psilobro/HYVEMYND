@@ -302,23 +302,87 @@ canvas {
     z-index: 10;
 }
 
+/* UHP Notation Styling - Insect-themed colors */
+.uhp-notation {
+    font-family: 'Courier New', monospace;
+    font-weight: 900; /* Extra bold */
+    font-size: 1.3em; /* Bigger text */
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    display: inline-block;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    margin: 2px;
+}
+
+/* Individual piece styling - OPAQUE backgrounds */
+.uhp-piece {
+    font-family: 'Courier New', monospace;
+    font-weight: 900;
+    font-size: 1.3em;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    display: inline;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    margin-right: 4px; /* Small margin only between separate pieces */
+}
+
+.uhp-queen {
+    background: rgb(255, 215, 0); /* Opaque Gold for Queen */
+    border-color: rgb(200, 170, 0);
+}
+
+.uhp-beetle {
+    background: rgb(144, 0, 240); /* Opaque Purple for Beetle */
+    border-color: rgb(100, 0, 180);
+}
+
+.uhp-ant {
+    background: rgb(27, 74, 215); /* Opaque Blue for Ant */
+    border-color: rgb(20, 60, 180);
+}
+
+.uhp-grasshopper {
+    background: rgb(1, 165, 1); /* Opaque Green for Grasshopper */
+    border-color: rgb(1, 120, 1);
+}
+
+.uhp-spider {
+    background: rgb(139, 69, 19); /* Opaque Brown for Spider */
+    border-color: rgb(100, 50, 15);
+}
+
+.uhp-default {
+    background: rgb(120, 120, 120); /* Opaque gray */
+    border-color: rgb(80, 80, 80);
+}
+
+/* Directional symbols are now included within piece styling */
+
 #move-history {
     display: none;
     position: fixed;
     right: 10px;
     bottom: 10px;
-    z-index: 20;
+    z-index: 30; /* Higher than chat button (20) */
     width: 250px;
     height: 300px;
     max-height: 300px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: visible; /* Allow close button to extend outside */
     scrollbar-width: thin;
     scrollbar-color: #E6B84D rgba(0,0,0,0.0);
     background: rgba(0,0,0,0.5);
     border-radius: 8px;
     box-sizing: border-box;
     color: var(--text);
+    transform-origin: bottom right; /* Shrink towards history button */
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
+}
+
+#move-history.closing {
+    transform: scale(0.1) translateX(80px) translateY(50px);
+    opacity: 0;
 }
 
 /* Hide scrollbar unless scrolling (Webkit browsers) */
@@ -1992,6 +2056,13 @@ canvas {
     margin-bottom: 20px;
 }
 
+/* Pulse animation for restart button when changes are pending */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 140, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 140, 0, 0); }
+}
+
 .engine-status-header {
     display: flex;
     align-items: center;
@@ -2372,7 +2443,7 @@ canvas {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.8);
-  display: flex;
+  display: none; /* Hidden by default - JS will show when needed */
   justify-content: center;
   align-items: center;
   z-index: 1500;

@@ -17,18 +17,16 @@
     window.shouldUseUHPEngine = function() {
         const currentPlayer = window.state?.current;
         
-        console.log('🔍 shouldUseUHPEngine check:', {
+        console.log('🔍 shouldUseUHPEngine check - UHP DISABLED, using WASM only:', {
             currentPlayer,
             wasmEngine: !!window.wasmEngine,
             wasmAvailable: window.wasmEngine?.isAvailable(),
-            wasmInitialized: window.wasmEngine?.initialized,
-            uhpClient: !!window.uhpClient,
-            uhpEnabled: window.uhpClient?.isEnabled()
+            wasmInitialized: window.wasmEngine?.initialized
         });
         
-        // Always prioritize WASM engine when available (even in browser)
+        // Always use WASM engine - UHP system removed
         if (window.wasmEngine && window.wasmEngine.isAvailable()) {
-            console.log('✅ Using WASM engine for AI');
+            console.log('✅ Using WASM engine for AI (UHP system disabled)');
             return true; // Use WASM engine whenever possible for offline AI
         }
         
@@ -77,9 +75,17 @@
                     
                     // Check if current player is an AI opponent
                     const currentPlayer = window.state?.current;
-                    const isAITurn = window.singlePlayerMode && currentPlayer === 'black'; // AI plays black
+                    const isDevOpsBattle = window.devOpsSystem && window.devOpsSystem.currentBattle && window.devOpsSystem.currentBattle.active;
+                    const isSinglePlayerAI = window.singlePlayerMode && currentPlayer === 'black'; // AI plays black in single mode
+                    const isAITurn = isSinglePlayerAI || isDevOpsBattle; // AI vs AI battles or single player AI
                     
                     if (isAITurn) {
+                        if (isDevOpsBattle) {
+                            // Dev Ops AI vs AI battle - let the battle system handle it
+                            console.log(`🎯 Dev Ops battle detected - letting battle system handle ${currentPlayer} move`);
+                            return; // Let dev-ops battle loop handle the move
+                        }
+                        
                         const activeEngine = window.getActiveEngine();
                         
                         if (activeEngine === 'wasm') {

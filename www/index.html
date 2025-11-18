@@ -80,7 +80,13 @@
   <div id="game-title" style="font-family: 'Milonga', serif;">HYVEMYND</div>
   <div id="hud">White to move</div>
   <div id="move-history">
-    <ol id="moves-list"></ol>
+    <button id="history-close-btn" style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #E6B84D; border: 2px solid #4B382A; color: #4B382A; font-size: 14px; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 31;" title="Close History">▼</button>
+    <div id="history-content" style="height: 100%; overflow-y: auto; overflow-x: hidden;">
+      <div id="history-header" style="padding: 8px 10px 4px 10px; border-bottom: 1px solid rgba(230,184,77,0.2);">
+        <h3 style="margin: 0; font-size: 14px; font-family: 'Milonga', serif; color: var(--text);">Move History</h3>
+      </div>
+      <ol id="moves-list"></ol>
+    </div>
     <div id="history-controls" style="position:sticky;bottom:0;z-index:10;background:rgba(0,0,0,0.5);padding-top:4px;">
       <input type="range" id="history-slider" min="0" value="0" step="1" style="width: 100%; margin: 8px 0;">
       <button id="return-to-live" style="display:none; margin: 4px 0;">Return to Live</button>
@@ -208,7 +214,7 @@
             <h4>Connection Status</h4>
             <div id="engine-connection-status" class="connection-status">
               <span id="connection-indicator" class="status-dot disconnected"></span>
-              <span id="connection-text">Connecting to UHP Bridge...</span>
+              <span id="connection-text">WASM Engine Ready - UHP Protocol Active</span>
             </div>
           </div>
           
@@ -242,8 +248,8 @@
           <h4>Engine Parameters</h4>
           <div class="settings-grid">
             <div class="control-group">
-              <label>
-                <input type="checkbox" id="engine-enabled"> Enable UHP Engine
+                            <label class="switch">
+                <input type="checkbox" id="engine-enabled" checked disabled> WASM Engine (Always On)
               </label>
               <small>Use external engine for AI moves</small>
             </div>
@@ -270,6 +276,15 @@
                 <input type="range" id="depth-limit" min="1" max="10" value="4" step="1">
                 <span id="depth-value">4 ply</span>
               </div>
+            </div>
+            
+            <div class="control-group">
+              <label for="table-size">Transposition Table:</label>
+              <div class="slider-container">
+                <input type="range" id="table-size" min="100" max="2000" value="100" step="50">
+                <span id="table-size-value">100MB</span>
+              </div>
+              <small style="color: #999; font-size: 11px; margin-top: 4px; display: block;">⚠️ Changes require engine restart</small>
             </div>
             
             <div class="control-group">
@@ -307,15 +322,16 @@
         </div>
 
         <div class="engine-info-section">
-          <h4>About UHP</h4>
-          <p>Universal Hive Protocol (UHP) allows HYVEMYND to connect with tournament-strength engines like Nokamute and Mzinga.</p>
+          <h4>About WASM Engine</h4>
+          <p>HYVEMYND includes a built-in Nokamute engine via WebAssembly for offline tournament-strength play. No external setup required!</p>
           <div class="engine-commands">
             <strong>Quick Start:</strong>
             <ol>
-              <li>Start UHP Bridge: <code>node tools/uhp-bridge.js</code></li>
-              <li>Enable UHP Engine above</li>
-              <li>Start a game - engine will play automatically!</li>
+              <li>✅ WASM engine loads automatically on first use</li>
+              <li>🎮 Use Single Mode or AI vs AI battles</li>
+              <li>⚙️ Adjust personalities for different difficulty levels</li>
             </ol>
+            <p><strong>Features:</strong> Configurable transposition table (100MB-2GB), adjustable search depth, personality-based difficulty scaling</p>
           </div>
         </div>
       </div>
@@ -499,89 +515,95 @@
   
   <!-- UHP AI Override MUST load before AI engines -->
   <script src="js/uhp/uhp-ai-override.js"></script>
-  
+
   <!-- Legacy AI engines - kept commented for debugging if needed -->
   <!-- <script src="js/ai-engine.js"></script> -->
   <!-- <script src="js/ai-engine-v2.js"></script> -->
     </div>
 
-  <!-- Tray Operations Modal -->
-  <div id="tray-ops-modal" style="display: none;">
-    <div class="modal-content tray-ops-content">
-      <div class="modal-header">
-        <h3>📐 Tray Operations</h3>
-        <button class="close-btn" id="close-tray-ops">×</button>
-      </div>
-      
-      <!-- Link Trays Toggle -->
-      <div class="link-trays-section">
-        <label class="link-toggle">
-          <input type="checkbox" id="link-trays-checkbox">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">🔗 Link Trays (Symmetrical)</span>
-        </label>
-      </div>
-      
-      <div class="tray-ops-container">
-        <!-- White Tray Controls -->
-        <div class="tray-controls white-controls">
-          <h4>⚪ White Tray</h4>
-          <div class="slider-group">
-            <label>Scale (10% - 250%)</label>
-            <input type="range" id="white-tray-scale" min="10" max="250" value="100" class="tray-slider">
-            <span id="white-scale-value">100%</span>
-          </div>
-          <div class="slider-group">
-            <label>Horizontal Position</label>
-            <input type="range" id="white-tray-x" min="-200" max="200" value="0" class="tray-slider">
-            <span id="white-x-value">0px</span>
-          </div>
-          <div class="slider-group">
-            <label>Vertical Position</label>
-            <input type="range" id="white-tray-y" min="-200" max="200" value="0" class="tray-slider">
-            <span id="white-y-value">0px</span>
-          </div>
-        </div>
-        
-        <!-- Black Tray Controls -->
-        <div class="tray-controls black-controls">
-          <h4>⚫ Black Tray</h4>
-          <div class="slider-group">
-            <label>Scale (10% - 250%)</label>
-            <input type="range" id="black-tray-scale" min="10" max="250" value="100" class="tray-slider">
-            <span id="black-scale-value">100%</span>
-          </div>
-          <div class="slider-group">
-            <label>Horizontal Position</label>
-            <input type="range" id="black-tray-x" min="-200" max="200" value="0" class="tray-slider">
-            <span id="black-x-value">0px</span>
-          </div>
-          <div class="slider-group">
-            <label>Vertical Position</label>
-            <input type="range" id="black-tray-y" min="-200" max="200" value="0" class="tray-slider">
-            <span id="black-y-value">0px</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+        <!-- Tray Operations Modal -->
+        <div id="tray-ops-modal" class="modal">
+            <div class="modal-content tray-ops-modal">
+                <div class="modal-header">
+                    <h3>📱 Tray Operations</h3>
+                    <span id="close-tray-ops" class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <!-- Link Trays Option -->
+                    <div class="tray-section">
+                        <div class="setting-row">
+                            <input type="checkbox" id="link-trays-checkbox" />
+                            <label for="link-trays-checkbox">🔗 Link Trays (Symmetrical Movement)</label>
+                        </div>
+                    </div>
 
+                    <!-- White Tray Controls -->
+                    <div class="tray-section">
+                        <h4>⚪ White Tray</h4>
+                        <div class="setting-row">
+                            <label for="white-tray-scale">Scale:</label>
+                            <input type="range" id="white-tray-scale" min="50" max="200" value="100" step="5">
+                            <span id="white-scale-value">100%</span>
+                        </div>
+                        <div class="setting-row">
+                            <label for="white-tray-x">X Position:</label>
+                            <input type="range" id="white-tray-x" min="-500" max="500" value="0" step="10">
+                            <span id="white-x-value">0px</span>
+                        </div>
+                        <div class="setting-row">
+                            <label for="white-tray-y">Y Position:</label>
+                            <input type="range" id="white-tray-y" min="-300" max="300" value="0" step="10">
+                            <span id="white-y-value">0px</span>
+                        </div>
+                    </div>
 
-
-  <!-- Only load nokamute-mzinga for UHP fallback compatibility -->
-  <script src="js/ai-engine-nokamute-mzinga.js?v=1.2"></script>
-  <script src="js/personalities.js"></script>
-  <script src="js/ai-ui.js"></script>
-  <script src="js/dev-ops.js"></script>
-  <script src="js/tray-ops.js"></script>
+                    <!-- Black Tray Controls -->
+                    <div class="tray-section">
+                        <h4>⚫ Black Tray</h4>
+                        <div class="setting-row">
+                            <label for="black-tray-scale">Scale:</label>
+                            <input type="range" id="black-tray-scale" min="50" max="200" value="100" step="5">
+                            <span id="black-scale-value">100%</span>
+                        </div>
+                        <div class="setting-row">
+                            <label for="black-tray-x">X Position:</label>
+                            <input type="range" id="black-tray-x" min="-500" max="500" value="0" step="10">
+                            <span id="black-x-value">0px</span>
+                        </div>
+                        <div class="setting-row">
+                            <label for="black-tray-y">Y Position:</label>
+                            <input type="range" id="black-tray-y" min="-300" max="300" value="0" step="10">
+                            <span id="black-y-value">0px</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>  <!-- All JS dependencies loaded in order -->
   
+  <!-- Duplicate scripts removed - pieces.js and main.js already loaded above -->
+  
+  <!-- AI opponent personality system -->
+  <script src="js/personalities.js"></script>
+  
+  <!-- NoKamute + Mzinga AI Engine -->
+  <script src="js/ai-engine-nokamute-mzinga.js?v=1.2"></script>
+  
+  <!-- AI user interface components -->
+  <script src="js/ai-ui.js"></script>
+
+  <!-- <!-- <script src="js/minimax-engine.js"></script> -->
+
   <!-- WASM Engine Integration (loads first for offline support) -->
   <script src="js/wasm-engine.js"></script>
   <script src="js/wasm-integration.js"></script>
   
-  <!-- UHP Engine Integration -->
+  <!-- UHP Protocol Client (WASM mode - no WebSocket connection) -->
   <script src="js/uhp/uhp-client.js"></script>
   <script src="js/uhp/engine-integration.js"></script>
+
+  <!-- Scripts consolidated to prevent duplicates -->
+  <script src="js/dev-ops.js"></script>
+  <script src="js/tray-ops.js"></script>
   
   <!-- Activate Nokamute/Mzinga AI Engine with personality-based difficulty -->
   <script>

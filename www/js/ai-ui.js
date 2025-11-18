@@ -237,16 +237,29 @@ window.AIUI.startAIMode = function(difficulty) {
   // Set global single player mode flag
   window.singlePlayerMode = true;
   
-  // Configure UHP engine with personality-specific settings
-  if (window.uhpClient) {
-    // Enable UHP engine and set it to play black
-    window.uhpClient.setSetting('enabled', true);
-    window.uhpClient.setSetting('aiColor', 'black');
-    window.uhpClient.setSetting('timeLimit', settings.timeLimit);
-    window.uhpClient.setSetting('depthLimit', settings.depthLimit);
-    window.uhpClient.setSetting('mode', settings.mode);
+  // Configure WASM engine with personality-specific settings
+  if (window.wasmEngine) {
+    console.log(`🧩 Configuring WASM engine for ${difficulty} difficulty`);
     
-    // Update UI elements to match these settings
+    // Initialize WASM engine if needed
+    if (!window.wasmEngine.initialized) {
+      window.wasmEngine.initialize().then(() => {
+        console.log('✅ WASM engine ready for Single Mode');
+      }).catch(error => {
+        console.error('❌ WASM engine initialization failed:', error);
+      });
+    }
+    
+    // Store settings on the single mode button for personality detection
+    const singleModeBtn = document.getElementById('single-mode-button');
+    if (singleModeBtn) {
+      singleModeBtn.dataset.difficulty = difficulty;
+      singleModeBtn.dataset.timeLimit = settings.timeLimit;
+      singleModeBtn.dataset.depthLimit = settings.depthLimit;
+      singleModeBtn.dataset.mode = settings.mode;
+    }
+    
+    // Update UI elements to reflect these settings
     const enabledCheckbox = document.getElementById('engine-enabled');
     if (enabledCheckbox) enabledCheckbox.checked = true;
     
@@ -270,11 +283,9 @@ window.AIUI.startAIMode = function(difficulty) {
     const colorSelect = document.getElementById('engine-color');
     if (colorSelect) colorSelect.value = 'black'; // AI plays black
     
-    console.log(`🤖 UHP engine configured for ${difficulty} difficulty`);
+    console.log(`🤖 WASM engine configured for ${difficulty} difficulty`);
   } else {
-    console.warn('⚠️ UHP client not available');
-    // Note: Legacy AI fallback systems have been simplified
-    // In clean deployment, UHP is the primary AI system
+    console.warn('⚠️ WASM engine not available');
   }
   
   // Set personality for voice lines and theming

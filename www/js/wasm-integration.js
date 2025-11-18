@@ -62,7 +62,21 @@
             
             if (moveColor && currentTurn && moveColor !== currentTurn) {
                 console.warn(`❌ WASM suggested ${moveColor} move "${bestMove}" but current turn is ${currentTurn}`);
-                console.warn(`⚠️ This indicates game state desync - rejecting move to prevent corruption`);
+                console.warn(`⚠️ Game state desync detected - attempting to fix by passing turn`);
+                
+                // Try to fix desync by passing the turn 
+                if (window.passTurn) {
+                    console.log(`🔄 Attempting to fix turn desync by passing turn`);
+                    window.passTurn();
+                    
+                    // Retry the WASM request after a delay
+                    setTimeout(() => {
+                        console.log(`🔄 Retrying WASM move request after turn correction`);  
+                        window.requestWASMMove(target, configOverride);
+                    }, 1000);
+                    return;
+                }
+                
                 throw new Error(`Turn mismatch: WASM suggested ${moveColor} move but current turn is ${currentTurn}`);
             }
             
@@ -103,11 +117,23 @@
         }
     };
     
-    // Get current personality based on Single Mode state
+    // Get current personality based on Single Mode state or Dev Ops battle
     function getCurrentPersonality() {
-        // Check if in Single Mode and get difficulty
-        const singleModeBtn = document.getElementById('single-mode-button');
-        const difficulty = singleModeBtn?.dataset?.difficulty || 'buzzwell'; // Default to medium
+        let difficulty = 'buzzwell'; // Default to medium
+        
+        // Check if in Dev Ops AI battle mode
+        if (window.devOpsSystem && window.devOpsSystem.currentBattle && window.devOpsSystem.currentBattle.active) {
+            const currentAI = window.state.current === 'white' 
+                ? window.devOpsSystem.currentBattle.whiteAI 
+                : window.devOpsSystem.currentBattle.blackAI;
+            difficulty = currentAI || 'buzzwell';
+            console.log(`🎭 Dev Ops battle mode - using ${difficulty} personality for ${window.state.current}`);
+        } else {
+            // Check if in Single Mode and get difficulty
+            const singleModeBtn = document.getElementById('single-mode-button');
+            difficulty = singleModeBtn?.dataset?.difficulty || 'buzzwell';
+            console.log(`🎭 Single mode - using ${difficulty} personality`);
+        }
         
         // Get personality settings from localStorage or defaults
         const personalities = {

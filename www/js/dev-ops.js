@@ -53,6 +53,36 @@ class DevOpsSystem {
             tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
         
+        // WASM engine event listeners for progress indicators
+        if (window.wasmEngine) {
+            window.wasmEngine.on('thinking', (data) => {
+                if (this.currentBattle && this.currentBattle.active) {
+                    const currentAI = window.state.current === 'white' 
+                        ? this.currentBattle.whiteAI 
+                        : this.currentBattle.blackAI;
+                    this.updateBattleStatus(`🧠 ${currentAI} thinking... (${data.phase})`);
+                }
+                
+                // Update engine progress popup if available
+                if (window.engineIntegration) {
+                    window.engineIntegration.updateProgressPopup(true, data);
+                }
+            });
+            
+            window.wasmEngine.on('initialized', () => {
+                console.log('✅ WASM engine ready for Dev Ops battles');
+                this.updateBattleStatus('✅ WASM engine ready');
+            });
+            
+            window.wasmEngine.on('error', (error) => {
+                console.error('❌ WASM engine error in Dev Ops:', error);
+                this.updateBattleStatus(`❌ Engine Error: ${error.message}`);
+                if (this.currentBattle && this.currentBattle.active) {
+                    this.stopAIBattle();
+                }
+            });
+        }
+        
         // AI vs AI controls
         const startBattleBtn = document.getElementById('start-ai-battle');
         if (startBattleBtn) {
@@ -220,95 +250,278 @@ class DevOpsSystem {
     }
     
     async makeAIMove(aiName) {
-        // Map AI names to difficulty levels
-        const difficultyMap = {
-            'sunny': 'easy',
-            'buzzwell': 'medium', 
-            'beedric': 'hard'
+        // Map AI names to personality settings
+        const personalityMap = {
+            'sunny': {
+                name: 'Sunny Pollenpatch',
+                mode: 'time',
+                timeLimit: 2,
+                depthLimit: 3
+            },
+            'buzzwell': {
+                name: 'Buzzwell Stingmore',
+                mode: 'time', 
+                timeLimit: 4,
+                depthLimit: 5
+            },
+            'beedric': {
+                name: 'Beedric Bumbleton',
+                mode: 'time',
+                timeLimit: 10,
+                depthLimit: 8
+            }
         };
         
-        const difficulty = difficultyMap[aiName] || 'medium';
+        const personality = personalityMap[aiName] || personalityMap['buzzwell'];
         
         try {
-            // Enable AI and set difficulty
-            if (window.AIEngine) {
-                const previousEnabled = window.AIEngine.enabled;
-                const previousDifficulty = window.AIEngine.difficulty;
-                const previousColor = window.AIEngine.color;
-                
-                window.AIEngine.enabled = true;
-                window.AIEngine.difficulty = difficulty;
-                window.AIEngine.color = window.state.current; // AI plays current player
-                
-                // Set personality for voice lines
-                if (window.Personalities && window.Personalities.setOpponent) {
-                    window.Personalities.setOpponent(difficulty);
-                }
-                
-                // Trigger AI move
-                if (window.AIEngine.checkAndMakeMove) {
-                    // Add error handling for AI moves
-                    const originalExecuteMove = window.AIEngine.executeMove;
-                    window.AIEngine.executeMove = function(move) {
-                        try {
-                            return originalExecuteMove.call(this, move);
-                        } catch (error) {
-                            console.error('🔧 AI move execution error:', error);
-                            // Try to recover by expanding board if it's a cell issue
-                            if (error.message.includes('stack') && move.type === 'place') {
-                                console.log('🔧 Attempting to expand board for AI move');
-                                if (window.expandBoard) {
-                                    window.expandBoard();
-                                    // Retry the move
-                                    return originalExecuteMove.call(this, move);
-                                }
-                            }
-                            throw error;
-                        }
-                    };
-                    
-                    window.AIEngine.checkAndMakeMove();
-                    
-                    // Restore original function
-                    window.AIEngine.executeMove = originalExecuteMove;
-                } else {
-                    throw new Error('AI move function not available');
-                }
-                
-                // Wait for AI to make its move
-                return new Promise((resolve, reject) => {
-                    let attempts = 0;
-                    const maxAttempts = 300; // 30 seconds max wait
-                    
-                    const checkMove = () => {
-                        attempts++;
-                        
-                        if (!window.AIEngine.thinking && !window.animating) {
-                            // Restore previous AI settings for battles
-                            if (this.currentBattle) {
-                                window.AIEngine.enabled = true; // Keep enabled for battle
-                            } else {
-                                window.AIEngine.enabled = previousEnabled;
-                                window.AIEngine.difficulty = previousDifficulty;
-                                window.AIEngine.color = previousColor;
-                            }
-                            resolve();
-                        } else if (attempts >= maxAttempts) {
-                            reject(new Error(`AI move timeout for ${aiName}`));
-                        } else {
-                            setTimeout(checkMove, 100);
-                        }
-                    };
-                    
-                    setTimeout(checkMove, 100);
-                });
-            } else {
-                throw new Error('AI Engine not available');
+            // Ensure WASM engine is available
+            if (!window.wasmEngine) {
+                throw new Error('WASM Engine not available');
             }
+            
+            this.updateBattleStatus(`🧠 ${personality.name} is thinking...`);
+            
+            // Initialize WASM engine if needed
+            if (!window.wasmEngine.initialized) {
+                await window.wasmEngine.initialize();
+            }
+            
+            // Set personality for voice lines
+            if (window.Personalities && window.Personalities.setOpponent) {
+                const difficultyMap = { 'sunny': 'easy', 'buzzwell': 'medium', 'beedric': 'hard' };
+                window.Personalities.setOpponent(difficultyMap[aiName] || 'medium');
+            }
+            
+            // For AI battles, get current UHP move history to send to WASM engine
+            // This ensures the engine knows what pieces are already on the board
+            let gameString = '';
+            if (window.uhpClient && window.uhpClient.uhpMoveHistory && window.uhpClient.uhpMoveHistory.size > 0) {
+                const moves = [];
+                const maxMoveNum = Math.max(...window.uhpClient.uhpMoveHistory.keys());
+                for (let i = 1; i <= maxMoveNum; i++) {
+                    if (window.uhpClient.uhpMoveHistory.has(i)) {
+                        moves.push(window.uhpClient.uhpMoveHistory.get(i));
+                    }
+                }
+                gameString = moves.join(';');
+                console.log(`🎯 AI battle: Sending ${moves.length} moves to WASM engine: ${gameString}`);
+            } else {
+                console.log(`🎯 AI battle: No move history found, starting fresh game`);
+            }
+            
+            // Use personality-specific engine settings for AI battles
+            const difficultyMap = {
+                'sunny': { timeLimit: 2, depthLimit: 2 },     // Easy: 2s, depth 2
+                'buzzwell': { timeLimit: 4, depthLimit: 4 },  // Medium: 4s, depth 4  
+                'beedric': { timeLimit: 6, depthLimit: 6 }    // Hard: 6s, depth 6
+            };
+            
+            const personalitySettings = difficultyMap[aiName] || difficultyMap['buzzwell'];
+            const searchMode = 'time'; // Use time mode for consistent battle pacing
+            
+            const engineOptions = {
+                mode: searchMode,
+                timeLimit: personalitySettings.timeLimit,
+                depthLimit: personalitySettings.depthLimit
+            };
+            
+            console.log(`🎯 Using personality settings for ${aiName}: ${personalitySettings.timeLimit}s (${personality.name})`);
+            
+            // Get best move from WASM engine with personality settings
+            const bestMove = await window.wasmEngine.getBestMove(gameString, engineOptions);
+            
+            if (!bestMove || bestMove.toLowerCase().includes('err')) {
+                throw new Error(`Invalid move response: ${bestMove}`);
+            }
+            
+            console.log(`🎯 ${aiName} suggests: ${bestMove}`);
+            
+            // Store the move in battle history instead of applying to main game
+            if (!this.currentBattle.moveHistory) {
+                this.currentBattle.moveHistory = [];
+            }
+            this.currentBattle.moveHistory.push({
+                aiName: aiName,
+                move: bestMove,
+                personality: personality.name,
+                timestamp: Date.now()
+            });
+            
+            // Apply the move to the game (this will update the main game state)
+            const moveApplied = await this.applyUHPMove(bestMove);
+            
+            if (!moveApplied) {
+                throw new Error(`WASM engine rejected move: ${bestMove}`);
+            }
+            
+            this.updateBattleStatus(`✅ ${aiName} played: ${bestMove}`);
+            // Wait for any animations to complete
+            while (window.animating) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            return Promise.resolve();
         } catch (error) {
             console.error(`Error making AI move for ${aiName}:`, error);
             this.updateBattleStatus(`❌ Error: ${error.message}`);
             throw error;
+        }
+    }
+    
+    // Export current game state to UHP format for AI battles
+    exportGameStateToUHP() {
+        // Use the existing UHP move history from the game system
+        if (window.uhpMoveHistory && window.uhpMoveHistory.length > 0) {
+            // Extract UHP moves from the move history
+            const uhpMoves = window.uhpMoveHistory.map(entry => {
+                if (Array.isArray(entry) && entry.length >= 2) {
+                    return entry[1]; // UHP string is at index 1
+                }
+                return entry.uhp || entry.move || entry; // fallback for different formats
+            }).filter(move => move && move.trim());
+            
+            if (uhpMoves.length > 0) {
+                const gameState = uhpMoves.join(';');
+                console.log(`🎯 Using UHP history (${uhpMoves.length} moves): ${gameState}`);
+                return gameState;
+            }
+        }
+        
+        // For fresh games, return empty string (same as human vs AI)
+        console.log(`🎯 Fresh game - no UHP history yet`);
+        return '';
+    }
+    
+    // Apply UHP move to the game state
+    async applyUHPMove(uhpMove) {
+        if (!uhpMove || typeof uhpMove !== 'string') {
+            console.error('❌ Invalid UHP move:', uhpMove);
+            return false;
+        }
+
+        try {
+            console.log(`🎯 Applying UHP move: ${uhpMove}`);
+            
+            // CRITICAL: Validate move with WASM engine first to prevent duplicate pieces
+            if (window.wasmEngine) {
+                // Get current game state for validation
+                const currentMoves = [];
+                if (window.uhpClient && window.uhpClient.uhpMoveHistory && window.uhpClient.uhpMoveHistory.size > 0) {
+                    const maxMoveNum = Math.max(...window.uhpClient.uhpMoveHistory.keys());
+                    for (let i = 1; i <= maxMoveNum; i++) {
+                        if (window.uhpClient.uhpMoveHistory.has(i)) {
+                            currentMoves.push(window.uhpClient.uhpMoveHistory.get(i));
+                        }
+                    }
+                }
+                
+                // Test if the move is valid by simulating it
+                try {
+                    const testGameString = currentMoves.concat([uhpMove]).join(';');
+                    const tempEngine = await window.wasmEngine.sendCommand('newgame Base');
+                    
+                    // Apply existing moves
+                    for (const move of currentMoves) {
+                        const result = await window.wasmEngine.sendCommand(`play ${move}`);
+                        if (result.includes('invalidmove')) {
+                            console.warn(`⚠️ Invalid existing move during validation: ${move}`);
+                            break;
+                        }
+                    }
+                    
+                    // Test the new move
+                    const testResult = await window.wasmEngine.sendCommand(`play ${uhpMove}`);
+                    if (testResult.includes('invalidmove')) {
+                        console.error(`❌ WASM engine rejects move: ${uhpMove}`);
+                        console.error(`❌ Response: ${testResult}`);
+                        return false; // Don't apply invalid moves to UI
+                    }
+                    
+                    console.log(`✅ WASM engine accepts move: ${uhpMove}`);
+                } catch (validationError) {
+                    console.error('❌ Move validation failed:', validationError);
+                    return false;
+                }
+            }            // Handle "pass" moves
+            if (uhpMove.toLowerCase() === 'pass') {
+                if (window.passTurn) {
+                    window.passTurn();
+                }
+                return;
+            }
+            
+            // Parse the UHP move - handle both placement and movement
+            const moveMatch = uhpMove.match(/([wb])([QAGBS])(\d*)([/\\-]?)(.*)/);
+            if (!moveMatch) {
+                console.error('❌ Failed to parse UHP move:', uhpMove);
+                return;
+            }
+            
+            const [, color, pieceType, pieceNumber, direction, position] = moveMatch;
+            const fullColor = color === 'w' ? 'white' : 'black';
+            
+            // Check if this is a movement (piece already placed) or placement
+            const existingPiece = window.tray.find(p => 
+                p.meta.color === fullColor && 
+                p.meta.key === pieceType && 
+                p.placed
+            );
+            
+            if (existingPiece) {
+                // This is a movement - find a legal destination
+                console.log(`🎯 Moving existing ${fullColor} ${pieceType}`);
+                
+                if (window.selectMove && window.commitMove && window.legalMoveZones) {
+                    const legalMoves = window.legalMoveZones(existingPiece);
+                    if (legalMoves && legalMoves.length > 0) {
+                        const targetKey = Array.isArray(legalMoves) ? legalMoves[0] : Array.from(legalMoves)[0];
+                        const [q, r] = targetKey.split(',').map(Number);
+                        
+                        window.selectMove(existingPiece);
+                        window.commitMove(q, r);
+                    } else {
+                        console.warn(`⚠️ No legal moves found for ${fullColor} ${pieceType}`);
+                    }
+                }
+            } else {
+                // This is a placement - find an unplaced piece
+                console.log(`🎯 Placing new ${fullColor} ${pieceType}`);
+                
+                const piece = window.tray.find(p => 
+                    p.meta.color === fullColor && 
+                    p.meta.key === pieceType && 
+                    !p.placed
+                );
+                
+                if (!piece) {
+                    console.error(`❌ Could not find unplaced ${fullColor} ${pieceType} piece`);
+                    return;
+                }
+                
+                // Find a valid placement location
+                if (window.selectPlacement && window.commitPlacement && window.legalPlacementZones) {
+                    const legalZones = window.legalPlacementZones(fullColor);
+                    if (legalZones.size > 0) {
+                        const firstLegal = Array.from(legalZones)[0];
+                        const [q, r] = firstLegal.split(',').map(Number);
+                        
+                        window.selectPlacement(piece);
+                        window.commitPlacement(q, r);
+                    } else {
+                        console.error(`❌ No legal placement zones for ${fullColor}`);
+                    }
+                } else {
+                    console.error('❌ Placement functions not available');
+                }
+            }
+            
+            console.log(`✅ Successfully applied UHP move: ${uhpMove}`);
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Failed to apply UHP move:', error);
+            return false;
         }
     }
     

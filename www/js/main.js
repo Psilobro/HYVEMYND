@@ -355,23 +355,49 @@ blackTrayApp.view.style.zIndex = '6';
         }
     });
 
-    // Move history toggle for all modes
+    // Move history toggle for all modes - always opens, never changes text
     moveHistoryToggle.addEventListener('click', (e) => {
         if (window.innerWidth >= 769 && window.innerWidth <= 850) {
-            moveHistory.classList.toggle('tablet-expanded');
-            e.target.textContent = moveHistory.classList.contains('tablet-expanded') ? 'Hide' : 'History';
+            moveHistory.classList.add('tablet-expanded');
         } else {
-            moveHistory.classList.toggle('expanded');
-            e.target.textContent = moveHistory.classList.contains('expanded') ? 'Hide' : 'History';
+            moveHistory.classList.add('expanded');
         }
+        // Button text always stays 'History'
     });
+    
+    // History close button handler
+    const historyCloseBtn = document.getElementById('history-close-btn');
+    if (historyCloseBtn) {
+        historyCloseBtn.addEventListener('click', (e) => {
+            // Add closing animation class
+            moveHistory.classList.add('closing');
+            
+            // After animation completes, actually hide the panel
+            setTimeout(() => {
+                moveHistory.classList.remove('tablet-expanded', 'expanded', 'closing');
+            }, 400); // Match CSS transition duration
+        });
+        
+        // Hover effect for close button - curtain pull effect
+        historyCloseBtn.addEventListener('mouseenter', (e) => {
+            e.target.style.background = '#f4c965';
+            e.target.style.transform = 'scale(1.1)';
+            e.target.style.boxShadow = '0 3px 6px rgba(0,0,0,0.4)';
+        });
+        historyCloseBtn.addEventListener('mouseleave', (e) => {
+            e.target.style.background = '#E6B84D';
+            e.target.style.transform = 'scale(1)';
+            e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        });
+    }
 
     // Ensure tablet history panel starts minimized
     function initializeTabletMode() {
         if (window.innerWidth >= 769 && window.innerWidth <= 850) {
             moveHistory.classList.remove('tablet-expanded');
-            moveHistoryToggle.textContent = 'History';
         }
+        // Always ensure toggle button shows 'History'
+        moveHistoryToggle.textContent = 'History';
     }
     initializeTabletMode();
     window.addEventListener('resize', initializeTabletMode);

@@ -19,3 +19,6 @@
 [submodule "tools/uhp-samples"]
 	path = tools/uhp-samples
 	url = https://github.com/jonthysell/UHPSampleCode.git
+[submodule "reference-repo"]
+	path = reference-repo
+	url = https://github.com/Psilobro/HYVEMYND.git

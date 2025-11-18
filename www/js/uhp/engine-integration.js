@@ -104,6 +104,18 @@
                 });
             }
             
+            // Transposition table size slider
+            const tableSizeSlider = document.getElementById('table-size');
+            const tableSizeValue = document.getElementById('table-size-value');
+            if (tableSizeSlider && tableSizeValue) {
+                tableSizeSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    const displayValue = this.formatTableSize(value);
+                    tableSizeValue.textContent = displayValue;
+                    this.setTableSize(value);
+                });
+            }
+            
             // Engine color selection
             const colorSelect = document.getElementById('engine-color');
             if (colorSelect) {
@@ -271,6 +283,25 @@
             console.log(`🔄 Restarting engine: ${engineType}`);
             this.logEntry(`🔄 Restarting ${engineType} engine`);
             
+            // Reset restart button styling
+            const restartBtn = document.getElementById('restart-engine');
+            if (restartBtn) {
+                restartBtn.style.background = '';
+                restartBtn.style.animation = '';
+                restartBtn.title = 'Restart Engine';
+            }
+            
+            // Apply any pending WASM engine settings
+            if (window.wasmEngine && window.wasmEngine.restart) {
+                try {
+                    await window.wasmEngine.restart();
+                    this.logEntry('✅ WASM engine settings applied');
+                } catch (error) {
+                    console.error('❌ WASM engine restart error:', error);
+                    this.logEntry(`❌ WASM restart error: ${error.message}`);
+                }
+            }
+            
             if (window.uhpClient) {
                 await window.uhpClient.stopEngine();
                 setTimeout(() => {
@@ -319,6 +350,90 @@
             }
             
             this.saveSettings();
+        }
+        
+        setTableSize(sizeMB) {
+            const displaySize = this.formatTableSize(sizeMB);
+            console.log(`💾 Transposition table: ${displaySize}`);
+            this.logEntry(`💾 Table size: ${displaySize} (restart required)`);
+            
+            if (window.wasmEngine) {
+                window.wasmEngine.setTableSize(sizeMB);
+                
+                // Listen for engine events to show restart notification
+                window.wasmEngine.on('table-size-changed', (data) => {
+                    if (data.requiresRestart) {
+                        this.showTableSizeWarning(data.newSize);
+                    }
+                });
+            }
+            
+            this.saveSettings();
+        }
+        
+        showTableSizeWarning(sizeMB) {
+            const displaySize = this.formatTableSize(sizeMB);
+            
+            // Highlight the restart button to indicate action needed
+            const restartBtn = document.getElementById('restart-engine');
+            if (restartBtn) {
+                restartBtn.style.background = '#ff8c00';
+                restartBtn.style.animation = 'pulse 2s infinite';
+                restartBtn.title = `Restart engine to apply ${displaySize} table size`;
+            }
+            
+            // Create a temporary notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(255, 165, 0, 0.95);
+                color: #000;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-family: 'Milonga', serif;
+                font-size: 13px;
+                font-weight: bold;
+                z-index: 10001;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                max-width: 300px;
+                backdrop-filter: blur(10px);
+                border: 2px solid #ff8c00;
+            `;
+            
+            notification.innerHTML = `
+                <div style="margin-bottom: 8px;">⚠️ Table Size Changed</div>
+                <div style="font-size: 11px; font-weight: normal; margin-bottom: 8px;">
+                    Transposition table set to ${displaySize}. Click "🔄 Restart" to apply changes.
+                </div>
+                <button onclick="this.parentElement.remove()" style="
+                    background: #ff8c00;
+                    color: white;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-family: 'Milonga', serif;
+                    font-size: 11px;
+                    cursor: pointer;
+                ">Got it</button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 8000);
+        }
+        
+        formatTableSize(sizeMB) {
+            if (sizeMB >= 1000) {
+                return `${(sizeMB / 1000).toFixed(1)}GB`;
+            }
+            return `${sizeMB}MB`;
         }
         
         setEngineColor(color) {
@@ -630,6 +745,7 @@
                 engineMode: document.getElementById('engine-mode')?.value || 'time',
                 timeLimit: parseInt(document.getElementById('time-limit')?.value) || 5,
                 depthLimit: parseInt(document.getElementById('depth-limit')?.value) || 4,
+                tableSize: parseInt(document.getElementById('table-size')?.value) || 100,
                 engineColor: document.getElementById('engine-color')?.value || 'black',
                 selectedEngine: document.getElementById('engine-select')?.value || 'nokamute'
             };
@@ -663,6 +779,14 @@
                 if (depthLimit && depthValue) {
                     depthLimit.value = settings.depthLimit || 4;
                     depthValue.textContent = `${settings.depthLimit || 4} ply`;
+                }
+                
+                const tableSizeSlider = document.getElementById('table-size');
+                const tableSizeValue = document.getElementById('table-size-value');
+                if (tableSizeSlider && tableSizeValue) {
+                    const tableSize = settings.tableSize || 100;
+                    tableSizeSlider.value = tableSize;
+                    tableSizeValue.textContent = this.formatTableSize(tableSize);
                 }
                 
                 const engineColor = document.getElementById('engine-color');

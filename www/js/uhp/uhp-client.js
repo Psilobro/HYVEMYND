@@ -37,12 +37,21 @@
             this.connect = this.connect.bind(this);
             this.handleMessage = this.handleMessage.bind(this);
             
-            // Health check interval for maintaining connection
+            // Health check interval for maintaining connection - disabled for WASM-only mode
             this.healthCheckInterval = null;
-            this.startHealthCheck();
+            // this.startHealthCheck(); // Disabled - WASM doesn't need WebSocket health checks
             
-            console.log('🐝 HYVEMYND UHP Client initializing...');
-            this.connect();
+            console.log('🐝 HYVEMYND UHP Client initializing (WASM mode - no WebSocket needed)...');
+            
+            // WASM mode: Keep UHP protocol parsing but skip WebSocket connection
+            // The UHP protocol is still used for move notation, just no network communication
+            console.log('🧩 UHP protocol parser ready for WASM engine integration');
+            
+            // Set initial status for WASM mode
+            this.updateConnectionStatus('WASM Engine Ready - UHP Protocol Active');
+            
+            // Make sure the global uhpClient is available for AI systems
+            window.uhpClient = this;
             
             // Track UHP moves by move number for history display
             this.uhpMoveHistory = new Map(); // moveNumber -> uhpMove
@@ -230,7 +239,7 @@
                 timeLimit: 5,
                 depthLimit: 4,
                 mode: 'time', // 'time' or 'depth'
-                enabled: false,
+                enabled: true, // Enable by default for WASM mode
                 aiColor: 'black' // AI plays black in single player mode
             };
             
@@ -297,6 +306,16 @@
                                  hostname.startsWith('192.168.') ||
                                  hostname === '' ||
                                  window.location.port === '8000'; // Allow our dev server
+                
+                // Skip UHP connection entirely if we have working WASM engine
+                // This prevents the spam of connection errors when WASM AI is working fine
+                if (window.wasmEngine && window.wasmEngine.isAvailable()) {
+                    console.log(`🧩 WASM engine available - skipping UHP connection`);
+                    this.connected = false;
+                    this.isConnecting = false;
+                    this.updateConnectionStatus('Using WASM engine - UHP not needed');
+                    return;
+                }
                 
                 if (!isLocalDev) {
                     console.log(`🌐 Running on remote server (${hostname}) - UHP bridge not available`);
@@ -2228,6 +2247,11 @@
         }
 
         isEnabled() {
+            // In WASM mode, we're enabled if WASM engine is available, regardless of WebSocket connection
+            if (window.wasmEngine && window.wasmEngine.isAvailable()) {
+                return this.settings.enabled; // Only check settings, not connection
+            }
+            // Fallback to old WebSocket-based check
             return this.settings.enabled && this.connected && this.currentEngine;
         }
 
@@ -2259,8 +2283,11 @@
         }
     }
 
-    // Initialize UHP client globally
-    window.uhpClient = new HYVEMYNDUHPClient();
+    // Initialize UHP client globally - WASM mode (no WebSocket needed)
+    if (!window.uhpClient) {
+        window.uhpClient = new HYVEMYNDUHPClient();
+        console.log('🐝 UHP Client initialized globally for WASM mode');
+    }
     
     // Clean up on page unload
     window.addEventListener('beforeunload', () => {

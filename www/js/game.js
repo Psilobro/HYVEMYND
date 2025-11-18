@@ -1136,6 +1136,15 @@ function legalPlacementZones(color){
 function commitPlacement(q,r){
     const p = selected.piece;
     
+    // Validate placement is in legal zones before committing
+    const legalZones = legalPlacementZones(p.meta.color);
+    const positionKey = `${q},${r}`;
+    if (!legalZones.has(positionKey)) {
+        console.error(`❌ INVALID PLACEMENT: ${p.meta.color} ${p.meta.key} at (${q}, ${r}) not in legal zones:`, Array.from(legalZones));
+        console.error(`⚠️ Blocking invalid placement to prevent game state corruption`);
+        return false; // Don't commit invalid placements
+    }
+    
     if (!isNearBorder(q,r)) {
         // Record UHP move for this placement using CHRONOLOGICAL placement order
         if (window.uhpClient && p && p.meta) {
@@ -1295,7 +1304,12 @@ function commitPlacement(q,r){
 
             const txt = document.createElement('div');
             txt.className = 'move-text';
-            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> placed at (${q},${r}) ${label}`;
+            // Get UHP notation for this move
+            const uhpNotation = getUHPNotationForDisplay(p, idx + 1);
+            const insectClass = getInsectThemeClass(p.meta.key);
+            const playerTextColor = p.meta.color === 'white' ? '#FFFFFF' : '#000000';
+            
+            txt.innerHTML = uhpNotation; // Already styled by parseAndStyleUHPMove
 
             li.appendChild(hexBtn);
             li.appendChild(txt);
@@ -1947,16 +1961,23 @@ try{
         let txt;
         if(p.meta.key === 'S'){
             const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-            const newLabel = labelFromCenter(q,r);
-            const oldCoords = oldKey.split(',').map(Number);
             txt = document.createElement('div'); txt.className='move-text';
-            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+            
+            // Get UHP notation for this movement
+            const uhpNotation = getUHPNotationForDisplay(p, idx + 1);
+            const insectClass = getInsectThemeClass(p.meta.key);
+            const playerTextColor = p.meta.color === 'white' ? '#FFFFFF' : '#000000';
+            
+            txt.innerHTML = uhpNotation; // Already styled by parseAndStyleUHPMove
         } else {
-            const { fullName, pieceColor } = getEnhancedPieceInfo(p);
-            const newLabel = labelFromCenter(q,r);
-            const oldCoords = oldKey.split(',').map(Number);
             txt = document.createElement('div'); txt.className='move-text';
-            txt.innerHTML = `<span class=\"piece-name\" style=\"color: ${pieceColor}\">${fullName}</span> moves from (${oldCoords[0]},${oldCoords[1]}) → (${q},${r})`;
+            
+            // Get UHP notation for this movement
+            const uhpNotation = getUHPNotationForDisplay(p, idx + 1);
+            const insectClass = getInsectThemeClass(p.meta.key);
+            const playerTextColor = p.meta.color === 'white' ? '#FFFFFF' : '#000000';
+            
+            txt.innerHTML = uhpNotation; // Already styled by parseAndStyleUHPMove
         }
         li.appendChild(hexBtn);
         li.appendChild(txt);
@@ -1995,6 +2016,100 @@ function getEnhancedPieceInfo(piece) {
     const pieceColor = pieceColors[piece.meta.key] || '#FFFFFF';
     
     return { fullName, pieceColor };
+}
+
+// Get UHP notation for history display with insect-themed styling
+function getUHPNotationForDisplay(piece, moveNumber) {
+    // Try to get UHP notation from the UHP client for current move
+    let uhpMove = '';
+    if (window.uhpClient && typeof window.uhpClient.getUHPMoveForTurn === 'function') {
+        const rawMove = window.uhpClient.getUHPMoveForTurn(moveNumber);
+        if (rawMove && rawMove.trim()) {
+            uhpMove = rawMove.trim();
+        }
+    }
+    
+    // Fallback: Generate basic UHP piece ID if no full notation available
+    if (!uhpMove) {
+        const color = piece.meta.color.charAt(0); // 'w' or 'b'  
+        const pieceKey = piece.meta.key; // 'Q', 'A', 'G', 'B', 'S'
+        const pieceNumber = piece.meta.i || (pieceKey === 'Q' ? '' : '1');
+        uhpMove = `${color}${pieceKey}${pieceNumber}`;
+    }
+    
+    // Parse and style individual pieces in the UHP notation
+    return parseAndStyleUHPMove(uhpMove);
+}
+
+// Parse UHP move and apply individual piece styling
+function parseAndStyleUHPMove(uhpMove) {
+    // UHP move patterns: "wG1", "bA1 wG1\", "wQ bG1-", "wG1/", "/bA1", "-wG1", etc.
+    let result = '';
+    let i = 0;
+    
+    while (i < uhpMove.length) {
+        // Check for directional symbol followed by piece: /wG1, -bA1, \wQ
+        const dirPieceMatch = uhpMove.substring(i).match(/^([/\\-])([wb])([QAGBS])(\d*)/);
+        
+        if (dirPieceMatch) {
+            const direction = dirPieceMatch[1]; // '/', '\', or '-'
+            const color = dirPieceMatch[2]; // 'w' or 'b'
+            const pieceType = dirPieceMatch[3]; // 'Q', 'A', 'G', 'B', 'S'
+            const pieceNumber = dirPieceMatch[4] || (pieceType === 'Q' ? '' : '1');
+            const fullPiece = `${direction}${color}${pieceType}${pieceNumber}`;
+            
+            // Get styling for this piece
+            const insectClass = getInsectThemeClass(pieceType);
+            const textColor = color === 'w' ? '#FFFFFF' : '#000000';
+            
+            result += `<span class="uhp-piece ${insectClass}" style="color: ${textColor}">${fullPiece}</span>`;
+            
+            i += dirPieceMatch[0].length;
+        } else {
+            // Check for piece followed by optional directional symbol: wG1/, bA1\, wQ-
+            const pieceDirMatch = uhpMove.substring(i).match(/^([wb])([QAGBS])(\d*)([/\\-]?)/);
+            
+            if (pieceDirMatch) {
+                const color = pieceDirMatch[1]; // 'w' or 'b'
+                const pieceType = pieceDirMatch[2]; // 'Q', 'A', 'G', 'B', 'S'
+                const pieceNumber = pieceDirMatch[3] || (pieceType === 'Q' ? '' : '1');
+                const direction = pieceDirMatch[4] || ''; // Optional directional symbol
+                const fullPiece = `${color}${pieceType}${pieceNumber}${direction}`;
+                
+                // Get styling for this piece
+                const insectClass = getInsectThemeClass(pieceType);
+                const textColor = color === 'w' ? '#FFFFFF' : '#000000';
+                
+                result += `<span class="uhp-piece ${insectClass}" style="color: ${textColor}">${fullPiece}</span>`;
+                
+                i += pieceDirMatch[0].length;
+            } else {
+                // Handle spaces and other characters
+                const char = uhpMove[i];
+                if (char === ' ') {
+                    result += ' '; // Preserve single spaces between pieces
+                } else {
+                    // Any other character, just add it
+                    result += char;
+                }
+                i++;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// Get insect-themed CSS class for piece type
+function getInsectThemeClass(pieceKey) {
+    const themeMap = {
+        'Q': 'uhp-queen',      // Gold
+        'B': 'uhp-beetle',     // Purple  
+        'A': 'uhp-ant',        // Blue
+        'G': 'uhp-grasshopper', // Green
+        'S': 'uhp-spider'      // Brown
+    };
+    return themeMap[pieceKey] || 'uhp-default';
 }
 
 // Build a tiny SVG visual showing a path (array of [q,r]) scaled to mini box
