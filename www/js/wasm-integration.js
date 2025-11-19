@@ -52,8 +52,49 @@
                 });
             }
             
+            // Check move limit before allowing AI to think
+            if (window.canAIMakeMove && !window.canAIMakeMove()) {
+                console.log('❌ Move limit reached - stopping AI');
+                throw new Error('Move limit reached');
+            }
+            
+            // Set up timeout protection for AI thinking
+            let moveCompleted = false;
+            const moveTimeoutId = setTimeout(() => {
+                if (!moveCompleted) {
+                    console.warn('⏱️ AI move timeout (60s) - move taking too long');
+                    if (window.engineIntegration) {
+                        window.engineIntegration.updateProgressPopup(false);
+                    }
+                    const hud = document.getElementById('hud');
+                    if (hud) {
+                        hud.innerHTML = '⏱️ AI timeout - move took too long';
+                        setTimeout(() => {
+                            if (window.updateHUD) window.updateHUD();
+                        }, 3000);
+                    }
+                }
+            }, 60000); // 60 second timeout
+            
+            const emergencyTimeoutId = setTimeout(() => {
+                if (!moveCompleted) {
+                    console.error('🚨 Emergency timeout (120s) - forcing move termination');
+                    moveCompleted = true;
+                    clearTimeout(moveTimeoutId);
+                    if (window.engineIntegration) {
+                        window.engineIntegration.updateProgressPopup(false);
+                    }
+                    alert('AI engine timeout - please reset the game');
+                }
+            }, 120000); // 120 second emergency timeout
+            
             // Get best move from WASM engine
             const bestMove = await window.wasmEngine.getBestMove(gameString, searchOptions);
+            
+            // Clear timeouts on successful completion
+            moveCompleted = true;
+            clearTimeout(moveTimeoutId);
+            clearTimeout(emergencyTimeoutId);
             
             if (!bestMove || bestMove.toLowerCase().includes('err')) {
                 throw new Error(`Invalid move response: ${bestMove}`);
@@ -96,6 +137,11 @@
             // Apply the move to the game
             setTimeout(() => {
                 applyEngineMove(bestMove);
+                
+                // Increment AI move counter after successful move
+                if (window.incrementAIMoveCount) {
+                    window.incrementAIMoveCount();
+                }
                 
                 // Hide progress popup
                 if (window.engineIntegration) {

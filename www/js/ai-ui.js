@@ -6,7 +6,11 @@
 window.AIUI = {
   initialized: false,
   isAIMode: false,
-  difficulty: 'medium'
+  difficulty: 'medium',
+  aiMoveCount: 0,
+  maxMoves: 300, // 150 moves per player - covers even longest professional games
+  moveTimeout: 60000, // 60 seconds per move
+  emergencyTimeout: 120000 // 120 seconds absolute maximum
 };
 
 /**
@@ -212,6 +216,7 @@ window.AIUI.hideDifficultyModal = function() {
 window.AIUI.startAIMode = function(difficulty) {
   this.difficulty = difficulty;
   this.isAIMode = true;
+  this.aiMoveCount = 0; // Reset move counter when starting new game
   
   // Get personality settings from dev-ops system
   let settings;
@@ -298,6 +303,11 @@ window.AIUI.startAIMode = function(difficulty) {
   
   // Reset game if needed
   this.resetGameForAI();
+  
+  // Reset AI move counter for safety limits
+  if (window.resetAIMoveCounter) {
+    window.resetAIMoveCounter();
+  }
   
   // Get opponent name for notification
   const baseDifficulty = difficulty === 'hard-v2' ? 'hard' : difficulty;

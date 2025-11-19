@@ -13,6 +13,47 @@
     let originalAIEngineCheckAndMakeMove = null;
     let originalUpdateHUD = null;
     
+    // Track AI move limits for Single Mode
+    let aiMoveCount = 0;
+    const MAX_AI_MOVES = 300; // 150 moves per player - covers longest professional games
+    const AI_MOVE_TIMEOUT = 60000; // 60 seconds per move
+    const EMERGENCY_TIMEOUT = 120000; // 120 seconds absolute maximum
+    let currentMoveTimeout = null;
+    let emergencyTimeoutHandle = null;
+    
+    // Global function to reset AI move counter (call when starting new game)
+    window.resetAIMoveCounter = function() {
+        aiMoveCount = 0;
+        if (currentMoveTimeout) clearTimeout(currentMoveTimeout);
+        if (emergencyTimeoutHandle) clearTimeout(emergencyTimeoutHandle);
+        console.log('🔄 AI move counter reset');
+    };
+    
+    // Global function to check if AI can make a move (safety limits)
+    window.canAIMakeMove = function() {
+        if (aiMoveCount >= MAX_AI_MOVES) {
+            console.warn(`⚠️ AI move limit reached (${aiMoveCount}/${MAX_AI_MOVES})`);
+            alert(`Game ended: Move limit reached (${MAX_AI_MOVES} moves).\n\nThis may indicate a draw or engine issue.`);
+            return false;
+        }
+        return true;
+    };
+    
+    // Global function to increment AI move counter
+    window.incrementAIMoveCount = function() {
+        aiMoveCount++;
+        console.log(`🎯 AI move count: ${aiMoveCount}/${MAX_AI_MOVES}`);
+    };
+    
+    // Global function to get current move count
+    window.getAIMoveCount = function() {
+        return {
+            current: aiMoveCount,
+            max: MAX_AI_MOVES,
+            remaining: MAX_AI_MOVES - aiMoveCount
+        };
+    };
+    
     // Global function to check if UHP engine should be active
     window.shouldUseUHPEngine = function() {
         const currentPlayer = window.state?.current;
