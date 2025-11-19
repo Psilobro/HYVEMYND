@@ -183,6 +183,9 @@
                 // Track thinking output for streaming to UI
                 const startTime = Date.now();
                 let currentDepth = 0;
+                let currentNodes = 0;
+                let currentNPS = 0;
+                let currentPV = null;
                 
                 // Clear output buffer at start
                 this.outputBuffer = [];
@@ -191,20 +194,46 @@
                 const thinkingInterval = setInterval(() => {
                     const elapsed = (Date.now() - startTime) / 1000;
                     
-                    // Parse depth from recent output
+                    // Parse UHP info lines from recent output
                     for (const line of this.outputBuffer) {
+                        if (!line.startsWith('info ')) continue;
+                        
+                        // Parse depth: "info depth 5"
                         const depthMatch = line.match(/info depth (\d+)/);
                         if (depthMatch) {
                             currentDepth = parseInt(depthMatch[1]);
                         }
+                        
+                        // Parse nodes: "info nodes 12345"
+                        const nodesMatch = line.match(/info nodes (\d+)/);
+                        if (nodesMatch) {
+                            currentNodes = parseInt(nodesMatch[1]);
+                        }
+                        
+                        // Parse NPS: "info nps 5000"
+                        const npsMatch = line.match(/info nps (\d+)/);
+                        if (npsMatch) {
+                            currentNPS = parseInt(npsMatch[1]);
+                        }
+                        
+                        // Parse PV (principal variation): "info pv wA1 bA2 wS1 /wA1"
+                        const pvMatch = line.match(/info pv (.+)/);
+                        if (pvMatch) {
+                            currentPV = pvMatch[1].trim();
+                        }
                     }
                     
-                    this._emit('thinking', {
+                    const thinkingData = {
                         phase: 'analyzing',
                         elapsed: elapsed,
                         depth: currentDepth,
+                        nodes: currentNodes,
+                        nps: currentNPS,
+                        pv: currentPV,
                         output: this.outputBuffer.slice(-6) // Last 6 lines
-                    });
+                    };
+                    console.log('🎯 Emitting thinking event:', thinkingData);
+                    this._emit('thinking', thinkingData);
                 }, 100);
                 
                 const bestMove = await this.sendCommand(searchCommand);

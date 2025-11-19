@@ -319,8 +319,8 @@ class DevOpsSystem {
         // Show battle status in the main HUD
         this.showBattleStatus(`🚀 AI Battle: ${whiteAI} vs ${blackAI} - Move 1`);
         
-        // Show floating battle controls
-        this.showBattleControls();
+        // Show floating battle controls - DISABLED (interferes with history)
+        // this.showBattleControls();
     }
     
     stopAIBattle() {
@@ -1316,6 +1316,9 @@ class DevOpsSystem {
     }
     
     showBattleControls() {
+        // DISABLED: Battle controls popup interferes with history panel
+        return;
+        
         // Create floating battle controls
         let battleControls = document.getElementById('floating-battle-controls');
         

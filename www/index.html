@@ -81,6 +81,7 @@
     <div id="turn-display">White to move</div>
     <div id="hud-controls">
       <button id="reset-button">Reset Game</button>
+      <button id="pause-game-button">⏸️ Pause</button>
     </div>
   </div>
   <div id="move-history">
@@ -630,5 +631,9 @@
       console.log('🎮 HYVEMYND loaded in sandbox mode - manual play ready');
     });
   </script>
+  
+  <!-- Eruda Mobile Console (TEMPORARY - for debugging) -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
 </body>
 </html>

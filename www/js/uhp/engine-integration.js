@@ -616,23 +616,66 @@
         
         setupWASMThinkingListener() {
             // Check for WASM engine (the correct reference)
-            if (!window.wasmEngine) return;
+            if (!window.wasmEngine) {
+                console.warn('⚠️ WASM engine not available for thinking listener');
+                return;
+            }
             
             const engineOutput = document.querySelector('.engine-output code');
             const depthElement = document.getElementById('progress-depth');
             
-            if (!engineOutput) return;
+            console.log('🔍 Setting up WASM thinking listener:', {
+                engineOutput: !!engineOutput,
+                depthElement: !!depthElement
+            });
+            
+            if (!engineOutput) {
+                console.error('❌ Engine output element not found!');
+                return;
+            }
             
             this.wasmThinkingListener = (data) => {
+                console.log('🧠 Thinking data received:', data);
+                
                 // Update depth if available
                 if (data.depth && depthElement) {
                     depthElement.textContent = data.depth;
+                    console.log('📊 Updated depth to:', data.depth);
                 }
                 
-                // Update output display with last few lines
-                if (data.output && data.output.length > 0) {
-                    const lines = data.output.slice(-10); // Show last 10 lines
-                    engineOutput.textContent = lines.join('\n');
+                // Build formatted engine output display
+                const outputLines = [];
+                
+                // Add key metrics if available
+                if (data.depth) {
+                    outputLines.push(`Depth: ${data.depth}`);
+                }
+                if (data.nodes) {
+                    outputLines.push(`Nodes: ${data.nodes.toLocaleString()}`);
+                }
+                if (data.nps) {
+                    const npsDisplay = data.nps >= 1000 
+                        ? `${(data.nps / 1000).toFixed(1)}k` 
+                        : data.nps;
+                    outputLines.push(`NPS: ${npsDisplay}`);
+                }
+                if (data.pv) {
+                    // Show first few moves of principal variation
+                    const pvMoves = data.pv.split(' ').slice(0, 3).join(' ');
+                    outputLines.push(`Best: ${pvMoves}`);
+                }
+                
+                // Add raw output lines if formatted data isn't available
+                if (outputLines.length === 0 && data.output && data.output.length > 0) {
+                    // Show last few raw lines
+                    const rawLines = data.output.slice(-6).filter(line => line.trim());
+                    outputLines.push(...rawLines);
+                }
+                
+                // Update the display
+                if (outputLines.length > 0) {
+                    engineOutput.textContent = outputLines.join('\n');
+                    console.log('📺 Updated engine output:', outputLines.join(' | '));
                     
                     // Auto-scroll to bottom
                     const outputContainer = engineOutput.parentElement;

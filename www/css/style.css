@@ -2358,6 +2358,48 @@ canvas {
     position: relative;
 }
 
+/* Tablet size reduction */
+@media (max-width: 1024px) {
+    .crt-monitor {
+        width: 200px;
+        padding: 8px 8px 10px 8px;
+        border: 2px solid #2a2a2a;
+        border-radius: 8px 8px 6px 6px;
+    }
+    
+    .power-led {
+        width: 4px;
+        height: 4px;
+        top: 5px;
+        right: 8px;
+    }
+    
+    .crt-screen {
+        border: 2px solid #333;
+        padding: 8px;
+    }
+    
+    #engine-progress-popup .progress-title {
+        font-size: 10px;
+        margin-bottom: 6px;
+    }
+    
+    #engine-progress-popup .progress-details {
+        font-size: 9px;
+        margin-bottom: 5px;
+    }
+    
+    .progress-bar-container {
+        height: 4px;
+        margin-bottom: 5px;
+    }
+    
+    .engine-output {
+        max-height: 50px;
+        font-size: 7px;
+    }
+}
+
 .power-led {
     position: absolute;
     top: 8px;
@@ -2604,23 +2646,46 @@ canvas {
     background: #00d4ff;
 }
 
-/* Mobile responsiveness for progress popup */
+/* Mobile responsiveness for progress popup - 1/4 size */
 @media (max-width: 480px) {
     .crt-monitor {
-        width: 280px;
+        width: 140px;
+        padding: 6px 6px 8px 6px;
+        border: 2px solid #2a2a2a;
+        border-radius: 6px 6px 4px 4px;
+    }
+    
+    .power-led {
+        width: 3px;
+        height: 3px;
+        top: 4px;
+        right: 6px;
+    }
+    
+    .crt-screen {
+        border: 1px solid #333;
+        padding: 6px;
     }
     
     #engine-progress-popup .progress-title {
-        font-size: 12px;
+        font-size: 8px;
+        margin-bottom: 4px;
     }
     
     #engine-progress-popup .progress-details {
-        font-size: 10px;
+        font-size: 7px;
+        margin-bottom: 4px;
+    }
+    
+    .progress-bar-container {
+        height: 3px;
+        margin-bottom: 4px;
     }
     
     .engine-output {
-        max-height: 60px;
-        font-size: 8px;
+        max-height: 40px;
+        font-size: 6px;
+        line-height: 1.2;
     }
 }
 

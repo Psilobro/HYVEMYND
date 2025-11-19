@@ -496,6 +496,28 @@ blackTrayApp.view.style.zIndex = '6';
                 }
             });
         }
+        
+        // Setup pause/resume button
+        const pauseButton = document.getElementById('pause-game-button');
+        if (pauseButton) {
+            pauseButton.addEventListener('click', () => {
+                if (window.state.gamePaused) {
+                    // Resume game
+                    window.state.gamePaused = false;
+                    pauseButton.textContent = '⏸️ Pause';
+                    console.log('▶️ Game resumed');
+                    // Update HUD to continue game flow
+                    if (window.updateHUD) {
+                        window.updateHUD();
+                    }
+                } else {
+                    // Pause game
+                    window.state.gamePaused = true;
+                    pauseButton.textContent = '▶️ Resume';
+                    console.log('⏸️ Game paused');
+                }
+            });
+        }
     }
     
     // Setup settings dropdown menu

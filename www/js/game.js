@@ -595,7 +595,8 @@ let state = {
     current:'white',
     moveNumber:1,
     queenPlaced:{white:false,black:false},
-    gameOver: false
+    gameOver: false,
+    gamePaused: false
 };
 window.state = state; // Make state globally accessible
 let selected = null;
@@ -956,6 +957,12 @@ const turnDisplay = document.getElementById('turn-display');
 function updateHUD(){
     console.log(`🎯 updateHUD called - current: ${state.current}, move: ${state.moveNumber}`);
     
+    // Don't update if game is paused
+    if (window.state.gamePaused) {
+        console.log('⏸️ Game is paused - skipping HUD update');
+        return;
+    }
+    
     // Check if current player has any legal moves
     if (hasLegalMoves(state.current)) {
         const displayElement = turnDisplay || hud;
@@ -1053,6 +1060,13 @@ function resetGame() {
     state.blackQueenPlaced = false;
     state.gameOver = false;
     state.winner = null;
+    state.gamePaused = false;
+    
+    // Update pause button if it exists
+    const pauseButton = document.getElementById('pause-game-button');
+    if (pauseButton) {
+        pauseButton.textContent = '⏸️ Pause';
+    }
     
     // Clear selections and legal zones
     selected = null;
@@ -1248,6 +1262,11 @@ function legalPlacementZones(color){
 }
 
 function commitPlacement(q,r){
+    if (state.gamePaused) {
+        console.log('⏸️ Game is paused - placement blocked');
+        return;
+    }
+    
     const p = selected.piece;
     
     // Validate placement is in legal zones before committing
@@ -1835,6 +1854,11 @@ function legalMoveZones(piece){
 
 
 function commitMove(q,r){
+    if (state.gamePaused) {
+        console.log('⏸️ Game is paused - move blocked');
+        return;
+    }
+    
     animating=true;
     
     // Check if a piece is selected
