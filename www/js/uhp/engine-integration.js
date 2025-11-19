@@ -502,16 +502,45 @@
             // Reset progress state
             this.progressStartTime = Date.now();
             this.progressUpdateInterval = null;
+            this.wasmThinkingListener = null;
             
             // Set initial values
             const timeElement = document.getElementById('progress-time');
             const depthElement = document.getElementById('progress-depth');
             const statusElement = document.getElementById('engine-status');
             const progressBar = document.getElementById('progress-bar');
+            const stopwatch = document.getElementById('progress-stopwatch');
+            const engineOutput = document.querySelector('.engine-output code');
+            const crtScreen = document.querySelector('.crt-screen');
+            const progressTitle = document.querySelector('.progress-title');
             
             if (timeElement) timeElement.textContent = '0s';
             if (depthElement) depthElement.textContent = data.depth || '-';
             if (statusElement) statusElement.textContent = data.status || 'Analyzing position...';
+            if (stopwatch) stopwatch.textContent = '0.0s';
+            if (engineOutput) engineOutput.textContent = '';
+            
+            // Apply color theme based on AI difficulty comparison
+            if (crtScreen && data.difficulty) {
+                // Remove existing color classes
+                crtScreen.classList.remove('color-green', 'color-amber', 'color-blue');
+                // Apply new color class
+                crtScreen.classList.add(`color-${data.difficulty}`);
+                console.log(`🎨 Applied color class: color-${data.difficulty} to CRT screen`);
+            } else if (crtScreen) {
+                // Default to green if no difficulty specified
+                crtScreen.classList.remove('color-amber', 'color-blue');
+                crtScreen.classList.add('color-green');
+                console.log(`🎨 Applied default color class: color-green to CRT screen`);
+            }
+            
+            // Update title emoji based on AI name
+            if (progressTitle && data.aiName) {
+                const emoji = data.aiName.includes('Sunny') ? '🌻' : 
+                             data.aiName.includes('Buzzwell') ? '⚔️' :
+                             data.aiName.includes('Beedric') ? '👑' : '🤖';
+                progressTitle.textContent = `${emoji} Engine Thinking...`;
+            }
             
             // Determine progress mode based on engine settings
             const engineMode = document.getElementById('engine-mode')?.value || 'time';
@@ -535,6 +564,12 @@
                 }
             }
             
+            // Start stopwatch for real-time elapsed display
+            this.setupStopwatch();
+            
+            // Listen for WASM thinking events
+            this.setupWASMThinkingListener();
+            
             // Show popup with animation
             popup.classList.add('show');
             
@@ -551,10 +586,63 @@
                 this.progressUpdateInterval = null;
             }
             
+            if (this.stopwatchInterval) {
+                clearInterval(this.stopwatchInterval);
+                this.stopwatchInterval = null;
+            }
+            
+            // Remove WASM thinking listener
+            if (this.wasmThinkingListener && window.wasmEngine) {
+                window.wasmEngine.off('thinking', this.wasmThinkingListener);
+                this.wasmThinkingListener = null;
+            }
+            
             // Hide popup with animation
             popup.classList.remove('show');
             
             console.log('🎯 Engine progress popup hidden');
+        }
+        
+        setupStopwatch() {
+            const stopwatch = document.getElementById('progress-stopwatch');
+            if (!stopwatch) return;
+            
+            // Update every 50ms for smooth display
+            this.stopwatchInterval = setInterval(() => {
+                const elapsed = (Date.now() - this.progressStartTime) / 1000;
+                stopwatch.textContent = `${elapsed.toFixed(1)}s`;
+            }, 50);
+        }
+        
+        setupWASMThinkingListener() {
+            // Check for WASM engine (the correct reference)
+            if (!window.wasmEngine) return;
+            
+            const engineOutput = document.querySelector('.engine-output code');
+            const depthElement = document.getElementById('progress-depth');
+            
+            if (!engineOutput) return;
+            
+            this.wasmThinkingListener = (data) => {
+                // Update depth if available
+                if (data.depth && depthElement) {
+                    depthElement.textContent = data.depth;
+                }
+                
+                // Update output display with last few lines
+                if (data.output && data.output.length > 0) {
+                    const lines = data.output.slice(-10); // Show last 10 lines
+                    engineOutput.textContent = lines.join('\n');
+                    
+                    // Auto-scroll to bottom
+                    const outputContainer = engineOutput.parentElement;
+                    if (outputContainer) {
+                        outputContainer.scrollTop = outputContainer.scrollHeight;
+                    }
+                }
+            };
+            
+            window.wasmEngine.on('thinking', this.wasmThinkingListener);
         }
         
         setupTimeProgress(timeLimit) {

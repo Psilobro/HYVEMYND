@@ -66,7 +66,7 @@ function showHistoryOverlay(moveIdx) {
         overlay.style.left = '0';
         overlay.style.width = '100%';
         overlay.style.height = '100%';
-        overlay.style.zIndex = '100';
+        overlay.style.zIndex = '250';
         overlay.style.pointerEvents = 'none';
         overlay.style.background = 'rgba(0,0,0,0.15)';
         document.getElementById('game-container').appendChild(overlay);

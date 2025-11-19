@@ -16,6 +16,7 @@
             this.eventListeners = {};
             this.tableSizeMB = 100; // Default 100MB
             this.pendingTableSize = null; // For changes requiring restart
+            this.outputBuffer = []; // Capture engine responses for streaming
             
             console.log('🧩 WASM Engine initializing...');
         }
@@ -97,6 +98,15 @@
                 const response = this.uhpFunction(command);
                 console.log(`📥 WASM Response: ${response}`);
                 
+                // Capture response for streaming display
+                if (response && response.trim()) {
+                    this.outputBuffer.push(response);
+                    // Keep only last 10 responses
+                    if (this.outputBuffer.length > 10) {
+                        this.outputBuffer.shift();
+                    }
+                }
+                
                 // Emit response event for compatibility with UHP client
                 this._emit('response', { command, response });
                 
@@ -170,7 +180,37 @@
                 console.log(`🎯 Getting best move with: ${searchCommand}`);
                 this._emit('thinking', { phase: 'starting', progress: 0 });
                 
+                // Track thinking output for streaming to UI
+                const startTime = Date.now();
+                let currentDepth = 0;
+                
+                // Clear output buffer at start
+                this.outputBuffer = [];
+                
+                // Start thinking event interval
+                const thinkingInterval = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    
+                    // Parse depth from recent output
+                    for (const line of this.outputBuffer) {
+                        const depthMatch = line.match(/info depth (\d+)/);
+                        if (depthMatch) {
+                            currentDepth = parseInt(depthMatch[1]);
+                        }
+                    }
+                    
+                    this._emit('thinking', {
+                        phase: 'analyzing',
+                        elapsed: elapsed,
+                        depth: currentDepth,
+                        output: this.outputBuffer.slice(-6) // Last 6 lines
+                    });
+                }, 100);
+                
                 const bestMove = await this.sendCommand(searchCommand);
+                
+                // Stop thinking interval
+                clearInterval(thinkingInterval);
                 
                 this._emit('thinking', { phase: 'complete', progress: 100 });
                 

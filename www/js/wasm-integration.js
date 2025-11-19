@@ -16,17 +16,22 @@
         try {
             console.log('🧩 Processing WASM engine move...');
             
-            // Show progress popup
-            if (window.engineIntegration) {
-                window.engineIntegration.updateProgressPopup(true, {
-                    phase: 'initializing',
-                    progress: 0
-                });
-            }
-            
             // Get current personality settings for AI difficulty
             const personality = getCurrentPersonality();
             console.log(`🎭 Using personality: ${personality.name}`);
+            
+            // Determine color theme based on AI difficulty comparison
+            const colorTheme = determineColorTheme(personality.name);
+            
+            // Show progress popup with color theme
+            if (window.engineIntegration) {
+                window.engineIntegration.updateProgressPopup(true, {
+                    phase: 'initializing',
+                    progress: 0,
+                    difficulty: colorTheme,
+                    aiName: personality.name
+                });
+            }
             
             // Export current game state to UHP format
             const gameString = exportGameStateToUHP();
@@ -169,6 +174,53 @@
         }
         
         return personalities[difficulty] || personalities.buzzwell;
+    }
+    
+    // Determine terminal color theme based on AI difficulty comparison
+    function determineColorTheme(currentAIName) {
+        // Map AI names to difficulty levels (1=easy, 2=medium, 3=hard)
+        const difficultyMap = {
+            'Sunny Pollenpatch': 1,
+            'Buzzwell Stingmore': 2,
+            'Beedric Bumbleton': 3
+        };
+        
+        const currentDifficulty = difficultyMap[currentAIName] || 2;
+        
+        // Check if in AI battle mode
+        if (window.devOpsSystem && window.devOpsSystem.currentBattle && window.devOpsSystem.currentBattle.active) {
+            const whiteAI = window.devOpsSystem.currentBattle.whiteAI;
+            const blackAI = window.devOpsSystem.currentBattle.blackAI;
+            
+            if (!whiteAI || !blackAI) {
+                return 'green'; // Default
+            }
+            
+            // Get AI names based on IDs
+            const aiNames = {
+                'sunny': 'Sunny Pollenpatch',
+                'buzzwell': 'Buzzwell Stingmore',
+                'beedric': 'Beedric Bumbleton'
+            };
+            
+            const whiteAIName = aiNames[whiteAI];
+            const blackAIName = aiNames[blackAI];
+            
+            const whiteDifficulty = difficultyMap[whiteAIName] || 2;
+            const blackDifficulty = difficultyMap[blackAIName] || 2;
+            
+            // Mirror match - use blue
+            if (whiteDifficulty === blackDifficulty) {
+                return 'blue';
+            }
+            
+            // Current AI is stronger - green (hacker vibe)
+            // Current AI is weaker - amber (retro vibe)
+            return currentDifficulty > (window.state.current === 'white' ? blackDifficulty : whiteDifficulty) ? 'green' : 'amber';
+        }
+        
+        // Single player mode - always show AI's difficulty as green (player is facing the AI)
+        return 'green';
     }
     
     // Clean up any invalid moves from UHP history

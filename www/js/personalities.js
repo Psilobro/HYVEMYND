@@ -235,6 +235,32 @@ window.Personalities = {
   },
   
   /**
+   * Fade out voice line with animation
+   */
+  fadeOutVoiceLine: function() {
+    if (!this.chatBubble || this.chatBubble.style.display === 'none') return;
+    
+    // Clear any auto-hide timeout
+    if (this.chatTimeout) {
+      clearTimeout(this.chatTimeout);
+      this.chatTimeout = null;
+    }
+    
+    // Apply transition and fade out
+    this.chatBubble.style.transition = 'opacity 1s, transform 1s';
+    this.chatBubble.style.opacity = '0';
+    this.chatBubble.style.transform = 'scale(0.95)';
+    
+    // Hide after animation completes
+    setTimeout(() => {
+      this.chatBubble.style.display = 'none';
+      this.chatBubble.style.opacity = '1';
+      this.chatBubble.style.transform = 'scale(1)';
+      this.chatBubble.style.transition = '';
+    }, 1000);
+  },
+  
+  /**
    * Create the floating chat bubble
    */
   createChatBubble: function() {

@@ -102,19 +102,29 @@
   
   <!-- Engine Progress Popup -->
   <div id="engine-progress-popup">
-    <div class="progress-title">🤖 Engine Thinking...</div>
-    <div class="progress-details">
-      <span class="progress-label">Time:</span>
-      <span class="progress-value" id="progress-time">0s</span>
+    <div class="crt-monitor">
+      <div class="power-led"></div>
+      <div class="crt-screen">
+        <div class="progress-title">🤖 Engine Thinking...</div>
+        <div class="progress-details">
+          <span class="progress-label">Time:</span>
+          <span class="progress-value" id="progress-time">0s</span>
+        </div>
+        <div class="progress-details">
+          <span class="progress-label">Depth:</span>
+          <span class="progress-value" id="progress-depth">-</span>
+        </div>
+        <div class="progress-details">
+          <span class="progress-label">⏱️ Stopwatch:</span>
+          <span class="progress-value" id="progress-stopwatch">0.0s</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="engine-status" id="engine-status">Analyzing position...</div>
+        <div class="engine-output" id="engine-output"><code></code></div>
+      </div>
     </div>
-    <div class="progress-details">
-      <span class="progress-label">Depth:</span>
-      <span class="progress-value" id="progress-depth">-</span>
-    </div>
-    <div class="progress-bar-container">
-      <div class="progress-bar" id="progress-bar"></div>
-    </div>
-    <div class="engine-status" id="engine-status">Analyzing position...</div>
   </div>
   
   <div id="white-tray" class="player-tray"></div>
@@ -189,11 +199,6 @@
           <div class="battle-controls">
             <button id="start-ai-battle">🚀 Start Battle</button>
             <button id="stop-ai-battle" style="display: none;">⏹️ Stop Battle</button>
-            <div class="battle-speed">
-              <label>Speed:</label>
-              <input type="range" id="battle-speed" min="100" max="3000" value="1000" step="100">
-              <span id="speed-display">1.0s</span>
-            </div>
           </div>
         </div>
         <div id="battle-status" class="battle-status">Ready to start AI battle</div>

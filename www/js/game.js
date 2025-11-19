@@ -41,6 +41,9 @@ window.GRID_RADIUS = 4;
 window.MIN_GRID_RADIUS = 4; // Original size
 window.AUTO_ZOOM_ENABLED = true; // Toggle for auto-zoom feature
 
+// Flag to prevent double UHP recording when applying WASM moves
+window.applyingWASMMove = false;
+
 // Zoom variables
 let currentZoom = 1.0;
 let minZoom = 1.0;
@@ -1009,6 +1012,17 @@ function hasLegalMoves(color) {
 function resetGame() {
     console.log('🔄 Resetting game to initial state');
     
+    // Stop any active AI battles
+    if (window.devOps && window.devOps.currentBattle && window.devOps.currentBattle.active) {
+        console.log('🛑 Stopping active AI battle');
+        window.devOps.stopAIBattle();
+    }
+    
+    // Hide engine progress popup
+    if (window.engineIntegration && window.engineIntegration.hideProgressPopup) {
+        window.engineIntegration.hideProgressPopup();
+    }
+    
     // Stop any ongoing animations
     animating = false;
     
@@ -1245,6 +1259,20 @@ function commitPlacement(q,r){
         return false; // Don't commit invalid placements
     }
     
+    // Assign placementOrder for UHP piece identification (which ant is wA1 vs wA2 vs wA3)
+    if (!p.meta.placementOrder) {
+        // Count how many pieces of this type+color have been placed already
+        const sameTypePlaced = window.tray.filter(piece =>
+            piece.meta &&
+            piece.meta.color === p.meta.color &&
+            piece.meta.key === p.meta.key &&
+            piece.meta.placed
+        ).length;
+        
+        p.meta.placementOrder = sameTypePlaced + 1; // 1-indexed (first piece is #1)
+        console.log(`🔢 Assigned placementOrder ${p.meta.placementOrder} to ${p.meta.color} ${p.meta.key}`);
+    }
+    
     if (!isNearBorder(q,r)) {
         // Record UHP move for this placement using CHRONOLOGICAL placement order
         if (window.uhpClient && p && p.meta) {
@@ -1343,6 +1371,10 @@ function commitPlacement(q,r){
     const winner = checkForWinner();
     if (winner) {
         state.gameOver = true;
+        // Dismiss engine progress popup immediately
+        if (window.engineIntegration) {
+            window.engineIntegration.updateProgressPopup(false);
+        }
         setTimeout(() => {
             const banner = window.winBanner;
             if (banner) {
@@ -1918,7 +1950,8 @@ function commitMove(q,r){
         p.meta.q=q; p.meta.r=r;
 
         // Record UHP movement using CHRONOLOGICAL placement order
-        if (window.uhpClient && p && p.meta) {
+        // Skip if we're applying a WASM move (it will record its own notation)
+        if (!window.applyingWASMMove && window.uhpClient && p && p.meta) {
             console.log(`🎯 Recording UHP movement for ${p.meta.color} ${p.meta.key} from (${fromQ}, ${fromR}) to (${q}, ${r}), move ${state.moveNumber || 1}`);
             
             try {
@@ -1995,6 +2028,12 @@ function commitMove(q,r){
             console.log(`🎯 Not recording UHP movement: uhpClient=${!!window.uhpClient}, piece=${!!p}, meta=${!!p?.meta}`);
         }
 
+        // Clear WASM flag here if it was set (after UHP recording check)
+        if (window.applyingWASMMove) {
+            window.applyingWASMMove = false;
+            console.log(`🔄 Cleared applyingWASMMove flag after animation callback`);
+        }
+
         animating=false;
         const oldTurn = state.current;
         state.moveNumber++;
@@ -2011,6 +2050,10 @@ function commitMove(q,r){
         const winner = checkForWinner();
         if (winner) {
             state.gameOver = true;
+            // Dismiss engine progress popup immediately
+            if (window.engineIntegration) {
+                window.engineIntegration.updateProgressPopup(false);
+            }
             setTimeout(() => {
                 const banner = window.winBanner;
                 if (banner) {

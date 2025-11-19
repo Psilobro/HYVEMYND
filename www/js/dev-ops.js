@@ -24,6 +24,138 @@ class DevOpsSystem {
         this.init();
     }
     
+    /**
+     * Parse UHP position notation into components
+     * Examples: "wG1" (first move), "wA1 -wG1" (placement), "wG1 wA1-" (movement)
+     * Returns: { piece, direction, reference, isPrefix } or null if invalid
+     */
+    parseUHPPosition(uhpMove) {
+        if (!uhpMove || typeof uhpMove !== 'string') return null;
+        
+        const trimmed = uhpMove.trim();
+        
+        // First move: just piece name like "wG1"
+        if (/^[wb][QAGBS]\d*$/.test(trimmed)) {
+            return { piece: trimmed, direction: null, reference: null, isPrefix: false };
+        }
+        
+        // Movement or placement: "piece reference" or "piece direction+reference"
+        // Examples: "wG1 wA1-", "wA1 -wG1", "bS2 \\wQ", "bB1 bQ" (beetle on top)
+        const parts = trimmed.split(/\s+/);
+        if (parts.length !== 2) return null;
+        
+        const piece = parts[0];
+        const position = parts[1];
+        
+        // Parse direction and reference from position string
+        // Direction can be prefix or suffix: "/wG1", "wG1/", "-wG1", "wG1-", etc.
+        let direction = null;
+        let reference = null;
+        let isPrefix = false;
+        
+        // Check for prefix direction: /wG1, -wG1, \wG1
+        if (/^[/\\-]/.test(position)) {
+            direction = position[0];
+            reference = position.substring(1);
+            isPrefix = true;
+        }
+        // Check for suffix direction: wG1/, wG1-, wG1\
+        else if (/[/\\-]$/.test(position)) {
+            direction = position[position.length - 1];
+            reference = position.substring(0, position.length - 1);
+            isPrefix = false;
+        }
+        // ✅ FIX: No direction marker means BEETLE CLIMBING ON TOP of reference piece
+        // Example: "bB1 bQ" means beetle bB1 climbs onto piece bQ (same hex position)
+        else if (/^[wb][QAGBS]\d*$/.test(position)) {
+            // This is a beetle movement onto another piece
+            direction = 'ontop'; // Special marker for on-top movement
+            reference = position;
+            isPrefix = false;
+        }
+        // Invalid format
+        else {
+            return null;
+        }
+        
+        return { piece, direction, reference, isPrefix };
+    }
+    
+    /**
+     * Find a piece on the board by its UHP identifier (e.g., "wG1", "bA2")
+     * Uses placementOrder tracking to identify which grasshopper is #1 vs #2 vs #3
+     */
+    findPieceByUHPName(uhpName) {
+        if (!uhpName || !window.tray) return null;
+        
+        // Parse UHP name: wG1 -> color=white, type=G, number=1
+        const match = uhpName.match(/^([wb])([QAGBS])(\d*)$/);
+        if (!match) return null;
+        
+        const [, colorCode, pieceType, numberStr] = match;
+        const color = colorCode === 'w' ? 'white' : 'black';
+        const number = numberStr ? parseInt(numberStr, 10) : 1;
+        
+        // Find all placed pieces of this type and color
+        const candidates = window.tray.filter(p => 
+            p.meta &&
+            p.meta.color === color &&
+            p.meta.key === pieceType &&
+            p.meta.placed
+        );
+        
+        // Sort by placementOrder to get chronological order
+        candidates.sort((a, b) => (a.meta.placementOrder || 0) - (b.meta.placementOrder || 0));
+        
+        // Return the Nth piece (1-indexed)
+        return candidates[number - 1] || null;
+    }
+    
+    /**
+     * Calculate neighbor hex position from flat-top hex coordinates
+     * UHP uses pointy-top orientation, we use flat-top (30° rotation)
+     * 
+     * UHP Direction Mapping (per user specification):
+     * Suffix notation (new piece in that direction from reference):
+     *   wG1/  (North) -> new piece at [0, -1] from reference
+     *   wG1-  (NE) -> new piece at [1, -1] from reference
+     *   wG1\  (SE) -> new piece at [1, 0] from reference
+     * 
+     * Prefix notation (new piece in opposite direction from reference):
+     *   /wG1  (South) -> new piece at [0, 1] from reference
+     *   -wG1  (SW) -> new piece at [-1, 1] from reference
+     *   \wG1  (NW) -> new piece at [-1, 0] from reference
+     */
+    getNeighborPosition(q, r, uhpDirection, isPrefix) {
+        if (!uhpDirection) return null;
+        
+        // Map UHP suffix directions to flat-top hex offsets
+        const suffixOffsets = {
+            '/': { dq: 0, dr: -1 },   // North: top edge
+            '-': { dq: 1, dr: -1 },   // Northeast: top-right
+            '\\': { dq: 1, dr: 0 }    // Southeast: bottom-right
+        };
+        
+        // Prefix directions are opposites of suffix
+        const prefixOffsets = {
+            '/': { dq: 0, dr: 1 },    // South: bottom edge (opposite of /)
+            '-': { dq: -1, dr: 1 },   // Southwest: bottom-left (opposite of -)
+            '\\': { dq: -1, dr: 0 }   // Northwest: top-left (opposite of \)
+        };
+        
+        const offset = isPrefix ? prefixOffsets[uhpDirection] : suffixOffsets[uhpDirection];
+        
+        if (!offset) {
+            console.error(`❌ Unknown UHP direction: ${uhpDirection} (prefix: ${isPrefix})`);
+            return null;
+        }
+        
+        return {
+            q: q + offset.dq,
+            r: r + offset.dr
+        };
+    }
+    
     init() {
         if (this.isInitialized) return;
         
@@ -32,7 +164,7 @@ class DevOpsSystem {
         this.updateStatisticsDisplay();
         
         this.isInitialized = true;
-        console.log('Dev Ops System initialized');
+        console.log('✅ Dev Ops System initialized');
     }
     
     setupEventListeners() {
@@ -63,10 +195,8 @@ class DevOpsSystem {
                     this.updateBattleStatus(`🧠 ${currentAI} thinking... (${data.phase})`);
                 }
                 
-                // Update engine progress popup if available
-                if (window.engineIntegration) {
-                    window.engineIntegration.updateProgressPopup(true, data);
-                }
+                // Don't update progress popup here - setupWASMThinkingListener handles it
+                // and calling updateProgressPopup without difficulty/aiName would overwrite the color theme
             });
             
             window.wasmEngine.on('initialized', () => {
@@ -94,11 +224,8 @@ class DevOpsSystem {
             stopBattleBtn.addEventListener('click', () => this.stopAIBattle());
         }
         
-        // Battle speed control
-        const speedSlider = document.getElementById('battle-speed');
-        if (speedSlider) {
-            speedSlider.addEventListener('input', (e) => this.updateBattleSpeed(e.target.value));
-        }
+        // Battle speed control - removed slider, using fixed 1s delay for better viewing
+        // Speed is now controlled only by floating battle controls if needed
         
         // Human Learning controls
         const startLearningBtn = document.getElementById('start-learning-game');
@@ -119,10 +246,14 @@ class DevOpsSystem {
     }
     
     showModal() {
+        console.log('🔧 Dev Ops showModal called');
         const modal = document.getElementById('dev-ops-modal');
         if (modal) {
+            console.log('📂 Dev Ops modal found, displaying...');
             modal.style.display = 'flex';
             this.updateStatisticsDisplay();
+        } else {
+            console.error('❌ Dev Ops modal not found in DOM!');
         }
     }
     
@@ -227,8 +358,8 @@ class DevOpsSystem {
         this.updateBattleStatus(battleStatus);
         this.showBattleStatus(`🚀 Battle: ${this.currentBattle.whiteAI} vs ${this.currentBattle.blackAI} - ${aiDisplayName} thinking (Move ${this.currentBattle.moveCount + 1})`);
         
-        // Get battle speed (convert to milliseconds)
-        const speed = parseInt(document.getElementById('battle-speed').value);
+        // Use fixed 1 second delay for better viewing of moves
+        const speed = 1000;
         
         // Wait for the specified speed delay
         setTimeout(async () => {
@@ -239,8 +370,9 @@ class DevOpsSystem {
                 await this.makeAIMove(currentAI);
                 this.currentBattle.moveCount++;
                 
-                // Continue battle loop
-                setTimeout(() => this.runAIBattleLoop(), 100);
+                // Wait for move to fully complete (animations + UI updates)
+                // Increased from 100ms to 1000ms to prevent move pileup
+                setTimeout(() => this.runAIBattleLoop(), 1000);
             } catch (error) {
                 console.error('Error in AI battle:', error);
                 this.updateBattleStatus('❌ Error in AI battle');
@@ -250,29 +382,16 @@ class DevOpsSystem {
     }
     
     async makeAIMove(aiName) {
-        // Map AI names to personality settings
-        const personalityMap = {
-            'sunny': {
-                name: 'Sunny Pollenpatch',
-                mode: 'time',
-                timeLimit: 2,
-                depthLimit: 3
-            },
-            'buzzwell': {
-                name: 'Buzzwell Stingmore',
-                mode: 'time', 
-                timeLimit: 4,
-                depthLimit: 5
-            },
-            'beedric': {
-                name: 'Beedric Bumbleton',
-                mode: 'time',
-                timeLimit: 10,
-                depthLimit: 8
-            }
-        };
+        // Use configured personality settings from Dev Ops UI
+        const personality = this.personalitySettings[aiName] || this.personalitySettings['buzzwell'];
         
-        const personality = personalityMap[aiName] || personalityMap['buzzwell'];
+        // Map AI names to display names
+        const displayNames = {
+            'sunny': 'Sunny Pollenpatch',
+            'buzzwell': 'Buzzwell Stingmore',
+            'beedric': 'Beedric Bumbleton'
+        };
+        const displayName = displayNames[aiName] || 'Buzzwell Stingmore';
         
         try {
             // Ensure WASM engine is available
@@ -281,6 +400,17 @@ class DevOpsSystem {
             }
             
             this.updateBattleStatus(`🧠 ${personality.name} is thinking...`);
+            
+            // Determine color theme based on AI difficulty comparison
+            const colorTheme = this.determineColorTheme(aiName);
+            
+            // Show progress popup with color theme
+            if (window.engineIntegration) {
+                window.engineIntegration.updateProgressPopup(true, {
+                    difficulty: colorTheme,
+                    aiName: displayName
+                });
+            }
             
             // Initialize WASM engine if needed
             if (!window.wasmEngine.initialized) {
@@ -310,23 +440,14 @@ class DevOpsSystem {
                 console.log(`🎯 AI battle: No move history found, starting fresh game`);
             }
             
-            // Use personality-specific engine settings for AI battles
-            const difficultyMap = {
-                'sunny': { timeLimit: 2, depthLimit: 2 },     // Easy: 2s, depth 2
-                'buzzwell': { timeLimit: 4, depthLimit: 4 },  // Medium: 4s, depth 4  
-                'beedric': { timeLimit: 6, depthLimit: 6 }    // Hard: 6s, depth 6
-            };
-            
-            const personalitySettings = difficultyMap[aiName] || difficultyMap['buzzwell'];
-            const searchMode = 'time'; // Use time mode for consistent battle pacing
-            
+            // Use configured personality settings from Dev Ops UI
             const engineOptions = {
-                mode: searchMode,
-                timeLimit: personalitySettings.timeLimit,
-                depthLimit: personalitySettings.depthLimit
+                mode: personality.mode || 'time',
+                timeLimit: personality.timeLimit || 5,
+                depthLimit: personality.depthLimit || 4
             };
             
-            console.log(`🎯 Using personality settings for ${aiName}: ${personalitySettings.timeLimit}s (${personality.name})`);
+            console.log(`🎯 Using configured settings for ${aiName}: ${engineOptions.timeLimit}s, depth ${engineOptions.depthLimit} (${displayName})`);
             
             // Get best move from WASM engine with personality settings
             const bestMove = await window.wasmEngine.getBestMove(gameString, engineOptions);
@@ -393,6 +514,44 @@ class DevOpsSystem {
         return '';
     }
     
+    // Determine terminal color theme based on AI difficulty comparison in battles
+    determineColorTheme(currentAIId) {
+        if (!this.currentBattle) {
+            return 'green'; // Default
+        }
+        
+        // Map AI IDs to difficulty levels (1=easy, 2=medium, 3=hard)
+        const difficultyMap = {
+            'sunny': 1,
+            'buzzwell': 2,
+            'beedric': 3
+        };
+        
+        const whiteAI = this.currentBattle.whiteAI;
+        const blackAI = this.currentBattle.blackAI;
+        
+        const whiteDifficulty = difficultyMap[whiteAI] || 2;
+        const blackDifficulty = difficultyMap[blackAI] || 2;
+        const currentDifficulty = difficultyMap[currentAIId] || 2;
+        
+        // Mirror match - use blue
+        if (whiteDifficulty === blackDifficulty) {
+            return 'blue';
+        }
+        
+        // Get opponent difficulty
+        const opponentAI = currentAIId === whiteAI ? blackAI : whiteAI;
+        const opponentDifficulty = difficultyMap[opponentAI] || 2;
+        
+        // Current AI is stronger - green (hacker vibe)
+        // Current AI is weaker - amber (retro vibe)
+        const colorTheme = currentDifficulty > opponentDifficulty ? 'green' : 'amber';
+        
+        console.log(`🎨 Color theme for ${currentAIId} (difficulty ${currentDifficulty}) vs ${opponentAI} (difficulty ${opponentDifficulty}): ${colorTheme}`);
+        
+        return colorTheme;
+    }
+    
     // Apply UHP move to the game state
     async applyUHPMove(uhpMove) {
         if (!uhpMove || typeof uhpMove !== 'string') {
@@ -403,116 +562,158 @@ class DevOpsSystem {
         try {
             console.log(`🎯 Applying UHP move: ${uhpMove}`);
             
-            // CRITICAL: Validate move with WASM engine first to prevent duplicate pieces
-            if (window.wasmEngine) {
-                // Get current game state for validation
-                const currentMoves = [];
-                if (window.uhpClient && window.uhpClient.uhpMoveHistory && window.uhpClient.uhpMoveHistory.size > 0) {
-                    const maxMoveNum = Math.max(...window.uhpClient.uhpMoveHistory.keys());
-                    for (let i = 1; i <= maxMoveNum; i++) {
-                        if (window.uhpClient.uhpMoveHistory.has(i)) {
-                            currentMoves.push(window.uhpClient.uhpMoveHistory.get(i));
-                        }
-                    }
-                }
-                
-                // Test if the move is valid by simulating it
-                try {
-                    const testGameString = currentMoves.concat([uhpMove]).join(';');
-                    const tempEngine = await window.wasmEngine.sendCommand('newgame Base');
-                    
-                    // Apply existing moves
-                    for (const move of currentMoves) {
-                        const result = await window.wasmEngine.sendCommand(`play ${move}`);
-                        if (result.includes('invalidmove')) {
-                            console.warn(`⚠️ Invalid existing move during validation: ${move}`);
-                            break;
-                        }
-                    }
-                    
-                    // Test the new move
-                    const testResult = await window.wasmEngine.sendCommand(`play ${uhpMove}`);
-                    if (testResult.includes('invalidmove')) {
-                        console.error(`❌ WASM engine rejects move: ${uhpMove}`);
-                        console.error(`❌ Response: ${testResult}`);
-                        return false; // Don't apply invalid moves to UI
-                    }
-                    
-                    console.log(`✅ WASM engine accepts move: ${uhpMove}`);
-                } catch (validationError) {
-                    console.error('❌ Move validation failed:', validationError);
-                    return false;
-                }
-            }            // Handle "pass" moves
+            // Handle "pass" moves
             if (uhpMove.toLowerCase() === 'pass') {
                 if (window.passTurn) {
                     window.passTurn();
                 }
-                return;
+                return true;
             }
             
-            // Parse the UHP move - handle both placement and movement
-            const moveMatch = uhpMove.match(/([wb])([QAGBS])(\d*)([/\\-]?)(.*)/);
-            if (!moveMatch) {
+            // Parse the UHP move into components
+            const parsed = this.parseUHPPosition(uhpMove);
+            if (!parsed) {
                 console.error('❌ Failed to parse UHP move:', uhpMove);
-                return;
+                return false;
             }
             
-            const [, color, pieceType, pieceNumber, direction, position] = moveMatch;
-            const fullColor = color === 'w' ? 'white' : 'black';
+            const { piece: uhpPieceName, direction, reference, isPrefix } = parsed;
             
-            // Check if this is a movement (piece already placed) or placement
-            const existingPiece = window.tray.find(p => 
-                p.meta.color === fullColor && 
-                p.meta.key === pieceType && 
-                p.placed
-            );
+            // Extract piece info from UHP name (e.g., "wA1" -> white, A, 1)
+            const pieceMatch = uhpPieceName.match(/^([wb])([QAGBS])(\d*)$/);
+            if (!pieceMatch) {
+                console.error('❌ Invalid UHP piece name:', uhpPieceName);
+                return false;
+            }
             
-            if (existingPiece) {
-                // This is a movement - find a legal destination
-                console.log(`🎯 Moving existing ${fullColor} ${pieceType}`);
+            const [, colorCode, pieceType, numberStr] = pieceMatch;
+            const color = colorCode === 'w' ? 'white' : 'black';
+            const pieceNumber = numberStr ? parseInt(numberStr, 10) : 1;
+            
+            // Determine if this is a movement (piece already placed) or placement
+            const placedPiece = this.findPieceByUHPName(uhpPieceName);
+            
+            if (placedPiece) {
+                // MOVEMENT: Move existing piece to new position
+                console.log(`🎯 Moving ${uhpPieceName} from (${placedPiece.meta.q},${placedPiece.meta.r})`);
                 
-                if (window.selectMove && window.commitMove && window.legalMoveZones) {
-                    const legalMoves = window.legalMoveZones(existingPiece);
-                    if (legalMoves && legalMoves.length > 0) {
-                        const targetKey = Array.isArray(legalMoves) ? legalMoves[0] : Array.from(legalMoves)[0];
-                        const [q, r] = targetKey.split(',').map(Number);
-                        
-                        window.selectMove(existingPiece);
-                        window.commitMove(q, r);
-                    } else {
-                        console.warn(`⚠️ No legal moves found for ${fullColor} ${pieceType}`);
+                // Calculate target position from reference + direction
+                const refPiece = this.findPieceByUHPName(reference);
+                if (!refPiece) {
+                    console.error(`❌ Reference piece not found: ${reference}`);
+                    return false;
+                }
+                
+                let targetPos;
+                
+                // ✅ FIX: Handle beetle climbing on top (same position as reference)
+                if (direction === 'ontop') {
+                    targetPos = { q: refPiece.meta.q, r: refPiece.meta.r };
+                    console.log(`🎯 Beetle climbing on top of ${reference} at (${targetPos.q},${targetPos.r})`);
+                } else {
+                    targetPos = this.getNeighborPosition(refPiece.meta.q, refPiece.meta.r, direction, isPrefix);
+                    if (!targetPos) {
+                        console.error(`❌ Failed to calculate target position for direction: ${direction}`);
+                        return false;
                     }
+                    console.log(`🎯 Moving to (${targetPos.q},${targetPos.r}) relative to ${reference}`);
+                }
+                
+                // Set flag to prevent double UHP recording
+                window.applyingWASMMove = true;
+                
+                // Apply the move using game functions
+                if (window.selectMove && window.commitMove) {
+                    window.selectMove(placedPiece);
+                    const success = window.commitMove(targetPos.q, targetPos.r);
+                    
+                    // Don't clear flag here - let animation callback clear it after UHP recording
+                    // Flag will be cleared in game.js commitMove animation callback
+                    
+                    if (success === false) {
+                        console.error(`❌ commitMove rejected position (${targetPos.q},${targetPos.r})`);
+                        window.applyingWASMMove = false;
+                        return false;
+                    }
+                    
+                    // ✅ FIX: Store WASM's exact UHP notation for movements!
+                    // This ensures WASM receives complete game history including all movements
+                    if (window.uhpClient && window.uhpClient.uhpMoveHistory) {
+                        const currentMove = window.state.moveNumber; // Use moveNumber which tracks actual move number
+                        window.uhpClient.uhpMoveHistory.set(currentMove, uhpMove);
+                        console.log(`📝 Stored WASM UHP movement ${currentMove}: ${uhpMove}`);
+                    }
+                } else {
+                    window.applyingWASMMove = false;
+                    console.error('❌ Move functions not available');
+                    return false;
                 }
             } else {
-                // This is a placement - find an unplaced piece
-                console.log(`🎯 Placing new ${fullColor} ${pieceType}`);
+                // PLACEMENT: Place new piece
+                console.log(`🎯 Placing new ${uhpPieceName}`);
                 
-                const piece = window.tray.find(p => 
-                    p.meta.color === fullColor && 
-                    p.meta.key === pieceType && 
-                    !p.placed
+                // Find an unplaced piece of this type
+                const piecesToPlace = window.tray.filter(p => 
+                    p.meta &&
+                    p.meta.color === color &&
+                    p.meta.key === pieceType &&
+                    !p.meta.placed
                 );
                 
-                if (!piece) {
-                    console.error(`❌ Could not find unplaced ${fullColor} ${pieceType} piece`);
-                    return;
+                if (piecesToPlace.length === 0) {
+                    console.error(`❌ No unplaced ${color} ${pieceType} pieces available`);
+                    return false;
                 }
                 
-                // Find a valid placement location
-                if (window.selectPlacement && window.commitPlacement && window.legalPlacementZones) {
-                    const legalZones = window.legalPlacementZones(fullColor);
-                    if (legalZones.size > 0) {
-                        const firstLegal = Array.from(legalZones)[0];
-                        const [q, r] = firstLegal.split(',').map(Number);
-                        
-                        window.selectPlacement(piece);
-                        window.commitPlacement(q, r);
-                    } else {
-                        console.error(`❌ No legal placement zones for ${fullColor}`);
+                // Take the first unplaced piece (order doesn't matter, placementOrder will be assigned)
+                const piece = piecesToPlace[0];
+                
+                // Calculate target position
+                let targetQ, targetR;
+                
+                if (!reference) {
+                    // First move: place at origin (0, 0)
+                    targetQ = 0;
+                    targetR = 0;
+                    console.log(`🎯 First move: placing at origin (0,0)`);
+                } else {
+                    // Find reference piece and calculate position
+                    const refPiece = this.findPieceByUHPName(reference);
+                    if (!refPiece) {
+                        console.error(`❌ Reference piece not found: ${reference}`);
+                        return false;
+                    }
+                    
+                    const targetPos = this.getNeighborPosition(refPiece.meta.q, refPiece.meta.r, direction, isPrefix);
+                    if (!targetPos) {
+                        console.error(`❌ Failed to calculate target position for direction: ${direction}`);
+                        return false;
+                    }
+                    
+                    targetQ = targetPos.q;
+                    targetR = targetPos.r;
+                    console.log(`🎯 Placing at (${targetQ},${targetR}) ${direction} of ${reference}`);
+                }
+                
+                // Apply the placement using game functions
+                if (window.selectPlacement && window.commitPlacement) {
+                    window.selectPlacement(piece);
+                    const success = window.commitPlacement(targetQ, targetR);
+                    
+                    if (success === false) {
+                        console.error(`❌ commitPlacement rejected position (${targetQ},${targetR})`);
+                        return false;
+                    }
+                    
+                    // Override UHP notation with WASM's exact string
+                    if (window.uhpClient && window.uhpClient.uhpMoveHistory) {
+                        const currentMove = window.state.moveNumber - 1; // commitPlacement already incremented
+                        window.uhpClient.uhpMoveHistory.set(currentMove, uhpMove);
+                        console.log(`📝 Stored WASM UHP move ${currentMove}: ${uhpMove}`);
                     }
                 } else {
                     console.error('❌ Placement functions not available');
+                    return false;
                 }
             }
             
@@ -677,6 +878,34 @@ class DevOpsSystem {
         // Reset button states
         document.getElementById('start-ai-battle').style.display = 'inline-block';
         document.getElementById('stop-ai-battle').style.display = 'none';
+        
+        // Trigger sequential personality reactions for AI battles
+        if (window.Personalities && battle.whiteAI && battle.blackAI) {
+            const loserAI = winner === 'white' ? battle.blackAI : winner === 'black' ? battle.whiteAI : null;
+            const winnerAI = winner === 'white' ? battle.whiteAI : winner === 'black' ? battle.blackAI : null;
+            
+            // Map AI IDs to personality objects
+            const personalities = window.Personalities.opponents;
+            const loserPersonality = personalities[loserAI];
+            const winnerPersonality = personalities[winnerAI];
+            
+            if (loserPersonality && winnerPersonality && loserAI && winnerAI) {
+                // Set loser as current opponent first
+                window.Personalities.currentOpponent = loserPersonality;
+                window.Personalities.showVoiceLine('defeat', 5000);
+                
+                // After 5s, switch to winner and show victory line
+                setTimeout(() => {
+                    window.Personalities.currentOpponent = winnerPersonality;
+                    window.Personalities.showVoiceLine('victory', 5000);
+                    
+                    // After another 5s, fade out both bubbles
+                    setTimeout(() => {
+                        window.Personalities.fadeOutVoiceLine();
+                    }, 5000);
+                }, 5000);
+            }
+        }
         
         this.currentBattle = null;
         
@@ -1148,12 +1377,8 @@ class DevOpsSystem {
                 const value = e.target.value;
                 speedDisplay.textContent = `${(value/1000).toFixed(1)}s`;
                 
-                // Update main speed slider too
-                const mainSpeedSlider = document.getElementById('battle-speed');
-                if (mainSpeedSlider) {
-                    mainSpeedSlider.value = value;
-                    this.updateBattleSpeed(value);
-                }
+                // Main speed slider removed, just update local display
+                this.updateBattleSpeed(value);
             });
         }
         
@@ -1208,9 +1433,10 @@ class DevOpsSystem {
     }
     
     updateBattleSpeed(value) {
-        const speedDisplay = document.getElementById('speed-display');
-        if (speedDisplay) {
-            speedDisplay.textContent = `${(value/1000).toFixed(1)}s`;
+        // Speed display removed from main UI, only used by floating controls
+        const floatingSpeedDisplay = document.querySelector('#floating-speed-display');
+        if (floatingSpeedDisplay) {
+            floatingSpeedDisplay.textContent = `${(value/1000).toFixed(1)}s`;
         }
     }
     
@@ -1901,14 +2127,11 @@ window.startQuickAIBattle = function() {
         setTimeout(() => {
             const whiteSelect = document.getElementById('white-ai-select');
             const blackSelect = document.getElementById('black-ai-select');
-            const speedSlider = document.getElementById('battle-speed');
             
-            if (whiteSelect && blackSelect && speedSlider) {
+            if (whiteSelect && blackSelect) {
                 whiteSelect.value = 'sunny';
                 blackSelect.value = 'buzzwell';
-                speedSlider.value = '500'; // Fast battle
                 
-                window.devOpsSystem.updateBattleSpeed('500');
                 window.devOpsSystem.startAIBattle();
                 
                 console.log('🧪 Quick AI battle started: Sunny vs Buzzwell');

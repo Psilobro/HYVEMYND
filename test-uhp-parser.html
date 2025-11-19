@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UHP Parser Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .test {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+        }
+        .pass { background: #002200; }
+        .fail { background: #220000; color: #ff0000; }
+    </style>
+</head>
+<body>
+    <h1>🧪 UHP Parser Test Suite</h1>
+    <div id="results"></div>
+    
+    <script>
+        // Minimal DevOpsSystem implementation for testing
+        class DevOpsSystem {
+            parseUHPPosition(uhpMove) {
+                if (!uhpMove || typeof uhpMove !== 'string') return null;
+                
+                const trimmed = uhpMove.trim();
+                
+                // First move: just piece name like "wG1"
+                if (/^[wb][QAGBS]\d*$/.test(trimmed)) {
+                    return { piece: trimmed, direction: null, reference: null, isPrefix: false };
+                }
+                
+                // Movement or placement: "piece reference" or "piece direction+reference"
+                const parts = trimmed.split(/\s+/);
+                if (parts.length !== 2) return null;
+                
+                const piece = parts[0];
+                const position = parts[1];
+                
+                let direction = null;
+                let reference = null;
+                let isPrefix = false;
+                
+                // Check for prefix direction: /wG1, -wG1, \wG1
+                if (/^[/\\-]/.test(position)) {
+                    direction = position[0];
+                    reference = position.substring(1);
+                    isPrefix = true;
+                }
+                // Check for suffix direction: wG1/, wG1-, wG1\
+                else if (/[/\\-]$/.test(position)) {
+                    direction = position[position.length - 1];
+                    reference = position.substring(0, position.length - 1);
+                    isPrefix = false;
+                }
+                else {
+                    return null;
+                }
+                
+                return { piece, direction, reference, isPrefix };
+            }
+            
+            getNeighborPosition(q, r, uhpDirection, isPrefix) {
+                if (!uhpDirection) return null;
+                
+                const suffixOffsets = {
+                    '/': { dq: 0, dr: -1 },
+                    '-': { dq: 1, dr: -1 },
+                    '\\': { dq: 1, dr: 0 }
+                };
+                
+                const prefixOffsets = {
+                    '/': { dq: 0, dr: 1 },
+                    '-': { dq: -1, dr: 1 },
+                    '\\': { dq: -1, dr: 0 }
+                };
+                
+                const offset = isPrefix ? prefixOffsets[uhpDirection] : suffixOffsets[uhpDirection];
+                
+                if (!offset) return null;
+                
+                return {
+                    q: q + offset.dq,
+                    r: r + offset.dr
+                };
+            }
+        }
+        
+        const devOps = new DevOpsSystem();
+        const results = document.getElementById('results');
+        
+        function test(name, fn) {
+            try {
+                fn();
+                results.innerHTML += `<div class="test pass">✅ ${name}</div>`;
+            } catch (e) {
+                results.innerHTML += `<div class="test fail">❌ ${name}: ${e.message}</div>`;
+            }
+        }
+        
+        function assertEquals(actual, expected, msg) {
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error(`${msg}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+            }
+        }
+        
+        // Test parseUHPPosition
+        test('Parse first move (wG1)', () => {
+            const result = devOps.parseUHPPosition('wG1');
+            assertEquals(result, { piece: 'wG1', direction: null, reference: null, isPrefix: false }, 'First move');
+        });
+        
+        test('Parse suffix placement (wA1 wG1-)', () => {
+            const result = devOps.parseUHPPosition('wA1 wG1-');
+            assertEquals(result, { piece: 'wA1', direction: '-', reference: 'wG1', isPrefix: false }, 'Suffix placement');
+        });
+        
+        test('Parse prefix placement (wA1 -wG1)', () => {
+            const result = devOps.parseUHPPosition('wA1 -wG1');
+            assertEquals(result, { piece: 'wA1', direction: '-', reference: 'wG1', isPrefix: true }, 'Prefix placement');
+        });
+        
+        test('Parse suffix slash (bG1 wQ/)', () => {
+            const result = devOps.parseUHPPosition('bG1 wQ/');
+            assertEquals(result, { piece: 'bG1', direction: '/', reference: 'wQ', isPrefix: false }, 'Suffix slash');
+        });
+        
+        test('Parse prefix slash (bG1 /wQ)', () => {
+            const result = devOps.parseUHPPosition('bG1 /wQ');
+            assertEquals(result, { piece: 'bG1', direction: '/', reference: 'wQ', isPrefix: true }, 'Prefix slash');
+        });
+        
+        test('Parse backslash suffix (wS1 wG1\\)', () => {
+            const result = devOps.parseUHPPosition('wS1 wG1\\\\');
+            assertEquals(result, { piece: 'wS1', direction: '\\\\', reference: 'wG1', isPrefix: false }, 'Backslash suffix');
+        });
+        
+        test('Parse backslash prefix (wS1 \\wG1)', () => {
+            const result = devOps.parseUHPPosition('wS1 \\\\wG1');
+            assertEquals(result, { piece: 'wS1', direction: '\\\\', reference: 'wG1', isPrefix: true }, 'Backslash prefix');
+        });
+        
+        // Test getNeighborPosition
+        test('Neighbor North suffix (wG1/) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '/', false);
+            assertEquals(result, { q: 0, r: -1 }, 'North suffix');
+        });
+        
+        test('Neighbor South prefix (/wG1) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '/', true);
+            assertEquals(result, { q: 0, r: 1 }, 'South prefix');
+        });
+        
+        test('Neighbor NE suffix (wG1-) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '-', false);
+            assertEquals(result, { q: 1, r: -1 }, 'NE suffix');
+        });
+        
+        test('Neighbor SW prefix (-wG1) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '-', true);
+            assertEquals(result, { q: -1, r: 1 }, 'SW prefix');
+        });
+        
+        test('Neighbor SE suffix (wG1\\\\) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '\\\\', false);
+            assertEquals(result, { q: 1, r: 0 }, 'SE suffix');
+        });
+        
+        test('Neighbor NW prefix (\\\\wG1) from (0,0)', () => {
+            const result = devOps.getNeighborPosition(0, 0, '\\\\', true);
+            assertEquals(result, { q: -1, r: 0 }, 'NW prefix');
+        });
+        
+        // Integration test: parse and calculate full move
+        test('Full integration: wA1 -wG1 with wG1 at (0,0)', () => {
+            const parsed = devOps.parseUHPPosition('wA1 -wG1');
+            const targetPos = devOps.getNeighborPosition(0, 0, parsed.direction, parsed.isPrefix);
+            assertEquals(targetPos, { q: -1, r: 1 }, 'Full integration SW');
+        });
+        
+        test('Full integration: wA2 wG1/ with wG1 at (0,0)', () => {
+            const parsed = devOps.parseUHPPosition('wA2 wG1/');
+            const targetPos = devOps.getNeighborPosition(0, 0, parsed.direction, parsed.isPrefix);
+            assertEquals(targetPos, { q: 0, r: -1 }, 'Full integration North');
+        });
+        
+        results.innerHTML += '<div class="test pass" style="margin-top: 20px; font-weight: bold;">🎉 All tests completed!</div>';
+    </script>
+</body>
+</html>

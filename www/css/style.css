@@ -390,7 +390,7 @@ canvas {
     position: fixed;
     right: 10px;
     bottom: 10px;
-    z-index: 100; /* Much higher than button to ensure it's on top */
+    z-index: 200; /* Above PIXI win banner */
     width: 250px;
     height: 300px;
     max-height: 300px;
@@ -2331,20 +2331,12 @@ canvas {
 }
 
 /* Engine Progress Popup */
+/* Retro CRT Monitor Engine Progress Popup */
 #engine-progress-popup {
-    position: absolute;
-    bottom: 10%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(40, 40, 40, 0.9));
-    border: 2px solid #E6B84D;
-    border-radius: 12px;
-    padding: 20px 25px;
-    min-width: 300px;
-    max-width: 400px;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
     z-index: 150;
-    box-shadow: 0 8px 32px rgba(230, 184, 77, 0.3);
-    backdrop-filter: blur(8px);
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
@@ -2354,59 +2346,97 @@ canvas {
 #engine-progress-popup.show {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(-10px);
+}
+
+.crt-monitor {
+    background: linear-gradient(145deg, #3a3a3a, #1a1a1a);
+    border: 4px solid #2a2a2a;
+    border-radius: 12px 12px 8px 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.05);
+    padding: 14px 14px 18px 14px;
+    width: 320px;
+    position: relative;
+}
+
+.power-led {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ff00;
+    box-shadow: 0 0 4px #00ff00;
+    animation: powerLedPulse 2s infinite;
+}
+
+@keyframes powerLedPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+    50% { opacity: 0.6; box-shadow: 0 0 8px currentColor; }
+}
+
+.crt-screen {
+    background: #000;
+    border: 3px solid #333;
+    border-radius: 4px;
+    padding: 12px;
+    box-shadow: inset 0 0 30px rgba(0,255,0,0.08);
+    position: relative;
 }
 
 #engine-progress-popup .progress-title {
-    color: #E6B84D;
-    font-family: 'Milonga', serif;
-    font-size: 16px;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
     font-weight: bold;
     text-align: center;
-    margin-bottom: 15px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+    margin-bottom: 10px;
+    text-shadow: 0 0 5px currentColor;
 }
 
 #engine-progress-popup .progress-details {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    color: #fff;
-    font-size: 14px;
-}
-
-#engine-progress-popup .progress-label {
-    color: #FFD700;
-    font-weight: 600;
-}
-
-#engine-progress-popup .progress-value {
-    color: #fff;
+    margin-bottom: 8px;
+    color: #00ff00;
+    font-size: 11px;
     font-family: 'Courier New', monospace;
 }
 
+#engine-progress-popup .progress-label {
+    color: #00ff00;
+    font-weight: 600;
+    text-shadow: 0 0 3px currentColor;
+}
+
+#engine-progress-popup .progress-value {
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 3px currentColor;
+}
+
 .progress-bar-container {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    height: 8px;
+    background: rgba(0, 255, 0, 0.1);
+    border-radius: 3px;
+    height: 6px;
     overflow: hidden;
-    margin-bottom: 10px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    margin-bottom: 8px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 255, 0, 0.3);
 }
 
 .progress-bar {
-    background: linear-gradient(90deg, #E6B84D, #FFD700);
+    background: #00ff00;
     height: 100%;
     width: 0%;
     transition: width 0.5s ease;
-    border-radius: 8px;
-    box-shadow: 0 0 8px rgba(230, 184, 77, 0.6);
+    box-shadow: 0 0 6px rgba(0, 255, 0, 0.8);
 }
 
 .progress-bar.indeterminate {
     width: 100%;
-    background: linear-gradient(90deg, transparent, #E6B84D, transparent);
+    background: linear-gradient(90deg, transparent, #00ff00, transparent);
     animation: progressIndeterminate 2s infinite;
 }
 
@@ -2415,36 +2445,182 @@ canvas {
     100% { transform: translateX(100%); }
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
 #engine-progress-popup .engine-status {
     text-align: center;
-    color: #ccc;
-    font-size: 12px;
+    color: #00ff00;
+    font-size: 10px;
     font-style: italic;
+    margin-bottom: 8px;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 3px currentColor;
+}
+
+.engine-output {
+    max-height: 75px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    line-height: 1.35;
+    background: rgba(0,0,0,0.7);
+    padding: 8px;
+    border-radius: 3px;
     margin-top: 8px;
+    position: relative;
+    border: 1px solid rgba(0,255,0,0.3);
+}
+
+.engine-output code {
+    color: #00ff00;
+    text-shadow: 0 0 5px currentColor, 1px 0 1px rgba(255,0,0,0.2), -1px 0 1px rgba(0,255,0,0.2);
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.engine-output::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(transparent 50%, rgba(0,0,0,0.3) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+    animation: scanline 8s linear infinite;
+    z-index: 1;
+}
+
+@keyframes scanline {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(100%); }
+}
+
+.engine-output::-webkit-scrollbar {
+    width: 4px;
+}
+
+.engine-output::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.3);
+}
+
+.engine-output::-webkit-scrollbar-thumb {
+    background: rgba(0,255,0,0.5);
+    border-radius: 2px;
+}
+
+/* Color themes for different AI difficulties */
+.crt-screen.color-green {
+    box-shadow: inset 0 0 30px rgba(0,255,0,0.08);
+}
+
+.crt-screen.color-amber {
+    box-shadow: inset 0 0 30px rgba(255,152,0,0.08);
+}
+
+.crt-screen.color-blue {
+    box-shadow: inset 0 0 30px rgba(0,212,255,0.08);
+}
+
+.color-green .progress-title,
+.color-green .progress-details,
+.color-green .progress-label,
+.color-green .progress-value,
+.color-green .engine-status,
+.color-green .engine-output code {
+    color: #00ff00;
+}
+
+.color-amber .progress-title,
+.color-amber .progress-details,
+.color-amber .progress-label,
+.color-amber .progress-value,
+.color-amber .engine-status,
+.color-amber .engine-output code {
+    color: #ff9800;
+}
+
+.color-blue .progress-title,
+.color-blue .progress-details,
+.color-blue .progress-label,
+.color-blue .progress-value,
+.color-blue .engine-status,
+.color-blue .engine-output code {
+    color: #00d4ff;
+}
+
+.color-green .progress-bar-container {
+    background: rgba(0, 255, 0, 0.1);
+    border-color: rgba(0, 255, 0, 0.3);
+}
+
+.color-amber .progress-bar-container {
+    background: rgba(255, 152, 0, 0.1);
+    border-color: rgba(255, 152, 0, 0.3);
+}
+
+.color-blue .progress-bar-container {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.color-green .progress-bar {
+    background: #00ff00;
+    box-shadow: 0 0 6px rgba(0, 255, 0, 0.8);
+}
+
+.color-amber .progress-bar {
+    background: #ff9800;
+    box-shadow: 0 0 6px rgba(255, 152, 0, 0.8);
+}
+
+.color-blue .progress-bar {
+    background: #00d4ff;
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.8);
+}
+
+.color-green .engine-output {
+    border-color: rgba(0, 255, 0, 0.3);
+}
+
+.color-amber .engine-output {
+    border-color: rgba(255, 152, 0, 0.3);
+}
+
+.color-blue .engine-output {
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.color-green .power-led {
+    background: #00ff00;
+}
+
+.color-amber .power-led {
+    background: #ff9800;
+}
+
+.color-blue .power-led {
+    background: #00d4ff;
 }
 
 /* Mobile responsiveness for progress popup */
-@media (max-width: 768px) {
-    #engine-progress-popup {
-        min-width: 250px;
-        max-width: 90%;
-        padding: 16px 20px;
-        bottom: 15%;
+@media (max-width: 480px) {
+    .crt-monitor {
+        width: 280px;
     }
     
     #engine-progress-popup .progress-title {
-        font-size: 14px;
-        margin-bottom: 12px;
+        font-size: 12px;
     }
     
     #engine-progress-popup .progress-details {
-        font-size: 12px;
-        margin-bottom: 10px;
+        font-size: 10px;
+    }
+    
+    .engine-output {
+        max-height: 60px;
+        font-size: 8px;
     }
 }
 
