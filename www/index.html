@@ -16,6 +16,28 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#ffd700">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Mobile landscape: nudge history UI left to avoid Android navigation/buttons */
+    @media (max-width: 900px) and (orientation: landscape) {
+      /* Move both the history panel and the floating history toggle slightly left */
+      #move-history,
+      #move-history-toggle,
+      #history-close-btn {
+        transform: translateX(-24px) !important;
+        right: 8px !important;
+      }
+
+      /* Ensure the panel doesn't overflow the viewport on very narrow devices */
+      #move-history {
+        max-width: calc(100% - 56px) !important;
+      }
+
+      /* If the toggle is absolutely positioned elsewhere, allow a small left shift via margin */
+      #move-history-toggle {
+        margin-left: -24px !important;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Background video - loads first with high priority -->
