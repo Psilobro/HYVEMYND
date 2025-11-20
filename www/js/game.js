@@ -1369,7 +1369,18 @@ function commitPlacement(q,r){
                             type: record.pieceType
                         }));
                     
+                    console.log(`📍 Building UHP notation for ${uhpPieceId} at (${q}, ${r})`);
+                    console.log(`📍 Available reference pieces (${playedPieces.length}):`, 
+                        playedPieces.map(pp => `${pp.uhpId}(${pp.q},${pp.r})`).join(', '));
+                    
                     uhpMove = window.uhpClient.buildUHPPositionalMove(uhpPieceId, mockPiece, playedPieces);
+                }
+                
+                // Fallback: if notation is just the piece ID (no reference), add a simple reference
+                if (uhpMove === uhpPieceId && playedPieces.length > 0) {
+                    const lastPiece = playedPieces[playedPieces.length - 1];
+                    uhpMove = `${uhpPieceId} ${lastPiece.uhpId}/`;
+                    console.warn(`⚠️ Notation had no reference - added fallback: ${uhpMove}`);
                 }
                 
                 // Validate UHP move before recording
@@ -2017,6 +2028,11 @@ function commitMove(q,r){
         });
 
         p.meta.q=q; p.meta.r=r;
+        
+        // Update UHP placement order position tracking when piece moves
+        if (window.uhpClient && window.uhpClient.updatePiecePosition) {
+            window.uhpClient.updatePiecePosition(p, q, r);
+        }
 
         // Record UHP movement using CHRONOLOGICAL placement order
         // Skip if we're applying a WASM move (it will record its own notation)

@@ -149,7 +149,7 @@
                     // Retry the WASM request after a delay
                     setTimeout(() => {
                         console.log(`🔄 Retrying WASM move request after turn correction`);  
-                        window.requestWASMMove(target, configOverride);
+                        window.requestWASMMove(); // No parameters - function takes none
                     }, 1000);
                     return;
                 }

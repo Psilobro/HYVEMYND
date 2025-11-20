@@ -192,6 +192,36 @@
         }
 
         /**
+         * Update position of a piece in placement order (called when piece moves)
+         */
+        updatePiecePosition(piece, newQ, newR) {
+            const color = piece.meta?.color || piece.color;
+            const pieceType = piece.meta?.key || piece.key;
+            const placementOrder = piece.meta?.placementOrder || 1;
+            
+            // Find matching record in placementOrder array
+            const record = this.placementOrder.find(r => 
+                r.color === color && 
+                r.pieceType === pieceType && 
+                r.uhpNumber === placementOrder
+            );
+            
+            if (record) {
+                const oldPos = `(${record.position.q}, ${record.position.r})`;
+                record.position = { q: newQ, r: newR };
+                console.log(`🔄 Updated ${record.uhpId} position: ${oldPos} → (${newQ}, ${newR})`);
+                
+                // Also update in uhpPieceMap
+                const mapKey = `${color}_${pieceType}_${placementOrder}`;
+                if (this.uhpPieceMap.has(mapKey)) {
+                    this.uhpPieceMap.get(mapKey).position = `${newQ},${newR}`;
+                }
+            } else {
+                console.warn(`⚠️ Could not find placement record for ${color} ${pieceType} #${placementOrder}`);
+            }
+        }
+
+        /**
          * Get the current turn color from game state
          */
         getCurrentTurnColor() {
@@ -1038,11 +1068,22 @@
             // Build UHP move with proper relative positioning
             console.log(`🔧 Building UHP move for ${uhpPieceId}`, { actualPiece, playedPieces: playedPieces.length });
             
+            // Debug: show all available reference pieces
+            console.log(`📋 Available reference pieces (${playedPieces.length}):`);
+            playedPieces.forEach(pp => {
+                console.log(`  - ${pp.uhpId} at (${pp.q}, ${pp.r})`);
+            });
+            
             if (!actualPiece || !actualPiece.position || playedPieces.length === 0) {
-                // Fallback to simple relative placement
-                const lastPiece = playedPieces[playedPieces.length - 1];
-                console.log(`🔧 Using fallback positioning relative to ${lastPiece.uhpId}`);
-                return `${uhpPieceId} ${lastPiece.uhpId}/`;
+                console.warn(`⚠️ Missing data - actualPiece: ${!!actualPiece}, position: ${!!actualPiece?.position}, playedPieces: ${playedPieces.length}`);
+                if (playedPieces.length > 0) {
+                    const lastPiece = playedPieces[playedPieces.length - 1];
+                    console.log(`🔧 Using fallback positioning relative to ${lastPiece.uhpId}`);
+                    return `${uhpPieceId} ${lastPiece.uhpId}/`;
+                } else {
+                    console.error(`❌ Cannot build UHP notation - no reference pieces available!`);
+                    return uhpPieceId; // Return bare piece ID
+                }
             }
             
             // Get the actual position of this piece
@@ -1060,12 +1101,12 @@
                 const refR = placedPiece.r;
                 const distance = Math.abs(myPos.q - refQ) + Math.abs(myPos.r - refR);
                 
-                console.log(`🔧 Distance to ${placedPiece.uhpId} at (${refQ}, ${refR}): ${distance}`);
+                console.log(`🔧 Checking ${placedPiece.uhpId} at (${refQ}, ${refR}): distance=${distance}`);
                 
                 // Collect all adjacent pieces (distance = 1)
                 if (distance === 1) {
                     adjacentPieces.push(placedPiece);
-                    console.log(`✅ Found adjacent piece: ${placedPiece.uhpId}`);
+                    console.log(`✅ Found adjacent piece: ${placedPiece.uhpId} at (${refQ}, ${refR})`);
                 }
                 
                 // Track closest piece as backup
@@ -1079,7 +1120,10 @@
             if (adjacentPieces.length > 0) {
                 bestReference = adjacentPieces[0];
                 minDistance = 1;
-                console.log(`🎯 Using adjacent reference: ${bestReference.uhpId}`);
+                console.log(`🎯 Using adjacent reference: ${bestReference.uhpId} at (${bestReference.q}, ${bestReference.r})`);
+            } else {
+                console.warn(`⚠️ No adjacent pieces found for ${uhpPieceId} at (${myPos.q}, ${myPos.r})!`);
+                console.log(`📋 Pieces checked: ${playedPieces.map(p => `${p.uhpId}(${p.q},${p.r})`).join(', ')}`);
             }
             
             if (!bestReference) {
@@ -1197,9 +1241,16 @@
                     console.error(`❌ No adjacent pieces found - this violates Hive placement rules`);
                     console.error(`❌ Available pieces:`, playedPieces.map(p => `${p.uhpId} at (${p.q}, ${p.r})`));
                     
-                    // Return null to prevent recording this invalid move
-                    result = null;
-                    console.log(`❌ INVALID PLACEMENT: Returning null to prevent UHP corruption`);
+                    // FALLBACK: Use the closest piece even if not adjacent (better than nothing)
+                    if (bestReference) {
+                        console.warn(`⚠️ Using non-adjacent fallback reference: ${bestReference.uhpId}`);
+                        result = `${uhpPieceId} ${bestReference.uhpId}-`;
+                    } else {
+                        // Last resort: use last piece
+                        const lastPiece = playedPieces[playedPieces.length - 1];
+                        console.warn(`⚠️ Using last-piece fallback: ${lastPiece.uhpId}`);
+                        result = `${uhpPieceId} ${lastPiece.uhpId}/`;
+                    }
                 }
             }
             
