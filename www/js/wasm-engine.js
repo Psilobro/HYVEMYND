@@ -164,7 +164,7 @@
                     }
                 }
                 
-                // Use bestmove with time parameter (UHP requires parameters)
+                // Use bestmove with time parameter (UHP requires HH:MM:SS format)
                 const { mode, timeLimit, depthLimit } = options;
                 let searchCommand;
                 
@@ -173,8 +173,12 @@
                 } else {
                     // Default to time-based search (2 seconds)
                     const seconds = timeLimit || 2;
-                    const timeString = `00:00:${seconds.toString().padStart(2, '0')}`;
+                    const hours = Math.floor(seconds / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    const secs = seconds % 60;
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
                     searchCommand = `bestmove time ${timeString}`;
+                    console.log(`⏱️ Time limit: ${seconds}s (${timeString})`);
                 }
                 
                 console.log(`🎯 Getting best move with: ${searchCommand}`);
@@ -320,6 +324,136 @@
                     }
                 });
             }
+        }
+        
+        /**
+         * Set engine option (generic setter for all UHP options)
+         */
+        async setOption(name, value) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            try {
+                const command = `options set ${name} ${value}`;
+                console.log(`🔧 Setting option: ${command}`);
+                const response = await this.sendCommand(command);
+                console.log(`✅ Option set response: ${response}`);
+                return response;
+            } catch (error) {
+                console.error(`❌ Failed to set option ${name}:`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Set aggression level (1-5)
+         * 1 = Defensive, 2 = Cautious, 3 = Balanced, 4 = Aggressive, 5 = Reckless
+         */
+        async setAggression(level) {
+            if (level < 1 || level > 5) {
+                throw new Error('Aggression must be between 1 and 5');
+            }
+            return await this.setOption('Aggression', level);
+        }
+        
+        /**
+         * Set hash table size in MB (1-1024)
+         */
+        async setHash(sizeMB) {
+            if (sizeMB < 1 || sizeMB > 1024) {
+                throw new Error('Hash size must be between 1 and 1024 MB');
+            }
+            return await this.setOption('Hash', sizeMB);
+        }
+        
+        /**
+         * Enable/disable verbose output
+         */
+        async setVerbose(enabled) {
+            return await this.setOption('Verbose', enabled ? 'true' : 'false');
+        }
+        
+        /**
+         * Enable/disable random opening
+         */
+        async setRandomOpening(enabled) {
+            return await this.setOption('RandomOpening', enabled ? 'true' : 'false');
+        }
+        
+        /**
+         * Get current option values
+         */
+        async getOptions() {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            return await this.sendCommand('options get');
+        }
+        
+        /**
+         * Set engine option (generic setter for all UHP options)
+         */
+        async setOption(name, value) {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            
+            try {
+                const command = `options set ${name} ${value}`;
+                console.log(`🔧 Setting option: ${command}`);
+                const response = await this.sendCommand(command);
+                console.log(`✅ Option set response: ${response}`);
+                return response;
+            } catch (error) {
+                console.error(`❌ Failed to set option ${name}:`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * Set aggression level (1-5)
+         * 1 = Defensive, 2 = Cautious, 3 = Balanced, 4 = Aggressive, 5 = Reckless
+         */
+        async setAggression(level) {
+            if (level < 1 || level > 5) {
+                throw new Error('Aggression must be between 1 and 5');
+            }
+            return await this.setOption('Aggression', level);
+        }
+        
+        /**
+         * Set hash table size in MB (1-1024)
+         */
+        async setHash(sizeMB) {
+            if (sizeMB < 1 || sizeMB > 1024) {
+                throw new Error('Hash size must be between 1 and 1024 MB');
+            }
+            return await this.setOption('Hash', sizeMB);
+        }
+        
+        /**
+         * Enable/disable verbose output
+         */
+        async setVerbose(enabled) {
+            return await this.setOption('Verbose', enabled ? 'true' : 'false');
+        }
+        
+        /**
+         * Enable/disable random opening
+         */
+        async setRandomOpening(enabled) {
+            return await this.setOption('RandomOpening', enabled ? 'true' : 'false');
+        }
+        
+        /**
+         * Get current option values
+         */
+        async getOptions() {
+            if (!this.initialized) {
+                await this.initialize();
+            }
+            return await this.sendCommand('options get');
         }
         
         /**

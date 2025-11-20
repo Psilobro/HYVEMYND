@@ -111,35 +111,313 @@ function showHistoryOverlay(moveIdx) {
     const transformGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     transformGroup.setAttribute('transform', `translate(${currentPosX}, ${currentPosY}) scale(${currentScale})`);
 
-    // Render each piece as a hex at correct position (in board coordinates)
+    // Build position map for all placed pieces
+    const positionMap = new Map();
+    snap.pieces.forEach(piece => {
+        if (piece.placed) {
+            const key = `${piece.q},${piece.r}`;
+            if (!positionMap.has(key)) {
+                positionMap.set(key, []);
+            }
+            positionMap.get(key).push(piece);
+        }
+    });
+    
+    // Get stack king (top piece) for each position
+    const stackKings = new Map();
+    positionMap.forEach((stack, key) => {
+        const topPiece = stack.reduce((top, p) => (p.stackIndex || 0) > (top.stackIndex || 0) ? p : top, stack[0]);
+        stackKings.set(key, topPiece);
+    });
+    
+    // UHP direction mapping to HYVEMYND flat-top hex edges
+    // HYVEMYND North = wG1/ (suffix after), South = /wG1 (prefix before)
+    // NorthEast = bB- (UHP East, suffix after), SouthWest = -bB (UHP West, prefix before)
+    // NorthWest = wG1\ (suffix after), SouthEast = \wG1 (prefix before)
+    // 
+    // Flat-top hex edge indices (vertex i to vertex i+1):
+    // Edge 0: Top (North) - between vertices 5 and 0
+    // Edge 1: Top-right (NorthEast) - between vertices 0 and 1
+    // Edge 2: Bottom-right (SouthEast) - between vertices 1 and 2
+    // Edge 3: Bottom (South) - between vertices 2 and 3
+    // Edge 4: Bottom-left (SouthWest) - between vertices 3 and 4
+    // Edge 5: Top-left (NorthWest) - between vertices 4 and 5
+    const uhpToEdge = {
+        'suffix/': 0,   // piece/ = North in HYVEMYND = top edge (between NW and NE)
+        'prefix/': 3,   // /piece = South in HYVEMYND = bottom edge (between SE and SW)
+        'suffix-': 1,   // piece- = NorthEast in HYVEMYND (UHP East)
+        'prefix-': 4,   // -piece = SouthWest in HYVEMYND (UHP West)
+        'suffix\\': 5,  // piece\ = NorthWest in HYVEMYND
+        'prefix\\': 2   // \piece = SouthEast in HYVEMYND
+    };
+    
+    // Parse ALL UHP moves from history to build comprehensive neighbor map
+    // Map structure: pieceId -> Set of {neighborId, edgeIndex}
+    const pieceNeighbors = new Map();
+    
+    // Helper to add bidirectional neighbor relationship
+    const addNeighborRelation = (pieceId, neighborId, pieceEdge, neighborEdge) => {
+        if (!pieceNeighbors.has(pieceId)) {
+            pieceNeighbors.set(pieceId, new Set());
+        }
+        if (!pieceNeighbors.has(neighborId)) {
+            pieceNeighbors.set(neighborId, new Set());
+        }
+        pieceNeighbors.get(pieceId).add(JSON.stringify({id: neighborId, edge: pieceEdge}));
+        pieceNeighbors.get(neighborId).add(JSON.stringify({id: pieceId, edge: neighborEdge}));
+    };
+    
+    // Parse all UHP moves up to current snapshot
+    for (let i = 0; i <= moveIdx; i++) {
+        const histSnap = window.historySnapshots[i];
+        if (!histSnap || !histSnap.uhpMove) continue;
+        
+        const uhpMove = histSnap.uhpMove.trim();
+        if (!uhpMove) continue;
+        
+        // Parse UHP move: "wA1 bQ/" or "bG1 -wS2" or "wG1" (move 1)
+        const parts = uhpMove.split(/\s+/);
+        if (parts.length === 0) continue;
+        
+        const movingPiece = parts[0];
+        
+        if (parts.length === 1) {
+            // Move 1 - no neighbors
+            continue;
+        }
+        
+        if (parts.length === 2) {
+            const reference = parts[1];
+            
+            // Check for directional prefix (/wG1, \wG1, -wG1)
+            const prefixMatch = reference.match(/^([\/\\-])(.+)$/);
+            if (prefixMatch) {
+                const separator = prefixMatch[1];
+                const refPiece = prefixMatch[2];
+                const key = `prefix${separator}`;
+                const movingEdge = uhpToEdge[key];
+                const refEdge = uhpToEdge[`suffix${separator}`]; // Opposite edge
+                addNeighborRelation(movingPiece, refPiece, movingEdge, refEdge);
+                continue;
+            }
+            
+            // Check for directional suffix (wG1/, wG1\, wG1-)
+            const suffixMatch = reference.match(/^(.+)([\/\\-])$/);
+            if (suffixMatch) {
+                const refPiece = suffixMatch[1];
+                const separator = suffixMatch[2];
+                const key = `suffix${separator}`;
+                const movingEdge = uhpToEdge[key];
+                const refEdge = uhpToEdge[`prefix${separator}`]; // Opposite edge
+                addNeighborRelation(movingPiece, refPiece, movingEdge, refEdge);
+                continue;
+            }
+            
+            // No separator - simple adjacency (Move 2 format: bA1 wG1)
+            // Determine edge by finding actual positions
+            const movingPieceObj = histSnap.pieces.find(p => {
+                const id = `${p.color.charAt(0)}${p.key}${p.key === 'Q' ? '' : (p.placementOrder || '')}`;
+                return id === movingPiece && p.placed;
+            });
+            const refPieceObj = histSnap.pieces.find(p => {
+                const id = `${p.color.charAt(0)}${p.key}${p.key === 'Q' ? '' : (p.placementOrder || '')}`;
+                return id === reference && p.placed;
+            });
+            
+            if (movingPieceObj && refPieceObj) {
+                const dq = movingPieceObj.q - refPieceObj.q;
+                const dr = movingPieceObj.r - refPieceObj.r;
+                
+                // Map coordinate delta to edges
+                let movingEdge, refEdge;
+                if (dq === 0 && dr === -1) { movingEdge = 0; refEdge = 3; }       // North/South
+                else if (dq === 1 && dr === -1) { movingEdge = 1; refEdge = 4; }  // NE/SW
+                else if (dq === 1 && dr === 0) { movingEdge = 2; refEdge = 5; }   // SE/NW
+                else if (dq === 0 && dr === 1) { movingEdge = 3; refEdge = 0; }   // South/North
+                else if (dq === -1 && dr === 1) { movingEdge = 4; refEdge = 1; }  // SW/NE
+                else if (dq === -1 && dr === 0) { movingEdge = 5; refEdge = 2; }  // NW/SE
+                
+                if (movingEdge !== undefined) {
+                    addNeighborRelation(movingPiece, reference, movingEdge, refEdge);
+                }
+            }
+        }
+    }
+    
+    // Debug: Log neighbor map for current snapshot
+    console.log('🎯 UHP Border Detection - Move', snap.moveNumber);
+    console.log('📊 Piece Neighbors Map:', Array.from(pieceNeighbors.entries()).map(([id, neighbors]) => ({
+        piece: id,
+        neighbors: Array.from(neighbors).map(n => JSON.parse(n))
+    })));
+    console.log('👑 Stack Kings:', Array.from(stackKings.entries()).map(([pos, piece]) => ({
+        position: pos,
+        piece: `${piece.color.charAt(0)}${piece.key}${piece.key === 'Q' ? '' : (piece.placementOrder || '')}`,
+        color: piece.color
+    })));
+
+    // Render last move FROM position (dashed border hex) - find the piece at FROM position
+    if (snap.lastMove) {
+        const fromPiece = snap.pieces.find(p => p.placed && p.q === snap.lastMove.from.q && p.r === snap.lastMove.from.r);
+        const fromBorderColor = fromPiece ? (fromPiece.color === 'white' ? '#fff' : '#222') : '#E6B84D';
+        
+        const fromP = axialToPixel(snap.lastMove.from.q, snap.lastMove.from.r);
+        const fromHex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        fromHex.setAttribute('points', getHexPoints(fromP.x, fromP.y, cellRadius));
+        fromHex.setAttribute('fill', 'none');
+        fromHex.setAttribute('stroke', fromBorderColor);
+        fromHex.setAttribute('stroke-width', '4');
+        fromHex.setAttribute('stroke-dasharray', '8,4');
+        fromHex.setAttribute('class', 'last-move-from');
+        transformGroup.appendChild(fromHex);
+    }
+
+    // FIRST PASS: Draw all piece fills (background layer)
     snap.pieces.forEach(piece => {
         if (!piece.placed) return;
         
-        // Use board coordinates directly - transform will handle the positioning
         const p = axialToPixel(piece.q, piece.r);
         const px = p.x;
-        const py = p.y - (piece.stackIndex || 0) * 6; // Stack offset in board units
+        const py = p.y - (piece.stackIndex || 0) * 6;
         
         const color = getReplayPieceColor(piece.key, piece.color);
         
-        // Draw hexagon
+        // Draw hexagon fill
         const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         const hexPoints = getHexPoints(px, py, cellRadius);
         hex.setAttribute('points', hexPoints);
         hex.setAttribute('fill', color);
-        hex.setAttribute('stroke', piece.color === 'white' ? '#fff' : '#222');
-        hex.setAttribute('stroke-width', '6');
+        hex.setAttribute('stroke', 'none');
         transformGroup.appendChild(hex);
+    });
+    
+    // SECOND PASS: Draw borders and labels (foreground layer) - ONLY for stack kings
+    stackKings.forEach((piece, posKey) => {
+        const p = axialToPixel(piece.q, piece.r);
+        const px = p.x;
+        const py = p.y - (piece.stackIndex || 0) * 6;
         
-        // Piece label (centered)
+        const borderColor = piece.color === 'white' ? '#fff' : '#222';
+        const hexPoints = getHexPoints(px, py, cellRadius);
+        
+        // Build piece UHP ID
+        const pieceId = `${piece.color.charAt(0)}${piece.key}${piece.key === 'Q' ? '' : (piece.placementOrder || '')}`;
+        
+        // Get neighbors for this piece from UHP-derived map
+        const neighbors = pieceNeighbors.get(pieceId) || new Set();
+        
+        // Filter to opposite-color neighbors and extract edge indices
+        const oppositeNeighbors = new Set();
+        neighbors.forEach(neighborJson => {
+            const neighbor = JSON.parse(neighborJson);
+            // Find the neighbor piece to check its color
+            const neighborPiece = snap.pieces.find(p => {
+                const nid = `${p.color.charAt(0)}${p.key}${p.key === 'Q' ? '' : (p.placementOrder || '')}`;
+                return nid === neighbor.id && p.placed;
+            });
+            
+            if (neighborPiece && neighborPiece.color !== piece.color) {
+                oppositeNeighbors.add(neighbor.edge);
+            }
+        });
+        
+        // Draw border - split for placements, two-layer for smart edges, normal for isolated
+        if (piece.wasPlacement) {
+            // Split border seesaw effect for placed pieces
+            const points = [];
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i;
+                const x = px + cellRadius * Math.cos(angle);
+                const y = py + cellRadius * Math.sin(angle);
+                points.push({x, y});
+            }
+            
+            // Left half path (vertices 0 -> 1 -> 2 -> 3)
+            const leftPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const leftD = `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y} L ${points[2].x} ${points[2].y} L ${points[3].x} ${points[3].y}`;
+            leftPath.setAttribute('d', leftD);
+            leftPath.setAttribute('fill', 'none');
+            leftPath.setAttribute('stroke', borderColor);
+            leftPath.setAttribute('stroke-width', '6');
+            leftPath.setAttribute('class', 'placement-left');
+            transformGroup.appendChild(leftPath);
+            
+            // Right half path (vertices 3 -> 4 -> 5 -> 0)
+            const rightPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const rightD = `M ${points[3].x} ${points[3].y} L ${points[4].x} ${points[4].y} L ${points[5].x} ${points[5].y} L ${points[0].x} ${points[0].y}`;
+            rightPath.setAttribute('d', rightD);
+            rightPath.setAttribute('fill', 'none');
+            rightPath.setAttribute('stroke', borderColor);
+            rightPath.setAttribute('stroke-width', '6');
+            rightPath.setAttribute('class', 'placement-right');
+            transformGroup.appendChild(rightPath);
+        } else if (oppositeNeighbors.size > 0) {
+            // Two-layer border system: inner 3px always visible, outer 3px hidden on shared edges
+            // Layer 1: Inner 3px - always drawn (full hexagon)
+            const innerBorder = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            innerBorder.setAttribute('points', hexPoints);
+            innerBorder.setAttribute('fill', 'none');
+            innerBorder.setAttribute('stroke', borderColor);
+            innerBorder.setAttribute('stroke-width', '3');
+            transformGroup.appendChild(innerBorder);
+            
+            // Layer 2: Outer 3px - drawn per edge, hidden on shared edges
+            for (let i = 0; i < 6; i++) {
+                const nextI = (i + 1) % 6;
+                const isSharedEdge = oppositeNeighbors.has(i);
+                
+                // Skip drawing outer layer on shared edges
+                if (isSharedEdge) continue;
+                
+                const angle1 = Math.PI / 3 * i;
+                const angle2 = Math.PI / 3 * nextI;
+                
+                const x1 = px + cellRadius * Math.cos(angle1);
+                const y1 = py + cellRadius * Math.sin(angle1);
+                const x2 = px + cellRadius * Math.cos(angle2);
+                const y2 = py + cellRadius * Math.sin(angle2);
+                
+                const outerEdge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                outerEdge.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+                outerEdge.setAttribute('fill', 'none');
+                outerEdge.setAttribute('stroke', borderColor);
+                outerEdge.setAttribute('stroke-width', '3');
+                transformGroup.appendChild(outerEdge);
+            }
+        } else {
+            // Normal border for pieces with no opposite neighbors
+            const border = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            border.setAttribute('points', hexPoints);
+            border.setAttribute('fill', 'none');
+            border.setAttribute('stroke', borderColor);
+            border.setAttribute('stroke-width', '6');
+            transformGroup.appendChild(border);
+        }
+        
+        // Add glow for last move TO piece
+        if (snap.lastMove && piece.q === snap.lastMove.to.q && piece.r === snap.lastMove.to.r) {
+            const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            glow.setAttribute('points', hexPoints);
+            glow.setAttribute('fill', 'none');
+            glow.setAttribute('stroke', borderColor);
+            glow.setAttribute('stroke-width', '8');
+            glow.setAttribute('class', 'last-move-to');
+            transformGroup.appendChild(glow);
+        }
+        
+        // Piece label with UHP notation (centered)
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', px);
         text.setAttribute('y', py + 7);
         text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-size', 26);
+        text.setAttribute('font-size', 24);
         text.setAttribute('fill', piece.color === 'white' ? '#222' : '#fff');
         text.setAttribute('font-family', 'Milonga, serif');
-        text.textContent = piece.key;
+        
+        // Build UHP label: wA1, bG2, wQ (queens have no number)
+        const colorPrefix = piece.color.charAt(0);
+        const orderSuffix = piece.key === 'Q' ? '' : (piece.placementOrder || '');
+        text.textContent = `${colorPrefix}${piece.key}${orderSuffix}`;
         transformGroup.appendChild(text);
     });
     

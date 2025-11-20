@@ -44,6 +44,29 @@
                 depthLimit: personality.depthLimit || 5
             };
             
+            // Apply personality engine options BEFORE search
+            console.log(`🔧 Applying personality options for ${personality.name}...`);
+            try {
+                if (personality.aggression) {
+                    await window.wasmEngine.setAggression(personality.aggression);
+                    console.log(`✅ Aggression set to ${personality.aggression}`);
+                }
+                if (personality.hash) {
+                    await window.wasmEngine.setHash(personality.hash);
+                    console.log(`✅ Hash set to ${personality.hash}MB`);
+                }
+                if (personality.verbose !== undefined) {
+                    await window.wasmEngine.setVerbose(personality.verbose);
+                    console.log(`✅ Verbose set to ${personality.verbose}`);
+                }
+                if (personality.randomOpening !== undefined) {
+                    await window.wasmEngine.setRandomOpening(personality.randomOpening);
+                    console.log(`✅ RandomOpening set to ${personality.randomOpening}`);
+                }
+            } catch (optErr) {
+                console.warn('⚠️ Failed to set some personality options:', optErr);
+            }
+            
             // Update progress
             if (window.engineIntegration) {
                 window.engineIntegration.updateProgressPopup(true, {
@@ -88,8 +111,16 @@
                 }
             }, 120000); // 120 second emergency timeout
             
-            // Get best move from WASM engine
+            // Get best move from WASM engine with timing diagnostics
+            const startTime = Date.now();
+            console.log(`⏱️ Requesting best move with ${searchOptions.timeLimit}s time limit`);
             const bestMove = await window.wasmEngine.getBestMove(gameString, searchOptions);
+            const actualTime = (Date.now() - startTime) / 1000;
+            const timeOverrun = actualTime - searchOptions.timeLimit;
+            console.log(`⏱️ Move completed in ${actualTime.toFixed(2)}s (limit: ${searchOptions.timeLimit}s)`);
+            if (timeOverrun > searchOptions.timeLimit * 0.2) {
+                console.warn(`⚠️ Time overrun: ${timeOverrun.toFixed(2)}s (${((timeOverrun/searchOptions.timeLimit)*100).toFixed(0)}% over limit)`);
+            }
             
             // Clear timeouts on successful completion
             moveCompleted = true;
@@ -192,19 +223,31 @@
                 name: 'Sunny Pollenpatch',
                 mode: 'time',
                 timeLimit: 2,
-                depthLimit: 3
+                depthLimit: 3,
+                aggression: 2,  // Cautious
+                hash: 32,       // 32 MB
+                randomOpening: false,
+                verbose: true   // Enable for dual console output
             },
             buzzwell: {
                 name: 'Buzzwell Stingmore', 
                 mode: 'time',
                 timeLimit: 4,
-                depthLimit: 5
+                depthLimit: 5,
+                aggression: 3,  // Balanced
+                hash: 64,       // 64 MB
+                randomOpening: false,
+                verbose: true
             },
             beedric: {
                 name: 'Beedric Bumbleton',
                 mode: 'time', 
                 timeLimit: 10,
-                depthLimit: 8
+                depthLimit: 8,
+                aggression: 4,  // Aggressive
+                hash: 128,      // 128 MB
+                randomOpening: false,
+                verbose: true
             }
         };
         

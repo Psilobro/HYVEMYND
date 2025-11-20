@@ -128,6 +128,16 @@
     </div>
   </div>
   
+  <!-- Dual AI Thinking Consoles (AI vs AI battles) -->
+  <div id="white-ai-console" class="ai-console" style="display:none;">
+    <div class="console-header">⚪ White AI</div>
+    <div class="console-output" id="white-ai-output"></div>
+  </div>
+  <div id="black-ai-console" class="ai-console" style="display:none;">
+    <div class="console-header">⚫ Black AI</div>
+    <div class="console-output" id="black-ai-output"></div>
+  </div>
+  
   <div id="white-tray" class="player-tray"></div>
   <div id="black-tray" class="player-tray"></div>
   <button id="play-music-button">🎵 Play Music</button>
@@ -382,11 +392,30 @@
               <span id="sunny-depth-value" class="control-value">3 ply</span>
             </div>
             <div class="control-group">
+              <label for="sunny-aggression">Aggression (1=Defensive, 5=Reckless):</label>
+              <input type="range" id="sunny-aggression" min="1" max="5" value="2" class="personality-slider">
+              <span id="sunny-aggression-value" class="control-value">2 (Cautious)</span>
+            </div>
+            <div class="control-group">
+              <label for="sunny-hash">Hash Size (MB):</label>
+              <select id="sunny-hash" class="personality-select">
+                <option value="16">16 MB</option>
+                <option value="32" selected>32 MB</option>
+                <option value="64">64 MB</option>
+                <option value="128">128 MB</option>
+                <option value="256">256 MB</option>
+              </select>
+            </div>
+            <div class="control-group">
               <label for="sunny-mode">Search Mode:</label>
               <select id="sunny-mode" class="personality-select">
                 <option value="time" selected>Time-based</option>
                 <option value="depth">Depth-based</option>
               </select>
+            </div>
+            <div class="control-group checkbox-group">
+              <input type="checkbox" id="sunny-random-opening">
+              <label for="sunny-random-opening">Random Opening Moves</label>
             </div>
           </div>
         </div>
@@ -412,11 +441,30 @@
               <span id="buzzwell-depth-value" class="control-value">5 ply</span>
             </div>
             <div class="control-group">
+              <label for="buzzwell-aggression">Aggression (1=Defensive, 5=Reckless):</label>
+              <input type="range" id="buzzwell-aggression" min="1" max="5" value="3" class="personality-slider">
+              <span id="buzzwell-aggression-value" class="control-value">3 (Balanced)</span>
+            </div>
+            <div class="control-group">
+              <label for="buzzwell-hash">Hash Size (MB):</label>
+              <select id="buzzwell-hash" class="personality-select">
+                <option value="16">16 MB</option>
+                <option value="32">32 MB</option>
+                <option value="64" selected>64 MB</option>
+                <option value="128">128 MB</option>
+                <option value="256">256 MB</option>
+              </select>
+            </div>
+            <div class="control-group">
               <label for="buzzwell-mode">Search Mode:</label>
               <select id="buzzwell-mode" class="personality-select">
                 <option value="time" selected>Time-based</option>
                 <option value="depth">Depth-based</option>
               </select>
+            </div>
+            <div class="control-group checkbox-group">
+              <input type="checkbox" id="buzzwell-random-opening">
+              <label for="buzzwell-random-opening">Random Opening Moves</label>
             </div>
           </div>
         </div>
@@ -442,11 +490,30 @@
               <span id="beedric-depth-value" class="control-value">8 ply</span>
             </div>
             <div class="control-group">
+              <label for="beedric-aggression">Aggression (1=Defensive, 5=Reckless):</label>
+              <input type="range" id="beedric-aggression" min="1" max="5" value="4" class="personality-slider">
+              <span id="beedric-aggression-value" class="control-value">4 (Aggressive)</span>
+            </div>
+            <div class="control-group">
+              <label for="beedric-hash">Hash Size (MB):</label>
+              <select id="beedric-hash" class="personality-select">
+                <option value="16">16 MB</option>
+                <option value="32">32 MB</option>
+                <option value="64">64 MB</option>
+                <option value="128" selected>128 MB</option>
+                <option value="256">256 MB</option>
+              </select>
+            </div>
+            <div class="control-group">
               <label for="beedric-mode">Search Mode:</label>
               <select id="beedric-mode" class="personality-select">
                 <option value="time" selected>Time-based</option>
                 <option value="depth">Depth-based</option>
               </select>
+            </div>
+            <div class="control-group checkbox-group">
+              <input type="checkbox" id="beedric-random-opening">
+              <label for="beedric-random-opening">Random Opening Moves</label>
             </div>
           </div>
         </div>
@@ -614,6 +681,7 @@
   <!-- WASM Engine Integration (loads first for offline support) -->
   <script src="js/wasm-engine.js"></script>
   <script src="js/wasm-integration.js"></script>
+  <script src="js/personality-ui.js"></script>
   
   <!-- UHP Protocol Client (WASM mode - no WebSocket connection) -->
   <script src="js/uhp/uhp-client.js"></script>

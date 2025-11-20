@@ -2,20 +2,41 @@
 window.historySnapshots = [];
 
 function snapshotBoardState() {
+    // Get previous snapshot to detect placements and movements
+    const prevSnap = window.historySnapshots[window.historySnapshots.length - 1];
+    
     // Deep copy of all placed pieces and their positions/stacks
-    const pieces = tray.map(p => ({
-        key: p.meta.key,
-        color: p.meta.color,
-        placed: p.meta.placed,
-        q: p.meta.q,
-        r: p.meta.r,
-        stackIndex: (() => {
-            if (!p.meta.placed) return null;
-            const cell = window.cells.get(`${p.meta.q},${p.meta.r}`);
-            if (!cell || !cell.stack) return null;
-            return cell.stack.indexOf(p);
-        })()
-    }));
+    const pieces = tray.map(p => {
+        const pieceData = {
+            key: p.meta.key,
+            color: p.meta.color,
+            placed: p.meta.placed,
+            q: p.meta.q,
+            r: p.meta.r,
+            placementOrder: p.meta.placementOrder,
+            stackIndex: (() => {
+                if (!p.meta.placed) return null;
+                const cell = window.cells.get(`${p.meta.q},${p.meta.r}`);
+                if (!cell || !cell.stack) return null;
+                return cell.stack.indexOf(p);
+            })(),
+            wasPlacement: false
+        };
+        
+        // Detect if this piece was just placed (went from not placed to placed)
+        if (prevSnap && p.meta.placed) {
+            const prevPiece = prevSnap.pieces.find(pp => 
+                pp.color === p.meta.color && 
+                pp.key === p.meta.key && 
+                pp.placementOrder === p.meta.placementOrder
+            );
+            if (prevPiece && !prevPiece.placed) {
+                pieceData.wasPlacement = true;
+            }
+        }
+        
+        return pieceData;
+    });
     
     // Try to get UHP notation for this specific move
     let uhpMove = '';
@@ -26,12 +47,36 @@ function snapshotBoardState() {
         console.log(`📝 History snapshot for move ${state.moveNumber}: No UHP client or method available`);
     }
     
+    // Detect last move (for movements, not placements)
+    let lastMove = null;
+    if (prevSnap) {
+        // Find piece that moved (changed position but was already placed)
+        for (const piece of pieces) {
+            if (!piece.placed || piece.wasPlacement) continue;
+            const prevPiece = prevSnap.pieces.find(pp => 
+                pp.color === piece.color && 
+                pp.key === piece.key && 
+                pp.placementOrder === piece.placementOrder
+            );
+            if (prevPiece && prevPiece.placed && (prevPiece.q !== piece.q || prevPiece.r !== piece.r)) {
+                const uhpId = `${piece.color.charAt(0)}${piece.key}${piece.placementOrder || ''}`;
+                lastMove = {
+                    from: { q: prevPiece.q, r: prevPiece.r },
+                    to: { q: piece.q, r: piece.r },
+                    pieceId: uhpId
+                };
+                break;
+            }
+        }
+    }
+    
     // Also store move number and current player
     window.historySnapshots.push({
         pieces,
         moveNumber: state.moveNumber,
         current: state.current,
-        uhpMove: uhpMove // Add UHP notation for this specific move
+        uhpMove: uhpMove,
+        lastMove: lastMove
     });
 }
 // --- CONFIG ---

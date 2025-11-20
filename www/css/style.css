@@ -82,6 +82,44 @@
     font-style: normal;
     font-display: swap;
 }
+
+/* History overlay animations */
+@keyframes placementSeesaw {
+    0%, 100% { opacity: 1.0; }
+    50% { opacity: 0.2; }
+}
+
+@keyframes placementSeesawReverse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1.0; }
+}
+
+@keyframes breatheIn {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.9; }
+}
+
+@keyframes breatheOut {
+    0%, 100% { opacity: 1.0; }
+    50% { opacity: 0.5; }
+}
+
+/* Apply animations to history overlay elements */
+.placement-left {
+    animation: placementSeesaw 4s ease-in-out infinite;
+}
+
+.placement-right {
+    animation: placementSeesawReverse 4s ease-in-out infinite;
+}
+
+.last-move-from {
+    animation: breatheIn 4s ease-in-out infinite;
+}
+
+.last-move-to {
+    animation: breatheOut 4s ease-in-out infinite;
+}
 /* Hexagonal Go button for history replay */
 .go-hex-btn {
     width: 32px;
@@ -2163,6 +2201,24 @@ canvas {
     gap: 5px;
 }
 
+.control-group.checkbox-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #e6b84d;
+}
+
+.control-group.checkbox-group label {
+    margin: 0;
+    cursor: pointer;
+}
+
 .control-group label {
     font-family: 'Milonga', serif;
     color: #e6b84d;
@@ -2342,6 +2398,97 @@ canvas {
     transition: all 0.3s ease;
     pointer-events: none;
 }
+
+/* Dual AI Mini-Consoles */
+.ai-console {
+    position: fixed;
+    bottom: 20px;
+    width: 220px;
+    height: 160px;
+    background: #0a0a0a;
+    border: 2px solid #333;
+    border-radius: 4px;
+    z-index: 160;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.7);
+}
+
+#white-ai-console {
+    left: 20px;
+}
+
+#black-ai-console {
+    right: 20px;
+}
+
+.ai-console .console-header {
+    background: #1a1a1a;
+    color: #888;
+    padding: 4px 8px;
+    font-weight: bold;
+    border-bottom: 1px solid #333;
+    font-size: 11px;
+}
+
+.ai-console .console-output {
+    padding: 6px;
+    height: calc(100% - 28px);
+    overflow-y: auto;
+    color: #0f0;
+    line-height: 1.3;
+}
+
+#black-ai-console .console-output {
+    color: #fb0;
+}
+
+.ai-console .console-output::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ai-console .console-output::-webkit-scrollbar-track {
+    background: #0a0a0a;
+}
+
+.ai-console .console-output::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+}
+
+#white-ai-console .console-output::-webkit-scrollbar-thumb {
+    background: #0f0;
+}
+
+#black-ai-console .console-output::-webkit-scrollbar-thumb {
+    background: #fb0;
+}
+
+.console-line {
+    margin-bottom: 2px;
+}
+
+.console-line.depth {
+    color: #0ff;
+}
+
+.console-line.score {
+    color: #f0f;
+}
+
+.console-line.bestmove {
+    color: #ff0;
+    font-weight: bold;
+}
+
+/* Hide consoles on mobile */
+@media (max-width: 768px) {
+    .ai-console {
+        display: none !important;
+    }
+}
+
 
 #engine-progress-popup.show {
     opacity: 1;

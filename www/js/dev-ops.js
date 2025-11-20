@@ -449,8 +449,34 @@ class DevOpsSystem {
             
             console.log(`🎯 Using configured settings for ${aiName}: ${engineOptions.timeLimit}s, depth ${engineOptions.depthLimit} (${displayName})`);
             
+            // Apply personality engine options BEFORE getting best move
+            console.log(`🔧 Applying personality options for ${aiName}...`);
+            try {
+                if (personality.aggression) {
+                    await window.wasmEngine.setAggression(personality.aggression);
+                    console.log(`✅ Aggression set to ${personality.aggression}`);
+                }
+                if (personality.hash) {
+                    await window.wasmEngine.setHash(personality.hash);
+                    console.log(`✅ Hash set to ${personality.hash}MB`);
+                }
+                if (personality.verbose !== undefined) {
+                    await window.wasmEngine.setVerbose(personality.verbose);
+                    console.log(`✅ Verbose set to ${personality.verbose}`);
+                }
+                if (personality.randomOpening !== undefined) {
+                    await window.wasmEngine.setRandomOpening(personality.randomOpening);
+                    console.log(`✅ RandomOpening set to ${personality.randomOpening}`);
+                }
+            } catch (optErr) {
+                console.warn('⚠️ Failed to set some personality options:', optErr);
+            }
+            
             // Get best move from WASM engine with personality settings
+            const startTime = Date.now();
             const bestMove = await window.wasmEngine.getBestMove(gameString, engineOptions);
+            const actualTime = (Date.now() - startTime) / 1000;
+            console.log(`⏱️ Move completed in ${actualTime.toFixed(2)}s (limit: ${engineOptions.timeLimit}s)`);
             
             if (!bestMove || bestMove.toLowerCase().includes('err')) {
                 throw new Error(`Invalid move response: ${bestMove}`);
