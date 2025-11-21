@@ -1135,6 +1135,13 @@ window.resetGame = resetGame;
 function passTurn() {
     console.log(`${state.current} has no legal moves - passing turn`);
     
+    // Record pass in UHP history BEFORE incrementing move number
+    const currentMoveNum = state.moveNumber;
+    if (window.uhpClient && window.uhpClient.uhpMoveHistory) {
+        window.uhpClient.uhpMoveHistory.set(currentMoveNum, 'pass');
+        console.log(`📝 Recorded UHP pass for move ${currentMoveNum}`);
+    }
+    
     // Add pass entry to history
     try {
         const list = document.getElementById('moves-list');

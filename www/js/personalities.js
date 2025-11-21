@@ -97,7 +97,7 @@ window.Personalities = {
       difficulty: "hard",
       color: "#4B0082", // Royal purple
       accentColor: "#8B0000", // Dark red accent
-      crest: "💎", // Diamond/crown crest
+      crest: "👑", // Royal crown crest
       
       voiceLines: {
         intro: [

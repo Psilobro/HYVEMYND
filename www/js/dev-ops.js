@@ -193,6 +193,11 @@ class DevOpsSystem {
                         ? this.currentBattle.whiteAI 
                         : this.currentBattle.blackAI;
                     this.updateBattleStatus(`🧠 ${currentAI} thinking... (${data.phase})`);
+                    
+                    // Update mini-console with raw engine output
+                    if (window.updateMiniConsole && data.output) {
+                        window.updateMiniConsole(window.state.current, data.output, currentAI);
+                    }
                 }
                 
                 // Don't update progress popup here - setupWASMThinkingListener handles it
@@ -310,6 +315,13 @@ class DevOpsSystem {
         // Reset game state for AI battle
         this.resetGameForBattle();
         
+        // Set personalities for INTRO voice lines only (one time at battle start)
+        if (window.Personalities && window.Personalities.setOpponent) {
+            const difficultyMap = { 'sunny': 'easy', 'buzzwell': 'medium', 'beedric': 'hard' };
+            // Set the personality for the first player (white)
+            window.Personalities.setOpponent(difficultyMap[whiteAI] || 'medium');
+        }
+        
         // Start the AI battle loop
         this.runAIBattleLoop();
         
@@ -417,11 +429,8 @@ class DevOpsSystem {
                 await window.wasmEngine.initialize();
             }
             
-            // Set personality for voice lines
-            if (window.Personalities && window.Personalities.setOpponent) {
-                const difficultyMap = { 'sunny': 'easy', 'buzzwell': 'medium', 'beedric': 'hard' };
-                window.Personalities.setOpponent(difficultyMap[aiName] || 'medium');
-            }
+            // Set personality for voice lines ONLY at start of battle (not every move)
+            // Voice lines are now only for intro/victory/defeat, controlled by battle start/end
             
             // For AI battles, get current UHP move history to send to WASM engine
             // This ensures the engine knows what pieces are already on the board

@@ -6282,13 +6282,7 @@ window.AIEngine.isEmergencyDefensive = function(move) {
     
     console.log(`🤖 🛡️ Defense check: AI Queen has ${currentThreats}/6 threats`);
     
-    // Trigger personality mid-game response when AI Queen gets half-surrounded
-    if (currentThreats === 3 && window.Personalities && !window.Personalities._midGameTriggered) {
-      setTimeout(() => {
-        window.Personalities.showVoiceLine('midGame');
-        window.Personalities._midGameTriggered = true; // Prevent spam
-      }, 1000);
-    }
+    // Mid-game voice lines removed - only speak at game start and end
     
     // If Queen has 4+ threats, this is emergency territory
     if (currentThreats >= 4) {

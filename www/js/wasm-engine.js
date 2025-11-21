@@ -234,11 +234,11 @@
                         nodes: currentNodes,
                         nps: currentNPS,
                         pv: currentPV,
-                        output: this.outputBuffer.slice(-6) // Last 6 lines
+                        output: this.outputBuffer.slice(-12) // Last 12 lines for rapid stream
                     };
                     console.log('🎯 Emitting thinking event:', thinkingData);
                     this._emit('thinking', thinkingData);
-                }, 100);
+                }, 66); // ~15 updates per second for rapid data stream
                 
                 const bestMove = await this.sendCommand(searchCommand);
                 

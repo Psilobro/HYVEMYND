@@ -123,33 +123,6 @@
     <div id="app"></div>
   </div>
   
-  <!-- Engine Progress Popup -->
-  <div id="engine-progress-popup">
-    <div class="crt-monitor">
-      <div class="power-led"></div>
-      <div class="crt-screen">
-        <div class="progress-title">🤖 Engine Thinking...</div>
-        <div class="progress-details">
-          <span class="progress-label">Time:</span>
-          <span class="progress-value" id="progress-time">0s</span>
-        </div>
-        <div class="progress-details">
-          <span class="progress-label">Depth:</span>
-          <span class="progress-value" id="progress-depth">-</span>
-        </div>
-        <div class="progress-details">
-          <span class="progress-label">⏱️ Stopwatch:</span>
-          <span class="progress-value" id="progress-stopwatch">0.0s</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" id="progress-bar"></div>
-        </div>
-        <div class="engine-status" id="engine-status">Analyzing position...</div>
-        <div class="engine-output" id="engine-output"><code></code></div>
-      </div>
-    </div>
-  </div>
-  
   <!-- Dual AI Thinking Consoles (AI vs AI battles) -->
   <div id="white-ai-console" class="ai-console" style="display:none;">
     <div class="console-header">⚪ White AI</div>
@@ -160,7 +133,23 @@
     <div class="console-output" id="black-ai-output"></div>
   </div>
   
+  <!-- Countdown Spinners Container -->
+  <div id="countdown-spinners"></div>
+  
+  <!-- Mini Console for White AI -->
+  <div class="mini-console white-mini-console" style="display:none;">
+    <span class="player-icon"></span>
+    <div class="data-stream"></div>
+  </div>
+  
   <div id="white-tray" class="player-tray"></div>
+  
+  <!-- Mini Console for Black AI -->
+  <div class="mini-console black-mini-console" style="display:none;">
+    <span class="player-icon"></span>
+    <div class="data-stream"></div>
+  </div>
+  
   <div id="black-tray" class="player-tray"></div>
   <button id="play-music-button">🎵 Play Music</button>
   <button id="auto-zoom-toggle">🎯 Auto-Center: ON</button>
@@ -704,6 +693,8 @@
   <script src="js/wasm-engine.js"></script>
   <script src="js/wasm-integration.js"></script>
   <script src="js/personality-ui.js"></script>
+  <script src="js/mini-console.js"></script>
+  <script src="js/countdown-spinner.js"></script>
   
   <!-- UHP Protocol Client (WASM mode - no WebSocket connection) -->
   <script src="js/uhp/uhp-client.js"></script>

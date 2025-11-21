@@ -152,18 +152,26 @@
                     window.incrementAIMoveCount();
                 }
                 
-                // Hide progress popup
+                // Hide progress popup and mini-console immediately
                 if (window.engineIntegration) {
                     window.engineIntegration.updateProgressPopup(false);
                 }
-            }, 500); // Brief delay to show completion
+                
+                // Hide mini-console immediately after move completes
+                if (window.hideMiniConsoles) {
+                    window.hideMiniConsoles();
+                }
+            }, 100); // Very brief delay just to show move completion
             
         } catch (error) {
             console.error('❌ WASM engine move failed:', error);
             
-            // Hide progress popup on error
+            // Hide progress popup and mini-console on error
             if (window.engineIntegration) {
                 window.engineIntegration.updateProgressPopup(false);
+            }
+            if (window.hideMiniConsoles) {
+                window.hideMiniConsoles();
             }
             
             // Show error in HUD
