@@ -13,6 +13,15 @@
             return;
         }
         
+        // In single player mode, AI ONLY plays black (human is white)
+        if (window.singlePlayerMode && window.singlePlayerAIColor) {
+            const currentTurn = window.state.current;
+            if (currentTurn !== window.singlePlayerAIColor) {
+                console.log(`👤 Single Mode: Not AI turn (current: ${currentTurn}, AI plays ${window.singlePlayerAIColor} only) - skipping`);
+                return; // Don't play for the human
+            }
+        }
+        
         try {
             console.log('🧩 Processing WASM engine move...');
             
@@ -43,29 +52,6 @@
                 timeLimit: personality.timeLimit || 4,
                 depthLimit: personality.depthLimit || 5
             };
-            
-            // Apply personality engine options BEFORE search
-            console.log(`🔧 Applying personality options for ${personality.name}...`);
-            try {
-                if (personality.aggression) {
-                    await window.wasmEngine.setAggression(personality.aggression);
-                    console.log(`✅ Aggression set to ${personality.aggression}`);
-                }
-                if (personality.hash) {
-                    await window.wasmEngine.setHash(personality.hash);
-                    console.log(`✅ Hash set to ${personality.hash}MB`);
-                }
-                if (personality.verbose !== undefined) {
-                    await window.wasmEngine.setVerbose(personality.verbose);
-                    console.log(`✅ Verbose set to ${personality.verbose}`);
-                }
-                if (personality.randomOpening !== undefined) {
-                    await window.wasmEngine.setRandomOpening(personality.randomOpening);
-                    console.log(`✅ RandomOpening set to ${personality.randomOpening}`);
-                }
-            } catch (optErr) {
-                console.warn('⚠️ Failed to set some personality options:', optErr);
-            }
             
             // Update progress
             if (window.engineIntegration) {
@@ -111,16 +97,8 @@
                 }
             }, 120000); // 120 second emergency timeout
             
-            // Get best move from WASM engine with timing diagnostics
-            const startTime = Date.now();
-            console.log(`⏱️ Requesting best move with ${searchOptions.timeLimit}s time limit`);
+            // Get best move from WASM engine
             const bestMove = await window.wasmEngine.getBestMove(gameString, searchOptions);
-            const actualTime = (Date.now() - startTime) / 1000;
-            const timeOverrun = actualTime - searchOptions.timeLimit;
-            console.log(`⏱️ Move completed in ${actualTime.toFixed(2)}s (limit: ${searchOptions.timeLimit}s)`);
-            if (timeOverrun > searchOptions.timeLimit * 0.2) {
-                console.warn(`⚠️ Time overrun: ${timeOverrun.toFixed(2)}s (${((timeOverrun/searchOptions.timeLimit)*100).toFixed(0)}% over limit)`);
-            }
             
             // Clear timeouts on successful completion
             moveCompleted = true;
@@ -146,10 +124,10 @@
                     console.log(`🔄 Attempting to fix turn desync by passing turn`);
                     window.passTurn();
                     
-                    // Retry the WASM request after a delay
+                    // Retry the WASM request after a delay - requestWASMMove takes no params
                     setTimeout(() => {
                         console.log(`🔄 Retrying WASM move request after turn correction`);  
-                        window.requestWASMMove(); // No parameters - function takes none
+                        window.requestWASMMove();
                     }, 1000);
                     return;
                 }
@@ -223,31 +201,19 @@
                 name: 'Sunny Pollenpatch',
                 mode: 'time',
                 timeLimit: 2,
-                depthLimit: 3,
-                aggression: 2,  // Cautious
-                hash: 32,       // 32 MB
-                randomOpening: false,
-                verbose: true   // Enable for dual console output
+                depthLimit: 3
             },
             buzzwell: {
                 name: 'Buzzwell Stingmore', 
                 mode: 'time',
                 timeLimit: 4,
-                depthLimit: 5,
-                aggression: 3,  // Balanced
-                hash: 64,       // 64 MB
-                randomOpening: false,
-                verbose: true
+                depthLimit: 5
             },
             beedric: {
                 name: 'Beedric Bumbleton',
                 mode: 'time', 
                 timeLimit: 10,
-                depthLimit: 8,
-                aggression: 4,  // Aggressive
-                hash: 128,      // 128 MB
-                randomOpening: false,
-                verbose: true
+                depthLimit: 8
             }
         };
         

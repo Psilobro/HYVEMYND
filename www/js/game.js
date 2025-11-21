@@ -2,41 +2,20 @@
 window.historySnapshots = [];
 
 function snapshotBoardState() {
-    // Get previous snapshot to detect placements and movements
-    const prevSnap = window.historySnapshots[window.historySnapshots.length - 1];
-    
     // Deep copy of all placed pieces and their positions/stacks
-    const pieces = tray.map(p => {
-        const pieceData = {
-            key: p.meta.key,
-            color: p.meta.color,
-            placed: p.meta.placed,
-            q: p.meta.q,
-            r: p.meta.r,
-            placementOrder: p.meta.placementOrder,
-            stackIndex: (() => {
-                if (!p.meta.placed) return null;
-                const cell = window.cells.get(`${p.meta.q},${p.meta.r}`);
-                if (!cell || !cell.stack) return null;
-                return cell.stack.indexOf(p);
-            })(),
-            wasPlacement: false
-        };
-        
-        // Detect if this piece was just placed (went from not placed to placed)
-        if (prevSnap && p.meta.placed) {
-            const prevPiece = prevSnap.pieces.find(pp => 
-                pp.color === p.meta.color && 
-                pp.key === p.meta.key && 
-                pp.placementOrder === p.meta.placementOrder
-            );
-            if (prevPiece && !prevPiece.placed) {
-                pieceData.wasPlacement = true;
-            }
-        }
-        
-        return pieceData;
-    });
+    const pieces = tray.map(p => ({
+        key: p.meta.key,
+        color: p.meta.color,
+        placed: p.meta.placed,
+        q: p.meta.q,
+        r: p.meta.r,
+        stackIndex: (() => {
+            if (!p.meta.placed) return null;
+            const cell = window.cells.get(`${p.meta.q},${p.meta.r}`);
+            if (!cell || !cell.stack) return null;
+            return cell.stack.indexOf(p);
+        })()
+    }));
     
     // Try to get UHP notation for this specific move
     let uhpMove = '';
@@ -47,36 +26,12 @@ function snapshotBoardState() {
         console.log(`📝 History snapshot for move ${state.moveNumber}: No UHP client or method available`);
     }
     
-    // Detect last move (for movements, not placements)
-    let lastMove = null;
-    if (prevSnap) {
-        // Find piece that moved (changed position but was already placed)
-        for (const piece of pieces) {
-            if (!piece.placed || piece.wasPlacement) continue;
-            const prevPiece = prevSnap.pieces.find(pp => 
-                pp.color === piece.color && 
-                pp.key === piece.key && 
-                pp.placementOrder === piece.placementOrder
-            );
-            if (prevPiece && prevPiece.placed && (prevPiece.q !== piece.q || prevPiece.r !== piece.r)) {
-                const uhpId = `${piece.color.charAt(0)}${piece.key}${piece.placementOrder || ''}`;
-                lastMove = {
-                    from: { q: prevPiece.q, r: prevPiece.r },
-                    to: { q: piece.q, r: piece.r },
-                    pieceId: uhpId
-                };
-                break;
-            }
-        }
-    }
-    
     // Also store move number and current player
     window.historySnapshots.push({
         pieces,
         moveNumber: state.moveNumber,
         current: state.current,
-        uhpMove: uhpMove,
-        lastMove: lastMove
+        uhpMove: uhpMove // Add UHP notation for this specific move
     });
 }
 // --- CONFIG ---
@@ -1218,7 +1173,19 @@ function passTurn() {
     
     // Check if the new current player also has no moves (potential game end)
     setTimeout(() => {
+        console.log(`🔄 After pass: calling updateHUD for ${state.current}`);
         updateHUD(); // This will recursively check the new player
+        
+        // Safety check: if new current player is black and single mode is active, ensure AI triggers
+        if (window.singlePlayerMode && state.current === 'black' && hasLegalMoves('black')) {
+            console.log('🔒 Safety: Ensuring AI triggers for black after white pass');
+            setTimeout(() => {
+                if (window.requestWASMMove) {
+                    console.log('🔒 Safety: Explicitly calling requestWASMMove for black');
+                    window.requestWASMMove();
+                }
+            }, 500);
+        }
     }, 100);
 }
 
@@ -1369,18 +1336,7 @@ function commitPlacement(q,r){
                             type: record.pieceType
                         }));
                     
-                    console.log(`📍 Building UHP notation for ${uhpPieceId} at (${q}, ${r})`);
-                    console.log(`📍 Available reference pieces (${playedPieces.length}):`, 
-                        playedPieces.map(pp => `${pp.uhpId}(${pp.q},${pp.r})`).join(', '));
-                    
                     uhpMove = window.uhpClient.buildUHPPositionalMove(uhpPieceId, mockPiece, playedPieces);
-                }
-                
-                // Fallback: if notation is just the piece ID (no reference), add a simple reference
-                if (uhpMove === uhpPieceId && playedPieces.length > 0) {
-                    const lastPiece = playedPieces[playedPieces.length - 1];
-                    uhpMove = `${uhpPieceId} ${lastPiece.uhpId}/`;
-                    console.warn(`⚠️ Notation had no reference - added fallback: ${uhpMove}`);
                 }
                 
                 // Validate UHP move before recording
@@ -2028,11 +1984,6 @@ function commitMove(q,r){
         });
 
         p.meta.q=q; p.meta.r=r;
-        
-        // Update UHP placement order position tracking when piece moves
-        if (window.uhpClient && window.uhpClient.updatePiecePosition) {
-            window.uhpClient.updatePiecePosition(p, q, r);
-        }
 
         // Record UHP movement using CHRONOLOGICAL placement order
         // Skip if we're applying a WASM move (it will record its own notation)

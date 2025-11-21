@@ -117,7 +117,8 @@
                     // Check if current player is an AI opponent
                     const currentPlayer = window.state?.current;
                     const isDevOpsBattle = window.devOpsSystem && window.devOpsSystem.currentBattle && window.devOpsSystem.currentBattle.active;
-                    const isSinglePlayerAI = window.singlePlayerMode && currentPlayer === 'black'; // AI plays black in single mode
+                    // In Single Mode, AI ONLY plays black (human is white)
+                    const isSinglePlayerAI = window.singlePlayerMode && currentPlayer === 'black';
                     const isAITurn = isSinglePlayerAI || isDevOpsBattle; // AI vs AI battles or single player AI
                     
                     if (isAITurn) {

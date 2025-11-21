@@ -236,8 +236,9 @@ window.AIUI.startAIMode = function(difficulty) {
   
   console.log(`🎮 Starting Single Player mode with UHP engine (${difficulty}): ${JSON.stringify(settings)}`);
   
-  // Set global single player mode flag
+  // Set global single player mode flag and AI color (default: AI plays black)
   window.singlePlayerMode = true;
+  window.singlePlayerAIColor = 'black'; // AI plays black, human plays white by default
   
   // Configure WASM engine with personality-specific settings
   if (window.wasmEngine) {
